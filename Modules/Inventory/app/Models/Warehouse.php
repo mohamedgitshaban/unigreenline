@@ -60,13 +60,16 @@ class Warehouse extends Model
     /**
      * Warehouse-level scoping (spec §2, layer 1): a user assigned to specific
      * warehouses only sees those, unless they hold a role with oversight
-     * across the whole tenant. Administrator already bypasses every Gate
-     * check (see CoreServiceProvider), so it never reaches this scope.
+     * across the whole tenant. This is a plain Eloquent scope/method, not a
+     * Gate/Policy check, so CoreServiceProvider's `Gate::before` bypass for
+     * Administrator never reaches it — Administrator must be listed here
+     * explicitly too, or "full system access" (spec §2) silently excludes
+     * every warehouse-scoped read/write.
      */
     #[Scope]
     protected function visibleTo(Builder $query, User $user): Builder
     {
-        if ($user->hasAnyRole(['Owner', 'Auditor'])) {
+        if ($user->hasAnyRole(['Administrator', 'Owner', 'Auditor'])) {
             return $query;
         }
 
@@ -75,7 +78,7 @@ class Warehouse extends Model
 
     public function isVisibleTo(User $user): bool
     {
-        if ($user->hasAnyRole(['Owner', 'Auditor'])) {
+        if ($user->hasAnyRole(['Administrator', 'Owner', 'Auditor'])) {
             return true;
         }
 

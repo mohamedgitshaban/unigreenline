@@ -26,6 +26,18 @@ class SalesOrderResource extends JsonResource
             'notes' => $this->notes,
             'order_date' => $this->order_date->toDateString(),
             'lines' => SalesOrderLineResource::collection($this->whenLoaded('lines')),
+            'invoices' => InvoiceResource::collection($this->whenLoaded('invoices')),
+            // hasOne, and doesn't exist until the order reaches `delivered`
+            // (UpdateSalesOrderStatusService::upsertDelivery) — eager-loaded
+            // but genuinely null before that, so this can't just be
+            // `new DeliveryResource($this->whenLoaded('delivery'))`: wrapping
+            // a loaded-but-null relation in a Resource crashes when toArray()
+            // reads a property off it, it only degrades gracefully when the
+            // relation was never loaded at all.
+            'delivery' => $this->whenLoaded(
+                'delivery',
+                fn () => $this->delivery ? new DeliveryResource($this->delivery) : null
+            ),
         ];
     }
 }

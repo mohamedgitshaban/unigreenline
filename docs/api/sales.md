@@ -140,7 +140,11 @@ repeats these):
 record is created (or updated) with `status: "delivered"` and a real
 `delivered_at` timestamp.
 
-**200** — the order, with `invoices` and `delivery` refreshed.
+**200** — the order, with `invoices` (array, empty until the first
+`invoiced`/`delivered` transition) and `delivery` (`null` until the order
+actually reaches `delivered`) refreshed. This is the only sales-order
+endpoint that includes these two — `GET /sales-orders`/`GET
+/sales-orders/{id}` don't, to avoid the extra joins on every list request.
 **422** — invalid transition, or insufficient stock (same shortfall shape
 as order creation).
 **403** — Sales Rep on someone else's order, or missing `sales.edit`.

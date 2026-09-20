@@ -1,0 +1,2512 @@
+{
+    "info": {
+        "name": "VetPharma ERP API",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "auth": {
+        "type": "bearer",
+        "bearer": [
+            {
+                "key": "token",
+                "value": "{{token}}",
+                "type": "string"
+            }
+        ]
+    },
+    "variable": [
+        {
+            "key": "root_url",
+            "value": "http://localhost:8000",
+            "type": "string"
+        },
+        {
+            "key": "base_url",
+            "value": "{{root_url}}/api/v1",
+            "type": "string"
+        },
+        {
+            "key": "token",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "seed_email",
+            "value": "admin@vetpharma.com",
+            "type": "string"
+        },
+        {
+            "key": "seed_password",
+            "value": "password",
+            "type": "string"
+        },
+        {
+            "key": "user_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "demo_user_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "warehouse_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "warehouse_id_2",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "product_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "category_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "customer_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "supplier_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "sales_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "invoice_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "delivery_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "purchase_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "purchase_order_line_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "complaint_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "campaign_id",
+            "value": "",
+            "type": "string"
+        }
+    ],
+    "item": [
+        {
+            "name": "Auth",
+            "item": [
+                {
+                    "name": "Health check",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{root_url}}/api/health",
+                            "host": [
+                                "{{root_url}}"
+                            ],
+                            "path": [
+                                "api",
+                                "health"
+                            ]
+                        },
+                        "description": "No auth required. Note: this one endpoint is unversioned (`/api/health`, not `/api/v1/health`) — it uses `{{root_url}}` directly rather than `{{base_url}}`.",
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    }
+                },
+                {
+                    "name": "Login",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "login"
+                            ]
+                        },
+                        "description": "No auth. Rate-limited: 5 attempts/minute per email+IP, then 429.\n\nSaves the returned token to the `token` collection variable automatically — every other request in this collection uses `{{token}}` via Bearer auth, so just run this first.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"email\": \"{{seed_email}}\",\n    \"password\": \"{{seed_password}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        },
+                        "auth": {
+                            "type": "noauth"
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code === 200) {",
+                                    "    const json = pm.response.json();",
+                                    "    pm.collectionVariables.set('token', json.token);",
+                                    "    pm.collectionVariables.set('user_id', json.user.id);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Me",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/auth/me",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "me"
+                            ]
+                        },
+                        "description": "Current authenticated user, same shape as the `user` object from login."
+                    }
+                },
+                {
+                    "name": "Change password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/auth/change-password",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "change-password"
+                            ]
+                        },
+                        "description": "Requires the caller's own current password. The old token keeps working afterward — not auto-revoked.\n\nSets the new password to the same value as the current one (`{{seed_password}}` both ways — that's allowed, there's no distinctness rule) so this request stays safely re-runnable without invalidating `seed_email`'s real login for the next run. Change the body to a genuinely different password if you want to test that case specifically.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"current_password\": \"{{seed_password}}\",\n    \"password\": \"{{seed_password}}\",\n    \"password_confirmation\": \"{{seed_password}}\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "description": "Spec §6. Bearer token via Sanctum. Run **Login** first — it captures `{{token}}` automatically for every other folder. **Logout lives at the very end of this collection, not here** — running it this early would revoke the token every other folder needs."
+        },
+        {
+            "name": "Inventory",
+            "item": [
+                {
+                    "name": "Warehouses",
+                    "item": [
+                        {
+                            "name": "List warehouses",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator."
+                            }
+                        },
+                        {
+                            "name": "Get warehouse",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}"
+                                    ]
+                                },
+                                "description": "Includes nested `batches`. 403 if this warehouse is not assigned to the caller."
+                            }
+                        },
+                        {
+                            "name": "Create warehouse",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses"
+                                    ]
+                                },
+                                "description": "Requires `inventory.add`. Only name/city/governorate are required — `manager_name` is derived server-side from `manager_id`, don't send it.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Main Warehouse\",\n    \"city\": \"Cairo\",\n    \"governorate\": \"Cairo\",\n    \"address\": null,\n    \"manager_id\": null,\n    \"temperature\": \"ambient\",\n    \"capacity\": 10000,\n    \"phone\": null,\n    \"status\": \"active\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('warehouse_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Create warehouse (secondary, for transfers)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses"
+                                    ]
+                                },
+                                "description": "Same as above — kept separate so `{{warehouse_id_2}}` is a distinct real warehouse for the Transfers request below (a transfer's from/to warehouse must differ).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Alexandria Branch\",\n    \"city\": \"Alexandria\",\n    \"governorate\": \"Alexandria\",\n    \"temperature\": \"ambient\",\n    \"capacity\": 5000,\n    \"status\": \"active\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('warehouse_id_2', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update warehouse",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}"
+                                    ]
+                                },
+                                "description": "Requires `inventory.edit` + visibility. All fields optional.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"active\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Categories",
+                    "item": [
+                        {
+                            "name": "List categories",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/categories?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`."
+                            }
+                        },
+                        {
+                            "name": "Create category",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/categories",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories"
+                                    ]
+                                },
+                                "description": "Requires `inventory.add`. Only `name` required, unique per tenant. No PUT endpoint exists for categories.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Demo Category\",\n    \"code\": null,\n    \"description\": null,\n    \"active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('category_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Products",
+                    "item": [
+                        {
+                            "name": "List products",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`. Catalog-wide, not warehouse-scoped."
+                            }
+                        },
+                        {
+                            "name": "Get product",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/{{product_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "{{product_id}}"
+                                    ]
+                                },
+                                "description": "Includes nested `batches`."
+                            }
+                        },
+                        {
+                            "name": "Create product",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/products",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products"
+                                    ]
+                                },
+                                "description": "Requires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"supplier_id\": null,\n    \"name\": \"Oxytetracycline 20% Injectable (Postman Demo)\",\n    \"sku\": \"POSTMAN-DEMO-0001\",\n    \"brand\": \"EgyVet\",\n    \"pack_unit\": \"Vial 100ml\",\n    \"carton_qty\": 20,\n    \"pack_cost_price\": 45,\n    \"pack_selling_price\": 65,\n    \"discount_pct\": 0,\n    \"tax_pct\": 14,\n    \"min_stock_cartons\": 10,\n    \"reorder_level\": 20\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('product_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update product",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/products/{{product_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "{{product_id}}"
+                                    ]
+                                },
+                                "description": "Requires `inventory.edit`. All fields optional.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"pack_selling_price\": 70\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Goods receipt (manual GRN)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/inventory/grn",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "inventory",
+                                "grn"
+                            ]
+                        },
+                        "description": "Requires `inventory.add` + destination warehouse visibility. `exp_date` is required — never fabricated. Re-receiving the same `batch_no` for the same product+warehouse tops up quantity instead of duplicating the row.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"batch_no\": \"BATCH-001\",\n    \"qty_cartons\": 50,\n    \"cost_per_carton\": 120,\n    \"exp_date\": \"2027-12-31\",\n    \"mfg_date\": null,\n    \"rcv_date\": null\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "Transfers",
+                    "item": [
+                        {
+                            "name": "List transfers",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/transfers?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "transfers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`."
+                            }
+                        },
+                        {
+                            "name": "Create transfer",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/transfers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "transfers"
+                                    ]
+                                },
+                                "description": "Requires `inventory.add` + **both** warehouses visible to the caller. Executes immediately and atomically — `status` is always `completed` in the response, there's no separate confirm step. Expiry date carries over to the destination batch.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"product_id\": \"{{product_id}}\",\n    \"from_warehouse_id\": \"{{warehouse_id}}\",\n    \"to_warehouse_id\": \"{{warehouse_id_2}}\",\n    \"batch_no\": \"BATCH-001\",\n    \"qty_cartons\": 20,\n    \"transfer_date\": \"2026-09-20\",\n    \"notes\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "description": "Spec §6, §5.1/§5.8. Warehouse-scoped for every non-Owner/Auditor/Administrator role — see docs/api/inventory.md. Any endpoint using FEFO deduction can return 422 with a `shortfalls` array if stock is insufficient."
+        },
+        {
+            "name": "CRM",
+            "item": [
+                {
+                    "name": "Customers",
+                    "item": [
+                        {
+                            "name": "List customers",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. A Sales Rep sees only their own customers."
+                            }
+                        },
+                        {
+                            "name": "Get customer",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}"
+                                    ]
+                                },
+                                "description": "Includes nested `orders`, `invoices`, and `visits`."
+                            }
+                        },
+                        {
+                            "name": "Create customer",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/customers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers"
+                                    ]
+                                },
+                                "description": "Requires `crm.add`. Only `name`/`type` required. A Sales Rep omitting `sales_rep_id` gets themselves; naming a different rep is 422.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"sales_rep_id\": null,\n    \"name\": \"Nile Valley Veterinary Clinic\",\n    \"type\": \"Clinic\",\n    \"classification\": \"B\",\n    \"phone\": null,\n    \"email\": null,\n    \"governorate\": null,\n    \"province\": null,\n    \"city\": null,\n    \"area\": null,\n    \"address\": null,\n    \"credit_limit\": 50000,\n    \"pay_terms\": null,\n    \"status\": \"active\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('customer_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update customer",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}"
+                                    ]
+                                },
+                                "description": "Requires `crm.edit` (+ ownership if Sales Rep). All fields optional.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"classification\": \"A\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Leads",
+                    "item": [
+                        {
+                            "name": "List leads",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/leads?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. No update/delete endpoint."
+                            }
+                        },
+                        {
+                            "name": "Create lead",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/leads",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads"
+                                    ]
+                                },
+                                "description": "Requires `crm.add`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"assigned_to\": null,\n    \"name\": \"Delta Farms\",\n    \"type\": \"Farm\",\n    \"contact\": null,\n    \"phone\": null,\n    \"email\": null,\n    \"source\": \"Referral\",\n    \"status\": \"new\",\n    \"value\": null,\n    \"notes\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Visits",
+                    "item": [
+                        {
+                            "name": "List visits",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/visits?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view`."
+                            }
+                        },
+                        {
+                            "name": "Create visit",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/visits",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits"
+                                    ]
+                                },
+                                "description": "Requires `crm.add`. `rep_id` defaults to the caller if omitted.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"rep_id\": null,\n    \"visit_date\": \"2026-09-20\",\n    \"type\": \"Follow-up\",\n    \"outcome\": \"positive\",\n    \"notes\": null,\n    \"next_visit\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Complaints",
+                    "item": [
+                        {
+                            "name": "List complaints",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view`."
+                            }
+                        },
+                        {
+                            "name": "Create complaint",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints"
+                                    ]
+                                },
+                                "description": "Requires `crm.add`. `priority` defaults to `medium`, `status` defaults to `investigating`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"product_id\": null,\n    \"assigned_to\": null,\n    \"batch_no\": null,\n    \"type\": \"Quality\",\n    \"description\": \"Vial arrived damaged.\",\n    \"priority\": \"medium\",\n    \"complaint_date\": \"2026-09-20\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('complaint_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Resolve complaint",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints/{{complaint_id}}/resolve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints",
+                                        "{{complaint_id}}",
+                                        "resolve"
+                                    ]
+                                },
+                                "description": "Requires `crm.edit`. `resolution` required — sets `status: resolved` and `resolved_date` to today.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"resolution\": \"Replacement shipped.\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Campaigns",
+                    "item": [
+                        {
+                            "name": "List campaigns",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view`."
+                            }
+                        },
+                        {
+                            "name": "Create campaign",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns"
+                                    ]
+                                },
+                                "description": "Requires `crm.add`. `status` defaults to `active`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Autumn Vaccine Drive\",\n    \"type\": \"Discount\",\n    \"target\": \"Clinics\",\n    \"discount\": 10,\n    \"start_date\": \"2026-10-01\",\n    \"end_date\": null,\n    \"description\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('campaign_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "End campaign",
+                            "request": {
+                                "method": "PUT",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns/{{campaign_id}}/end",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns",
+                                        "{{campaign_id}}",
+                                        "end"
+                                    ]
+                                },
+                                "description": "Requires `crm.edit`. Sets `status: completed` and fills `end_date` with today if it wasn't already set."
+                            }
+                        }
+                    ]
+                }
+            ],
+            "description": "Spec §6. A Sales Rep gets crm.* too (not just sales.*) per spec §2's \"own orders/customers\" grouping, scoped to their own sales_rep_id."
+        },
+        {
+            "name": "Purchasing",
+            "item": [
+                {
+                    "name": "Suppliers",
+                    "item": [
+                        {
+                            "name": "List suppliers",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view` (also reachable with `accounting.view`)."
+                            }
+                        },
+                        {
+                            "name": "Create supplier",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.add`. Only `name` required. `balance` starts at 0 and moves negative as POs are received — negative means we owe them.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Demo Pharmaceutical Supplier\",\n    \"country\": \"Egypt\",\n    \"city\": \"Cairo\",\n    \"contact\": null,\n    \"email\": null,\n    \"phone\": null,\n    \"pay_terms\": \"Net 30\",\n    \"currency\": \"EGP\",\n    \"rating\": null,\n    \"status\": \"active\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('supplier_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Purchase Orders",
+                    "item": [
+                        {
+                            "name": "List purchase orders",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view`."
+                            }
+                        },
+                        {
+                            "name": "Get purchase order",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{purchase_order_id}}"
+                                    ]
+                                },
+                                "description": "Includes nested `lines`."
+                            }
+                        },
+                        {
+                            "name": "Create purchase order",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.add`. `status` starts as `draft`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"supplier_id\": \"{{supplier_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"expected_date\": null,\n    \"notes\": null,\n    \"order_date\": \"2026-09-19\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 50,\n            \"cost_per_carton\": 40\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('purchase_order_id', value); }",
+                                            "}",
+                                            "if (pm.response.code === 201) {",
+                                            "    const line = pm.response.json().data?.lines?.[0];",
+                                            "    if (line) { pm.collectionVariables.set('purchase_order_line_id', line.id); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Receive purchase order",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}/receive",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{purchase_order_id}}",
+                                        "receive"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by the Create Purchase Order request above — for a PO with more than one line, replace it with the specific line id you're receiving.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"receipts\": [\n        {\n            \"line_id\": \"{{purchase_order_line_id}}\",\n            \"batch_no\": \"PO-BATCH-1\",\n            \"exp_date\": \"2028-01-01\",\n            \"mfg_date\": null,\n            \"rcv_date\": null\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "AP aging report",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/ap-aging",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "ap-aging"
+                            ]
+                        },
+                        "description": "Requires `purchasing.view` or `accounting.view`. **Not date-bucketed** (unlike AR) — `purchase_orders` has no due-date/payment tracking, so this is every supplier's current outstanding balance sorted by amount owed."
+                    }
+                }
+            ],
+            "description": "Spec §6, §5.2. See docs/api/purchasing.md — note /suppliers isn't in the spec's own endpoint table but is required to make purchase_orders.supplier_id usable at all."
+        },
+        {
+            "name": "Sales",
+            "item": [
+                {
+                    "name": "Sales Orders",
+                    "item": [
+                        {
+                            "name": "List sales orders",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `sales.view`. A Sales Rep only sees their own orders. Newest `order_date` first."
+                            }
+                        },
+                        {
+                            "name": "Get sales order",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}"
+                                    ]
+                                },
+                                "description": "Includes nested `lines`. 403 if a Sales Rep requests another rep's order."
+                            }
+                        },
+                        {
+                            "name": "Create sales order",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders"
+                                    ]
+                                },
+                                "description": "Requires `sales.add`. Validates FEFO stock availability and (for `pay_type: credit`) the customer's credit limit **before writing anything** — 422 with a `shortfalls` or credit-limit-exceeded body otherwise. `unit: Pack` rounds a line's stock need up to whole cartons.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"sales_rep_id\": null,\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"pay_type\": \"credit\",\n    \"grace_period\": 30,\n    \"invoice_discount\": 0,\n    \"notes\": null,\n    \"order_date\": \"2026-09-17\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"batch_no\": null,\n            \"qty\": 5,\n            \"unit\": \"Carton\",\n            \"unit_price\": 65,\n            \"discount_pct\": 5,\n            \"free_qty\": 0\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('sales_order_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update sales order status",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}/status",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}",
+                                        "status"
+                                    ]
+                                },
+                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.\n\nGoes straight to `delivered` (skipping `invoiced`) so this one call populates both `{{invoice_id}}` and `{{delivery_id}}` for the Invoices/Deliveries/Collections requests below — change the body to `invoiced` if you want to see that intermediate state instead.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"delivered\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code === 200) {",
+                                            "    const json = pm.response.json();",
+                                            "    const invoice = json.data?.invoices?.[0];",
+                                            "    if (invoice) { pm.collectionVariables.set('invoice_id', invoice.id); }",
+                                            "    const delivery = json.data?.delivery;",
+                                            "    if (delivery) { pm.collectionVariables.set('delivery_id', delivery.id); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "name": "Invoices",
+                    "item": [
+                        {
+                            "name": "List invoices",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `sales.view` or `accounting.view`. No POST — invoices only come from the sales-order status transition."
+                            }
+                        },
+                        {
+                            "name": "Get invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{invoice_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{invoice_id}}"
+                                    ]
+                                },
+                                "description": "Includes `lines` (mirrored from the originating order) and `collections`."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Deliveries",
+                    "item": [
+                        {
+                            "name": "List deliveries",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `sales.view` (+ ownership if Sales Rep)."
+                            }
+                        },
+                        {
+                            "name": "Get delivery",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries/{{delivery_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries",
+                                        "{{delivery_id}}"
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "Mark delivery delivered",
+                            "request": {
+                                "method": "PUT",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries/{{delivery_id}}/deliver",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries",
+                                        "{{delivery_id}}",
+                                        "deliver"
+                                    ]
+                                },
+                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Collections",
+                    "item": [
+                        {
+                            "name": "List collections",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/collections?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "collections"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep)."
+                            }
+                        },
+                        {
+                            "name": "Record collection",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/collections",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "collections"
+                                    ]
+                                },
+                                "description": "Requires `sales.add` or `accounting.add`. Records a payment against an invoice: updates the invoice's paid/balance/status, decreases the customer's AR balance, posts a balanced journal entry. 422 if amount ≤ 0, exceeds the remaining balance, or the invoice is already paid.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"invoice_id\": \"{{invoice_id}}\",\n    \"amount\": 300,\n    \"method\": \"Bank Transfer\",\n    \"reference\": null,\n    \"payment_date\": \"2026-09-18\",\n    \"notes\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Returns",
+                    "item": [
+                        {
+                            "name": "List returns",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/returns?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "returns"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `sales.view` or `purchasing.view`."
+                            }
+                        },
+                        {
+                            "name": "Create return",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/returns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "returns"
+                                    ]
+                                },
+                                "description": "Requires `sales.add` or `purchasing.add`. No financial side effect — only ever moves stock (or doesn't). `type: \"Purchase Return\"` always deducts; the other 4 types only move stock if `restocked: true` (and then add back). The batch is never fabricated — a non-existent batch_no fails rather than guessing an expiry.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"invoice_id\": null,\n    \"customer_id\": \"{{customer_id}}\",\n    \"supplier_id\": null,\n    \"product_id\": \"{{product_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"batch_no\": \"BATCH-001\",\n    \"type\": \"Sales Return\",\n    \"qty\": 3,\n    \"unit\": \"Carton\",\n    \"amount\": 60,\n    \"restocked\": true,\n    \"reason\": null,\n    \"return_date\": \"2026-09-20\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "AR aging report",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/ar-aging",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "ar-aging"
+                            ]
+                        },
+                        "description": "Requires `sales.view` or `accounting.view`. Every customer with an outstanding/partial/overdue balance, bucketed by days overdue."
+                    }
+                }
+            ],
+            "description": "Spec §6, §5.1/§5.3/§5.4/§5.6/§5.9. See docs/api/sales.md for full lifecycle rules, ownership scoping, and every error-response shape."
+        },
+        {
+            "name": "Accounting",
+            "item": [
+                {
+                    "name": "Chart of accounts",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/chart-of-accounts?page=1&per_page=100",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "chart-of-accounts"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "100",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree."
+                    }
+                },
+                {
+                    "name": "Journal entries",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/journal-entries?page=1&per_page=15&start_date=2026-09-01&end_date=2026-09-30",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "journal-entries"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "start_date",
+                                    "value": "2026-09-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2026-09-30",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting."
+                    }
+                },
+                {
+                    "name": "Balance sheet",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/balance-sheet",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "balance-sheet"
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. `balanced: false` is expected in this build (no period-close process sweeps net income into Retained Earnings)."
+                    }
+                },
+                {
+                    "name": "Income statement",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/income-statement?start_date=2026-09-01&end_date=2026-09-30",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "income-statement"
+                            ],
+                            "query": [
+                                {
+                                    "key": "start_date",
+                                    "value": "2026-09-01",
+                                    "disabled": false
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2026-09-30",
+                                    "disabled": false
+                                }
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. `start_date`/`end_date` are both required (422 without) — unlike every other `?filter=` param in this collection, these two are enabled by default rather than disabled, since omitting them isn't just \"no filter,\" it's a 422."
+                    }
+                }
+            ],
+            "description": "Spec §6 only lists chart-of-accounts and journal-entries; the two reports above and the aging reports (see Sales/Purchasing folders) fill a gap between the spec's endpoint table and its build-order narrative (§10.7) — shapes here are this build's own design, not spec-mandated. See docs/api/accounting.md."
+        },
+        {
+            "name": "Analytics",
+            "item": [
+                {
+                    "name": "Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/analytics/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analytics",
+                                "dashboard"
+                            ]
+                        },
+                        "description": "Requires `analytics.view`. The 8 KPI cards from spec §8 (monthly_sales, active_customers, collected_amount, outstanding_ar, overdue_amount, inventory_value, critical_expiry_count, pending_deliveries)."
+                    }
+                },
+                {
+                    "name": "Expiry tracking",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/analytics/expiry?page=1&per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analytics",
+                                "expiry"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `analytics.view`. Paginated, soonest-expiring first. `days_left` is signed (negative = already expired). Excludes exhausted batches."
+                    }
+                },
+                {
+                    "name": "Stock rollup",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/analytics/stock?page=1&per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analytics",
+                                "stock"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `analytics.view`. Per-product stock across every warehouse — paginated by product, not by row."
+                    }
+                },
+                {
+                    "name": "Sales report (export)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/sales?start_date=2026-09-01&end_date=2026-09-30&warehouse_id=%7B%7Bwarehouse_id%7D%7D&per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "sales"
+                            ],
+                            "query": [
+                                {
+                                    "key": "start_date",
+                                    "value": "2026-09-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2026-09-30",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "warehouse_id",
+                                    "value": "{{warehouse_id}}",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `analytics.export` specifically (not just `view`). Same row shape as GET /sales-orders."
+                    }
+                },
+                {
+                    "name": "Inventory report (export)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/inventory?start_date=2026-09-01&end_date=2026-09-30&warehouse_id=%7B%7Bwarehouse_id%7D%7D&per_page=15",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "inventory"
+                            ],
+                            "query": [
+                                {
+                                    "key": "start_date",
+                                    "value": "2026-09-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2026-09-30",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "warehouse_id",
+                                    "value": "{{warehouse_id}}",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `analytics.export`. Batch-level detail, date filters apply to `rcv_date` not `exp_date`."
+                    }
+                }
+            ],
+            "description": "Spec §6/§8. **Only Administrator, Owner, and Auditor hold any analytics.* permission in this build** — the spec's own role table never grants it to an operational role. See docs/api/analytics.md."
+        },
+        {
+            "name": "Admin",
+            "item": [
+                {
+                    "name": "Users",
+                    "item": [
+                        {
+                            "name": "List users",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/users?page=1&per_page=15&role=&status=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "role",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "status",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `admin.audit`."
+                            }
+                        },
+                        {
+                            "name": "Get user",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/users/{{demo_user_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users",
+                                        "{{demo_user_id}}"
+                                    ]
+                                },
+                                "description": "Requires `admin.audit`. Includes `warehouse_ids`. Targets `{{demo_user_id}}` (captured by Create user below), **not** `{{user_id}}` — `user_id` is whoever Login authenticated as, and this folder deliberately never reads or writes that id, so running it can't lock you out of your own session."
+                            }
+                        },
+                        {
+                            "name": "Create user",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/users",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users"
+                                    ]
+                                },
+                                "description": "Requires `admin.add` (Administrator only — Owner/Auditor are oversight roles without add/edit). `role` must be one of the 10 seeded role names. `warehouse_ids` is required in practice for Warehouse Manager/Employee — without it that account sees zero warehouses.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"New Employee\",\n    \"email\": \"new.employee@vetpharma.com\",\n    \"password\": \"a-secure-password\",\n    \"role\": \"Warehouse Employee\",\n    \"status\": \"active\",\n    \"warehouse_ids\": [\n        \"{{warehouse_id}}\"\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('demo_user_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update user",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/users/{{demo_user_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users",
+                                        "{{demo_user_id}}"
+                                    ]
+                                },
+                                "description": "Requires `admin.edit`. Same shape as create, all fields optional, **except password is not accepted here** — a user changes their own via Auth > Change password. `warehouse_ids` replaces the full set, not a merge.\n\n**Deliberately targets the demo user created above, not `{{user_id}}`** — this body suspends its target account, and `{{user_id}}` is whoever you're currently authenticated as. Pointing this at your own id would lock you out of the rest of the collection.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"suspended\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Audit Log",
+                    "item": [
+                        {
+                            "name": "List audit log",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/audit-log?page=1&per_page=15&module=&entity_type=",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "audit-log"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "module",
+                                            "value": "",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "entity_type",
+                                            "value": "",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `admin.audit`. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7)."
+                            }
+                        },
+                        {
+                            "name": "Verify audit chain integrity",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/audit-log/verify-integrity",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "audit-log",
+                                        "verify-integrity"
+                                    ]
+                                },
+                                "description": "Requires `admin.audit`. Re-walks the whole hash chain, returns `{ intact, broken_at }`. HTTP equivalent of the `audit:verify` console command."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Notifications",
+                    "item": [
+                        {
+                            "name": "List notifications",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/notifications?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "notifications"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Any authenticated user — own inbox (personal + broadcast, `user_id: null`)."
+                            }
+                        },
+                        {
+                            "name": "Mark all notifications read",
+                            "request": {
+                                "method": "PUT",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/notifications/read-all",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "notifications",
+                                        "read-all"
+                                    ]
+                                },
+                                "description": "`unread` is a single flag per row (spec §4.14 has no per-viewer read state) — marking a broadcast notification read here affects every user, not just the caller. See docs/api/admin.md for the full trade-off."
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Discarded Actions",
+                    "item": [
+                        {
+                            "name": "List discarded actions",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/discarded-actions?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "discarded-actions"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `admin.view`. Tenant-wide — the admin review screen, not scoped to the caller."
+                            }
+                        },
+                        {
+                            "name": "Save discarded action",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/discarded-actions",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "discarded-actions"
+                                    ]
+                                },
+                                "description": "Any authenticated user — saves their own abandoned form draft. `payload` is free-form JSON. Not in the spec's own §6 table, but §4.15 explicitly asks for it to be wired up.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"type\": \"sales_order\",\n    \"label\": \"Draft order for Al-Salam Vet Clinic\",\n    \"payload\": {\n        \"customer_id\": \"{{customer_id}}\",\n        \"lines\": []\n    }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    ]
+                }
+            ],
+            "description": "Spec §6/§9.4. See docs/api/admin.md — also documents why there's no Settings endpoint (no backing schema anywhere in the spec)."
+        },
+        {
+            "name": "Session end",
+            "item": [
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/auth/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "auth",
+                                "logout"
+                            ]
+                        },
+                        "description": "Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid."
+                    }
+                }
+            ]
+        }
+    ]
+}

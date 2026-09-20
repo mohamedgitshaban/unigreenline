@@ -64,6 +64,46 @@ class SalesOrderStatusUpdateTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('invoices', ['so_id' => $order->id]);
+        $response->assertJsonPath('data.invoices.0.so_id', $order->id);
+    }
+
+    /**
+     * Regression: SalesOrderResource used to omit `invoices`/`delivery`
+     * entirely despite the service eager-loading both and the docs
+     * documenting them — found via an end-to-end Postman collection run
+     * that couldn't chain into Invoices/Deliveries/Collections at all
+     * because there was nowhere to read the created ids from.
+     */
+    public function test_transition_to_delivered_returns_both_the_invoice_and_delivery_reference(): void
+    {
+        [$tenant, $rep, $order] = $this->arrange();
+        $this->seedAccounts($tenant);
+        Sanctum::actingAs($rep);
+
+        $response = $this->putJson("/api/v1/sales-orders/{$order->id}/status", ['status' => 'delivered']);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.invoices.0.so_id', $order->id);
+        $response->assertJsonPath('data.delivery.so_id', $order->id);
+        $response->assertJsonPath('data.delivery.status', 'delivered');
+    }
+
+    /**
+     * Regression: naively wrapping the (loaded but null) `delivery` relation
+     * in `new DeliveryResource(...)` crashes with a 500 on any property
+     * access, since it's genuinely null before the order reaches
+     * `delivered` — this locks in the null-safe fix.
+     */
+    public function test_transition_to_invoiced_alone_returns_a_null_delivery_without_erroring(): void
+    {
+        [$tenant, $rep, $order] = $this->arrange();
+        $this->seedAccounts($tenant);
+        Sanctum::actingAs($rep);
+
+        $response = $this->putJson("/api/v1/sales-orders/{$order->id}/status", ['status' => 'invoiced']);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.delivery', null);
     }
 
     /**

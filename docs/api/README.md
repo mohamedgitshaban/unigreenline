@@ -44,6 +44,20 @@ Unauthenticated requests return `401`:
 
 This file is updated as each module ships.
 
+## Postman collection
+
+[docs/postman/VetPharma-ERP.postman_collection.json](../postman/VetPharma-ERP.postman_collection.json) +
+[VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
+import both into Postman (or run with `newman`), select the environment, run
+**Auth > Login**, and every other request authenticates automatically. Covers
+all 72 endpoints below, organized to match this doc's module split, with
+"create" requests auto-saving the id they create for the next request to
+reuse. See the collection's own top-level description (visible in Postman)
+for the couple of things worth knowing before a full top-to-bottom run —
+notably a request delay to stay under the API's rate limit. Regenerate it
+with `php docs/postman/generate.php` after any endpoint contract change;
+don't hand-edit the JSON.
+
 ## Roles & permissions
 
 10 roles are seeded (`Administrator`, `Owner`, `Sales Manager`, `Sales Rep`,

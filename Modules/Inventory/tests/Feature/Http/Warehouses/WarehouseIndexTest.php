@@ -72,6 +72,29 @@ class WarehouseIndexTest extends TestCase
         $this->assertCount(3, $response->json('data'));
     }
 
+    /**
+     * Regression: Warehouse::visibleTo() only special-cased Owner/Auditor —
+     * an Administrator with zero user_warehouses rows saw an empty list
+     * despite spec §2 describing "full system access". Found via an
+     * end-to-end Postman collection run against a real seeded DB.
+     */
+    public function test_administrator_sees_every_warehouse_regardless_of_assignment(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
+
+        $user = User::factory()->recycle($tenant)->create();
+        $user->assignRole('Administrator');
+        Sanctum::actingAs($user);
+
+        Warehouse::factory()->recycle($tenant)->count(3)->create();
+
+        $response = $this->getJson('/api/v1/warehouses');
+
+        $response->assertOk();
+        $this->assertCount(3, $response->json('data'));
+    }
+
     public function test_response_is_paginated(): void
     {
         $this->seed(RolePermissionSeeder::class);

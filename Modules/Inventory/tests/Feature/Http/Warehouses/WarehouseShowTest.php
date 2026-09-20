@@ -52,4 +52,27 @@ class WarehouseShowTest extends TestCase
 
         $response->assertForbidden();
     }
+
+    /**
+     * Regression: Warehouse::isVisibleTo() is a plain Eloquent method, not a
+     * Gate/Policy check, so CoreServiceProvider's Gate::before bypass for
+     * Administrator never reaches it. An Administrator with zero
+     * user_warehouses rows used to get 403 here despite spec §2 describing
+     * "full system access" — found via an end-to-end Postman collection run.
+     */
+    public function test_administrator_can_view_a_warehouse_they_are_not_explicitly_assigned_to(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
+
+        $user = User::factory()->recycle($tenant)->create();
+        $user->assignRole('Administrator');
+        Sanctum::actingAs($user);
+
+        $warehouse = Warehouse::factory()->recycle($tenant)->create();
+
+        $response = $this->getJson("/api/v1/warehouses/{$warehouse->id}");
+
+        $response->assertOk();
+    }
 }
