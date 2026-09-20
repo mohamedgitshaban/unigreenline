@@ -1,5 +1,10 @@
 # VetPharma ERP API
 
+This file and its siblings (`auth.md`, `inventory.md`, etc.) are also served as a
+browsable site at **`/docs`** on a running instance of this app (`ApiDocsController`,
+`resources/views/api-docs/show.blade.php`) — same content, syntax-highlighted and
+navigable, if that's easier to share with the frontend dev than raw markdown files.
+
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 
 Auth: Bearer token (Laravel Sanctum). Send `Authorization: Bearer <token>` on every
