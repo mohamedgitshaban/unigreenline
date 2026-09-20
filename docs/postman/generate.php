@@ -1,0 +1,558 @@
+<?php
+
+/**
+ * Generates docs/postman/VetPharma-ERP.postman_collection.json from the
+ * documented request/response shapes in docs/api/*.md. Not part of the
+ * application — run manually (`php docs/postman/generate.php`) whenever an
+ * endpoint's contract changes, then delete this script's output is the
+ * deliverable, this file is just how it's built.
+ */
+
+function url(string $path, array $query = []): array
+{
+    $segments = array_values(array_filter(explode('/', $path)));
+    $raw = '{{base_url}}'.$path;
+
+    $urlObj = [
+        'raw' => $raw.($query === [] ? '' : ('?'.http_build_query($query))),
+        'host' => ['{{base_url}}'],
+        'path' => $segments,
+    ];
+
+    if ($query !== []) {
+        $urlObj['query'] = array_map(
+            fn ($k, $v) => ['key' => $k, 'value' => (string) $v, 'disabled' => true],
+            array_keys($query),
+            $query
+        );
+    }
+
+    return $urlObj;
+}
+
+function req(string $method, string $name, string $path, array $opts = []): array
+{
+    $request = [
+        'method' => $method,
+        'header' => [],
+        'url' => url($path, $opts['query'] ?? []),
+    ];
+
+    if (isset($opts['description'])) {
+        $request['description'] = $opts['description'];
+    }
+
+    if (isset($opts['body'])) {
+        $request['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
+        $request['body'] = [
+            'mode' => 'raw',
+            'raw' => json_encode($opts['body'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+            'options' => ['raw' => ['language' => 'json']],
+        ];
+    }
+
+    if (! empty($opts['noauth'])) {
+        $request['auth'] = ['type' => 'noauth'];
+    }
+
+    $item = ['name' => $name, 'request' => $request];
+
+    if (isset($opts['tests'])) {
+        $item['event'] = [[
+            'listen' => 'test',
+            'script' => ['type' => 'text/javascript', 'exec' => $opts['tests']],
+        ]];
+    }
+
+    return $item;
+}
+
+function folder(string $name, array $items, ?string $description = null): array
+{
+    $folder = ['name' => $name, 'item' => $items];
+    if ($description !== null) {
+        $folder['description'] = $description;
+    }
+
+    return $folder;
+}
+
+/** Standard "save this id for later requests" test script. */
+function saveId(string $varName, string $jsonPath = 'data.id'): array
+{
+    return [
+        "if (pm.response.code >= 200 && pm.response.code < 300) {",
+        "    const json = pm.response.json();",
+        "    const value = ".jsonPathJs($jsonPath).";",
+        "    if (value) { pm.collectionVariables.set('{$varName}', value); }",
+        "}",
+    ];
+}
+
+function jsonPathJs(string $path): string
+{
+    $parts = explode('.', $path);
+    $expr = 'json';
+    foreach ($parts as $part) {
+        $expr .= is_numeric($part) ? "[{$part}]" : "?.{$part}";
+    }
+
+    return $expr;
+}
+
+// ---------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------
+
+$auth = folder('Auth', [
+    req('GET', 'Health check', '/../health', [
+        'description' => "No auth required. Note: this one endpoint is unversioned (`/api/health`, not `/api/v1/health`) — the URL below accounts for that.",
+        'noauth' => true,
+    ]),
+    req('POST', 'Login', '/auth/login', [
+        'description' => "No auth. Rate-limited: 5 attempts/minute per email+IP, then 429.\n\nSaves the returned token to the `token` collection variable automatically — every other request in this collection uses `{{token}}` via Bearer auth, so just run this first.",
+        'noauth' => true,
+        'body' => ['email' => '{{seed_email}}', 'password' => '{{seed_password}}'],
+        'tests' => [
+            "if (pm.response.code === 200) {",
+            "    const json = pm.response.json();",
+            "    pm.collectionVariables.set('token', json.token);",
+            "    pm.collectionVariables.set('user_id', json.user.id);",
+            "}",
+        ],
+    ]),
+    req('GET', 'Me', '/auth/me', [
+        'description' => 'Current authenticated user, same shape as the `user` object from login.',
+    ]),
+    req('POST', 'Change password', '/auth/change-password', [
+        'description' => "Requires the caller's own current password. The old token keeps working afterward — not auto-revoked.",
+        'body' => ['current_password' => '{{seed_password}}', 'password' => 'new-password', 'password_confirmation' => 'new-password'],
+    ]),
+    req('POST', 'Logout', '/auth/logout', [
+        'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry. The token is unusable (401) immediately after.',
+    ]),
+], "Spec §6. Bearer token via Sanctum. Run **Login** first — it captures `{{token}}` automatically for every other folder.");
+
+// ---------------------------------------------------------------------
+// Inventory
+// ---------------------------------------------------------------------
+
+$inventory = folder('Inventory', [
+    folder('Warehouses', [
+        req('GET', 'List warehouses', '/warehouses', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator.",
+        ]),
+        req('GET', 'Get warehouse', '/warehouses/{{warehouse_id}}', [
+            'description' => 'Includes nested `batches`. 403 if this warehouse is not assigned to the caller.',
+        ]),
+        req('POST', 'Create warehouse', '/warehouses', [
+            'description' => "Requires `inventory.add`. Only name/city/governorate are required — `manager_name` is derived server-side from `manager_id`, don't send it.",
+            'body' => ['name' => 'Main Warehouse', 'city' => 'Cairo', 'governorate' => 'Cairo', 'address' => null, 'manager_id' => null, 'temperature' => 'ambient', 'capacity' => 10000, 'phone' => null, 'status' => 'active'],
+            'tests' => saveId('warehouse_id'),
+        ]),
+        req('PUT', 'Update warehouse', '/warehouses/{{warehouse_id}}', [
+            'description' => 'Requires `inventory.edit` + visibility. All fields optional.',
+            'body' => ['status' => 'active'],
+        ]),
+    ]),
+    folder('Products', [
+        req('GET', 'List products', '/products', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `inventory.view`. Catalog-wide, not warehouse-scoped.',
+        ]),
+        req('GET', 'Get product', '/products/{{product_id}}', [
+            'description' => 'Includes nested `batches`.',
+        ]),
+        req('POST', 'Create product', '/products', [
+            'description' => "Requires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
+            'body' => ['category_id' => '{{category_id}}', 'supplier_id' => null, 'name' => 'Oxytetracycline 20% Injectable', 'sku' => 'PRD-00001', 'brand' => 'EgyVet', 'pack_unit' => 'Vial 100ml', 'carton_qty' => 20, 'pack_cost_price' => 45.00, 'pack_selling_price' => 65.00, 'discount_pct' => 0, 'tax_pct' => 14, 'min_stock_cartons' => 10, 'reorder_level' => 20],
+            'tests' => saveId('product_id'),
+        ]),
+        req('PUT', 'Update product', '/products/{{product_id}}', [
+            'description' => 'Requires `inventory.edit`. All fields optional.',
+            'body' => ['pack_selling_price' => 70.00],
+        ]),
+    ]),
+    folder('Categories', [
+        req('GET', 'List categories', '/categories', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `inventory.view`.',
+        ]),
+        req('POST', 'Create category', '/categories', [
+            'description' => 'Requires `inventory.add`. Only `name` required, unique per tenant. No PUT endpoint exists for categories.',
+            'body' => ['name' => 'Antibiotics', 'code' => null, 'description' => null, 'active' => true],
+            'tests' => saveId('category_id'),
+        ]),
+    ]),
+    req('POST', 'Goods receipt (manual GRN)', '/inventory/grn', [
+        'description' => "Requires `inventory.add` + destination warehouse visibility. `exp_date` is required — never fabricated. Re-receiving the same `batch_no` for the same product+warehouse tops up quantity instead of duplicating the row.",
+        'body' => ['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'BATCH-001', 'qty_cartons' => 50, 'cost_per_carton' => 120.00, 'exp_date' => '2027-12-31', 'mfg_date' => null, 'rcv_date' => null],
+    ]),
+    folder('Transfers', [
+        req('GET', 'List transfers', '/transfers', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `inventory.view`.',
+        ]),
+        req('POST', 'Create transfer', '/transfers', [
+            'description' => "Requires `inventory.add` + **both** warehouses visible to the caller. Executes immediately and atomically — `status` is always `completed` in the response, there's no separate confirm step. Expiry date carries over to the destination batch.",
+            'body' => ['product_id' => '{{product_id}}', 'from_warehouse_id' => '{{warehouse_id}}', 'to_warehouse_id' => '{{warehouse_id_2}}', 'batch_no' => 'BATCH-001', 'qty_cartons' => 20, 'transfer_date' => '2026-09-20', 'notes' => null],
+        ]),
+    ]),
+], "Spec §6, §5.1/§5.8. Warehouse-scoped for every non-Owner/Auditor/Administrator role — see docs/api/inventory.md. Any endpoint using FEFO deduction can return 422 with a `shortfalls` array if stock is insufficient.");
+
+// ---------------------------------------------------------------------
+// Sales
+// ---------------------------------------------------------------------
+
+$sales = folder('Sales', [
+    folder('Sales Orders', [
+        req('GET', 'List sales orders', '/sales-orders', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `sales.view`. A Sales Rep only sees their own orders. Newest `order_date` first.',
+        ]),
+        req('GET', 'Get sales order', '/sales-orders/{{sales_order_id}}', [
+            'description' => 'Includes nested `lines`. 403 if a Sales Rep requests another rep\'s order.',
+        ]),
+        req('POST', 'Create sales order', '/sales-orders', [
+            'description' => "Requires `sales.add`. Validates FEFO stock availability and (for `pay_type: credit`) the customer's credit limit **before writing anything** — 422 with a `shortfalls` or credit-limit-exceeded body otherwise. `unit: Pack` rounds a line's stock need up to whole cartons.",
+            'body' => ['customer_id' => '{{customer_id}}', 'sales_rep_id' => null, 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'credit', 'grace_period' => 30, 'invoice_discount' => 0, 'notes' => null, 'order_date' => '2026-09-17', 'lines' => [['product_id' => '{{product_id}}', 'batch_no' => null, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65, 'discount_pct' => 5, 'free_qty' => 0]]],
+            'tests' => saveId('sales_order_id'),
+        ]),
+        req('PUT', 'Update sales order status', '/sales-orders/{{sales_order_id}}/status', [
+            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.",
+            'body' => ['status' => 'invoiced'],
+            'tests' => [
+                "if (pm.response.code === 200) {",
+                "    const json = pm.response.json();",
+                "    const invoice = json.data?.invoices?.[0];",
+                "    if (invoice) { pm.collectionVariables.set('invoice_id', invoice.id); }",
+                "    const delivery = json.data?.delivery;",
+                "    if (delivery) { pm.collectionVariables.set('delivery_id', delivery.id); }",
+                "}",
+            ],
+        ]),
+    ]),
+    folder('Invoices', [
+        req('GET', 'List invoices', '/invoices', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `sales.view` or `accounting.view`. No POST — invoices only come from the sales-order status transition.',
+        ]),
+        req('GET', 'Get invoice', '/invoices/{{invoice_id}}', [
+            'description' => 'Includes `lines` (mirrored from the originating order) and `collections`.',
+        ]),
+    ]),
+    folder('Deliveries', [
+        req('GET', 'List deliveries', '/deliveries', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `sales.view` (+ ownership if Sales Rep).',
+        ]),
+        req('GET', 'Get delivery', '/deliveries/{{delivery_id}}', []),
+        req('PUT', 'Mark delivery delivered', '/deliveries/{{delivery_id}}/deliver', [
+            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition.",
+        ]),
+    ]),
+    folder('Collections', [
+        req('GET', 'List collections', '/collections', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep).',
+        ]),
+        req('POST', 'Record collection', '/collections', [
+            'description' => "Requires `sales.add` or `accounting.add`. Records a payment against an invoice: updates the invoice's paid/balance/status, decreases the customer's AR balance, posts a balanced journal entry. 422 if amount ≤ 0, exceeds the remaining balance, or the invoice is already paid.",
+            'body' => ['invoice_id' => '{{invoice_id}}', 'amount' => 300, 'method' => 'Bank Transfer', 'reference' => null, 'payment_date' => '2026-09-18', 'notes' => null],
+        ]),
+    ]),
+    folder('Returns', [
+        req('GET', 'List returns', '/returns', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `sales.view` or `purchasing.view`.',
+        ]),
+        req('POST', 'Create return', '/returns', [
+            'description' => "Requires `sales.add` or `purchasing.add`. No financial side effect — only ever moves stock (or doesn't). `type: \"Purchase Return\"` always deducts; the other 4 types only move stock if `restocked: true` (and then add back). The batch is never fabricated — a non-existent batch_no fails rather than guessing an expiry.",
+            'body' => ['invoice_id' => null, 'customer_id' => '{{customer_id}}', 'supplier_id' => null, 'product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'BATCH-001', 'type' => 'Sales Return', 'qty' => 3, 'unit' => 'Carton', 'amount' => 60, 'restocked' => true, 'reason' => null, 'return_date' => '2026-09-20'],
+        ]),
+    ]),
+    req('GET', 'AR aging report', '/reports/ar-aging', [
+        'description' => 'Requires `sales.view` or `accounting.view`. Every customer with an outstanding/partial/overdue balance, bucketed by days overdue.',
+    ]),
+], 'Spec §6, §5.1/§5.3/§5.4/§5.6/§5.9. See docs/api/sales.md for full lifecycle rules, ownership scoping, and every error-response shape.');
+
+// ---------------------------------------------------------------------
+// Purchasing
+// ---------------------------------------------------------------------
+
+$purchasing = folder('Purchasing', [
+    folder('Suppliers', [
+        req('GET', 'List suppliers', '/suppliers', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `purchasing.view` (also reachable with `accounting.view`).',
+        ]),
+        req('POST', 'Create supplier', '/suppliers', [
+            'description' => "Requires `purchasing.add`. Only `name` required. `balance` starts at 0 and moves negative as POs are received — negative means we owe them.",
+            'body' => ['name' => 'EgyVet Pharmaceutical', 'country' => 'Egypt', 'city' => 'Cairo', 'contact' => null, 'email' => null, 'phone' => null, 'pay_terms' => 'Net 30', 'currency' => 'EGP', 'rating' => null, 'status' => 'active'],
+            'tests' => saveId('supplier_id'),
+        ]),
+    ]),
+    folder('Purchase Orders', [
+        req('GET', 'List purchase orders', '/purchase-orders', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `purchasing.view`.',
+        ]),
+        req('GET', 'Get purchase order', '/purchase-orders/{{purchase_order_id}}', [
+            'description' => 'Includes nested `lines`.',
+        ]),
+        req('POST', 'Create purchase order', '/purchase-orders', [
+            'description' => 'Requires `purchasing.add`. `status` starts as `draft`.',
+            'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'expected_date' => null, 'notes' => null, 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 50, 'cost_per_carton' => 40]]],
+            'tests' => saveId('purchase_order_id'),
+        ]),
+        req('POST', 'Receive purchase order', '/purchase-orders/{{purchase_order_id}}/receive', [
+            'description' => "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n**Before running:** replace `line_id` below with an actual line id from the Create Purchase Order response's `lines[0].id`.",
+            'body' => ['receipts' => [['line_id' => 'REPLACE-WITH-PO-LINE-ID', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]]],
+        ]),
+    ]),
+    req('GET', 'AP aging report', '/reports/ap-aging', [
+        'description' => "Requires `purchasing.view` or `accounting.view`. **Not date-bucketed** (unlike AR) — `purchase_orders` has no due-date/payment tracking, so this is every supplier's current outstanding balance sorted by amount owed.",
+    ]),
+], 'Spec §6, §5.2. See docs/api/purchasing.md — note /suppliers isn\'t in the spec\'s own endpoint table but is required to make purchase_orders.supplier_id usable at all.');
+
+// ---------------------------------------------------------------------
+// CRM
+// ---------------------------------------------------------------------
+
+$crm = folder('CRM', [
+    folder('Customers', [
+        req('GET', 'List customers', '/customers', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `crm.view`. A Sales Rep sees only their own customers.',
+        ]),
+        req('GET', 'Get customer', '/customers/{{customer_id}}', [
+            'description' => 'Includes nested `orders`, `invoices`, and `visits`.',
+        ]),
+        req('POST', 'Create customer', '/customers', [
+            'description' => 'Requires `crm.add`. Only `name`/`type` required. A Sales Rep omitting `sales_rep_id` gets themselves; naming a different rep is 422.',
+            'body' => ['sales_rep_id' => null, 'name' => 'Nile Valley Veterinary Clinic', 'type' => 'Clinic', 'classification' => 'B', 'phone' => null, 'email' => null, 'governorate' => null, 'province' => null, 'city' => null, 'area' => null, 'address' => null, 'credit_limit' => 50000, 'pay_terms' => null, 'status' => 'active'],
+            'tests' => saveId('customer_id'),
+        ]),
+        req('PUT', 'Update customer', '/customers/{{customer_id}}', [
+            'description' => 'Requires `crm.edit` (+ ownership if Sales Rep). All fields optional.',
+            'body' => ['classification' => 'A'],
+        ]),
+    ]),
+    folder('Leads', [
+        req('GET', 'List leads', '/leads', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `crm.view`. No update/delete endpoint.',
+        ]),
+        req('POST', 'Create lead', '/leads', [
+            'description' => 'Requires `crm.add`.',
+            'body' => ['assigned_to' => null, 'name' => 'Delta Farms', 'type' => 'Farm', 'contact' => null, 'phone' => null, 'email' => null, 'source' => 'Referral', 'status' => 'new', 'value' => null, 'notes' => null],
+        ]),
+    ]),
+    folder('Visits', [
+        req('GET', 'List visits', '/visits', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `crm.view`.',
+        ]),
+        req('POST', 'Create visit', '/visits', [
+            'description' => 'Requires `crm.add`. `rep_id` defaults to the caller if omitted.',
+            'body' => ['customer_id' => '{{customer_id}}', 'rep_id' => null, 'visit_date' => '2026-09-20', 'type' => 'Follow-up', 'outcome' => 'positive', 'notes' => null, 'next_visit' => null],
+        ]),
+    ]),
+    folder('Complaints', [
+        req('GET', 'List complaints', '/complaints', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `crm.view`.',
+        ]),
+        req('POST', 'Create complaint', '/complaints', [
+            'description' => 'Requires `crm.add`. `priority` defaults to `medium`, `status` defaults to `investigating`.',
+            'body' => ['customer_id' => '{{customer_id}}', 'product_id' => null, 'assigned_to' => null, 'batch_no' => null, 'type' => 'Quality', 'description' => 'Vial arrived damaged.', 'priority' => 'medium', 'complaint_date' => '2026-09-20'],
+            'tests' => saveId('complaint_id'),
+        ]),
+        req('PUT', 'Resolve complaint', '/complaints/{{complaint_id}}/resolve', [
+            'description' => 'Requires `crm.edit`. `resolution` required — sets `status: resolved` and `resolved_date` to today.',
+            'body' => ['resolution' => 'Replacement shipped.'],
+        ]),
+    ]),
+    folder('Campaigns', [
+        req('GET', 'List campaigns', '/campaigns', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `crm.view`.',
+        ]),
+        req('POST', 'Create campaign', '/campaigns', [
+            'description' => 'Requires `crm.add`. `status` defaults to `active`.',
+            'body' => ['name' => 'Autumn Vaccine Drive', 'type' => 'Discount', 'target' => 'Clinics', 'discount' => 10, 'start_date' => '2026-10-01', 'end_date' => null, 'description' => null],
+            'tests' => saveId('campaign_id'),
+        ]),
+        req('PUT', 'End campaign', '/campaigns/{{campaign_id}}/end', [
+            'description' => "Requires `crm.edit`. Sets `status: completed` and fills `end_date` with today if it wasn't already set.",
+        ]),
+    ]),
+], 'Spec §6. A Sales Rep gets crm.* too (not just sales.*) per spec §2\'s "own orders/customers" grouping, scoped to their own sales_rep_id.');
+
+// ---------------------------------------------------------------------
+// Accounting
+// ---------------------------------------------------------------------
+
+$accounting = folder('Accounting', [
+    req('GET', 'Chart of accounts', '/chart-of-accounts', [
+        'query' => ['page' => 1, 'per_page' => 100],
+        'description' => 'Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.',
+    ]),
+    req('GET', 'Journal entries', '/journal-entries', [
+        'query' => ['page' => 1, 'per_page' => 15, 'start_date' => '2026-09-01', 'end_date' => '2026-09-30'],
+        'description' => 'Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting.',
+    ]),
+    req('GET', 'Balance sheet', '/reports/balance-sheet', [
+        'description' => "Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. `balanced: false` is expected in this build (no period-close process sweeps net income into Retained Earnings).",
+    ]),
+    req('GET', 'Income statement', '/reports/income-statement', [
+        'query' => ['start_date' => '2026-09-01', 'end_date' => '2026-09-30'],
+        'description' => 'Requires `accounting.view`. `start_date`/`end_date` are both required (422 without) — this is a period report, not a snapshot.',
+    ]),
+], "Spec §6 only lists chart-of-accounts and journal-entries; the two reports above and the aging reports (see Sales/Purchasing folders) fill a gap between the spec's endpoint table and its build-order narrative (§10.7) — shapes here are this build's own design, not spec-mandated. See docs/api/accounting.md.");
+
+// ---------------------------------------------------------------------
+// Analytics
+// ---------------------------------------------------------------------
+
+$analytics = folder('Analytics', [
+    req('GET', 'Dashboard', '/analytics/dashboard', [
+        'description' => 'Requires `analytics.view`. The 8 KPI cards from spec §8 (monthly_sales, active_customers, collected_amount, outstanding_ar, overdue_amount, inventory_value, critical_expiry_count, pending_deliveries).',
+    ]),
+    req('GET', 'Expiry tracking', '/analytics/expiry', [
+        'query' => ['page' => 1, 'per_page' => 15],
+        'description' => 'Requires `analytics.view`. Paginated, soonest-expiring first. `days_left` is signed (negative = already expired). Excludes exhausted batches.',
+    ]),
+    req('GET', 'Stock rollup', '/analytics/stock', [
+        'query' => ['page' => 1, 'per_page' => 15],
+        'description' => 'Requires `analytics.view`. Per-product stock across every warehouse — paginated by product, not by row.',
+    ]),
+    req('GET', 'Sales report (export)', '/reports/sales', [
+        'query' => ['start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'warehouse_id' => '{{warehouse_id}}', 'per_page' => 15],
+        'description' => 'Requires `analytics.export` specifically (not just `view`). Same row shape as GET /sales-orders.',
+    ]),
+    req('GET', 'Inventory report (export)', '/reports/inventory', [
+        'query' => ['start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'warehouse_id' => '{{warehouse_id}}', 'per_page' => 15],
+        'description' => 'Requires `analytics.export`. Batch-level detail, date filters apply to `rcv_date` not `exp_date`.',
+    ]),
+], "Spec §6/§8. **Only Administrator, Owner, and Auditor hold any analytics.* permission in this build** — the spec's own role table never grants it to an operational role. See docs/api/analytics.md.");
+
+// ---------------------------------------------------------------------
+// Admin
+// ---------------------------------------------------------------------
+
+$admin = folder('Admin', [
+    folder('Users', [
+        req('GET', 'List users', '/users', [
+            'query' => ['page' => 1, 'per_page' => 15, 'role' => '', 'status' => ''],
+            'description' => 'Requires `admin.audit`.',
+        ]),
+        req('GET', 'Get user', '/users/{{user_id}}', [
+            'description' => 'Requires `admin.audit`. Includes `warehouse_ids`.',
+        ]),
+        req('POST', 'Create user', '/users', [
+            'description' => "Requires `admin.add` (Administrator only — Owner/Auditor are oversight roles without add/edit). `role` must be one of the 10 seeded role names. `warehouse_ids` is required in practice for Warehouse Manager/Employee — without it that account sees zero warehouses.",
+            'body' => ['name' => 'New Employee', 'email' => 'new.employee@vetpharma.com', 'password' => 'a-secure-password', 'role' => 'Warehouse Employee', 'status' => 'active', 'warehouse_ids' => ['{{warehouse_id}}']],
+        ]),
+        req('PUT', 'Update user', '/users/{{user_id}}', [
+            'description' => "Requires `admin.edit`. Same shape as create, all fields optional, **except password is not accepted here** — a user changes their own via Auth > Change password. `warehouse_ids` replaces the full set, not a merge.",
+            'body' => ['status' => 'suspended'],
+        ]),
+    ]),
+    folder('Audit Log', [
+        req('GET', 'List audit log', '/audit-log', [
+            'query' => ['page' => 1, 'per_page' => 15, 'module' => '', 'entity_type' => ''],
+            'description' => 'Requires `admin.audit`. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7).',
+        ]),
+        req('POST', 'Verify audit chain integrity', '/audit-log/verify-integrity', [
+            'description' => "Requires `admin.audit`. Re-walks the whole hash chain, returns `{ intact, broken_at }`. HTTP equivalent of the `audit:verify` console command.",
+        ]),
+    ]),
+    folder('Notifications', [
+        req('GET', 'List notifications', '/notifications', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => "Any authenticated user — own inbox (personal + broadcast, `user_id: null`).",
+        ]),
+        req('PUT', 'Mark all notifications read', '/notifications/read-all', [
+            'description' => "`unread` is a single flag per row (spec §4.14 has no per-viewer read state) — marking a broadcast notification read here affects every user, not just the caller. See docs/api/admin.md for the full trade-off.",
+        ]),
+    ]),
+    folder('Discarded Actions', [
+        req('GET', 'List discarded actions', '/discarded-actions', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `admin.view`. Tenant-wide — the admin review screen, not scoped to the caller.',
+        ]),
+        req('POST', 'Save discarded action', '/discarded-actions', [
+            'description' => "Any authenticated user — saves their own abandoned form draft. `payload` is free-form JSON. Not in the spec's own §6 table, but §4.15 explicitly asks for it to be wired up.",
+            'body' => ['type' => 'sales_order', 'label' => 'Draft order for Al-Salam Vet Clinic', 'payload' => ['customer_id' => '{{customer_id}}', 'lines' => []]],
+        ]),
+    ]),
+], "Spec §6/§9.4. See docs/api/admin.md — also documents why there's no Settings endpoint (no backing schema anywhere in the spec).");
+
+$collection = [
+    'info' => [
+        'name' => 'VetPharma ERP API',
+        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which is unversioned).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
+    ],
+    'auth' => [
+        'type' => 'bearer',
+        'bearer' => [['key' => 'token', 'value' => '{{token}}', 'type' => 'string']],
+    ],
+    'variable' => array_map(
+        fn ($k, $v) => ['key' => $k, 'value' => $v, 'type' => 'string'],
+        array_keys($vars = [
+            'base_url' => 'http://localhost:8000/api/v1',
+            'token' => '',
+            'seed_email' => 'admin@vetpharma.com',
+            'seed_password' => 'password',
+            'user_id' => '',
+            'warehouse_id' => '',
+            'warehouse_id_2' => '',
+            'product_id' => '',
+            'category_id' => '',
+            'customer_id' => '',
+            'supplier_id' => '',
+            'sales_order_id' => '',
+            'invoice_id' => '',
+            'delivery_id' => '',
+            'purchase_order_id' => '',
+            'complaint_id' => '',
+            'campaign_id' => '',
+        ]),
+        $vars
+    ),
+    'item' => [$auth, $inventory, $sales, $purchasing, $crm, $accounting, $analytics, $admin],
+];
+
+$environment = [
+    'id' => '7c4b0b3a-3b1a-4b6a-9b3a-2f4e0f6c9a11',
+    'name' => 'VetPharma ERP — Local',
+    'values' => [
+        ['key' => 'base_url', 'value' => 'http://localhost:8000/api/v1', 'type' => 'default', 'enabled' => true],
+        ['key' => 'seed_email', 'value' => 'admin@vetpharma.com', 'type' => 'default', 'enabled' => true],
+        ['key' => 'seed_password', 'value' => 'password', 'type' => 'default', 'enabled' => true],
+        ['key' => 'token', 'value' => '', 'type' => 'secret', 'enabled' => true],
+    ],
+    '_postman_variable_scope' => 'environment',
+];
+
+file_put_contents(
+    __DIR__.'/VetPharma-ERP.postman_collection.json',
+    json_encode($collection, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n"
+);
+
+file_put_contents(
+    __DIR__.'/VetPharma-ERP-Local.postman_environment.json',
+    json_encode($environment, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n"
+);
+
+$count = 0;
+array_walk_recursive($collection['item'], function ($v, $k) use (&$count) {
+    if ($k === 'method') {
+        $count++;
+    }
+});
+
+echo "Generated collection with {$count} requests.\n";

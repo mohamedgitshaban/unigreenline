@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Modules\Core\Console\Commands\VerifyAuditChain;
 use Modules\Core\Models\User;
+use Modules\Core\Policies\UserPolicy;
 use Modules\Core\Services\AuditLogService;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 use RuntimeException;
@@ -91,5 +92,7 @@ class CoreServiceProvider extends ModuleServiceProvider
         });
 
         Gate::before(fn (User $user) => $user->hasRole('Administrator') ? true : null);
+
+        Gate::policy(User::class, UserPolicy::class);
     }
 }

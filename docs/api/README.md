@@ -5,6 +5,13 @@ Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 Auth: Bearer token (Laravel Sanctum). Send `Authorization: Bearer <token>` on every
 request except `POST /auth/login` and `GET /health`.
 
+**CORS:** locked down outside local/testing (`config/cors.php`) — in any deployed
+environment, the frontend's origin(s) must be added to the `FRONTEND_URLS` env var
+(comma-separated) or the browser will block responses. Not needed for local dev
+against this repo's default `.env` (defaults to allowing any origin there). No
+cookies are involved (`supports_credentials` is always `false`) — only the
+`Authorization` header, so no CSRF token or `withCredentials` setup is needed.
+
 All responses are JSON. Validation errors return `422` with:
 
 ```json
@@ -33,7 +40,7 @@ Unauthenticated requests return `401`:
 | CRM (Customers / Leads / Visits / Complaints / Campaigns) | Done | [crm.md](./crm.md) |
 | Accounting (Chart of Accounts / Journal Entries / Balance Sheet / Income Statement) | Done | [accounting.md](./accounting.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
-| Admin (users, audit log, notifications) | Partial — audit log hash-chain exists, no HTTP endpoint yet | — |
+| Admin (users, audit log, notifications, discarded actions) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
 
 This file is updated as each module ships.
 
