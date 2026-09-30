@@ -22,7 +22,7 @@ class StoreProductCategoryRequest extends FormRequest
             ],
             'code' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'active' => ['sometimes', 'boolean'],
+            'active' => ['sometimes', 'in:true|false|1|0'],
         ];
     }
 }

@@ -37,7 +37,7 @@ class ProductCategoryController extends Controller
     {
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
-
+        $data['active'] = $data['active'] == '1' || $data['active'] == 'true' ? true : false;
         $category = ProductCategory::create($data);
 
         return new ProductCategoryResource($category);
