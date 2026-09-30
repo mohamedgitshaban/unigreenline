@@ -4,6 +4,7 @@ namespace Modules\Sales\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Sales\Http\Requests\StoreReturnRequest;
 use Modules\Sales\Http\Resources\ReturnRecordResource;
 use Modules\Sales\Models\ReturnRecord;
@@ -11,16 +12,28 @@ use Modules\Sales\Services\ProcessReturnService;
 
 class ReturnController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly ProcessReturnService $processReturn) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ReturnRecord::class);
 
-        $returns = ReturnRecord::query()
+        $query = ReturnRecord::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('return_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('return_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, ['sales.export', 'purchasing.export'], $query,
+            ['ID', 'Type', 'Product', 'Warehouse', 'Batch No', 'Qty', 'Unit', 'Amount', 'Restocked', 'Return Date'],
+            fn (ReturnRecord $r) => [$r->id, $r->type, $r->product_id, $r->warehouse_id, $r->batch_no, $r->qty, $r->unit, $r->amount, $r->restocked ? 'Yes' : 'No', $r->return_date->toDateString()],
+            'returns',
+        )) {
+            return $export;
+        }
+
+        $returns = $query->paginate($request->integer('per_page', 15));
 
         return ReturnRecordResource::collection($returns);
     }

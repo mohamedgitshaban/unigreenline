@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "VetPharma ERP API",
-        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "auth": {
@@ -256,7 +256,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/warehouses?page=1&per_page=15",
+                                    "raw": "{{base_url}}/warehouses?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -272,6 +272,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -432,7 +437,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/categories?page=1&per_page=15",
+                                    "raw": "{{base_url}}/categories?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -448,6 +453,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -512,7 +522,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/products?page=1&per_page=15",
+                                    "raw": "{{base_url}}/products?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -528,6 +538,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -674,7 +689,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/transfers?page=1&per_page=15",
+                                    "raw": "{{base_url}}/transfers?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -690,6 +705,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -745,7 +765,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/customers?page=1&per_page=15",
+                                    "raw": "{{base_url}}/customers?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -761,6 +781,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -875,7 +900,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/leads?page=1&per_page=15",
+                                    "raw": "{{base_url}}/leads?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -891,6 +916,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -940,7 +970,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/visits?page=1&per_page=15",
+                                    "raw": "{{base_url}}/visits?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -956,6 +986,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1005,7 +1040,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/complaints?page=1&per_page=15",
+                                    "raw": "{{base_url}}/complaints?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1021,6 +1056,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1118,7 +1158,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/campaigns?page=1&per_page=15",
+                                    "raw": "{{base_url}}/campaigns?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1134,6 +1174,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1223,7 +1268,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/suppliers?page=1&per_page=15",
+                                    "raw": "{{base_url}}/suppliers?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1239,6 +1284,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1303,7 +1353,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/purchase-orders?page=1&per_page=15",
+                                    "raw": "{{base_url}}/purchase-orders?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1319,6 +1369,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1462,7 +1517,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/sales-orders?page=1&per_page=15",
+                                    "raw": "{{base_url}}/sales-orders?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1478,6 +1533,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1610,7 +1670,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/invoices?page=1&per_page=15",
+                                    "raw": "{{base_url}}/invoices?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1626,6 +1686,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1662,7 +1727,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/deliveries?page=1&per_page=15",
+                                    "raw": "{{base_url}}/deliveries?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1678,6 +1743,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1732,7 +1802,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/collections?page=1&per_page=15",
+                                    "raw": "{{base_url}}/collections?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1748,6 +1818,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1797,7 +1872,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/returns?page=1&per_page=15",
+                                    "raw": "{{base_url}}/returns?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1813,6 +1888,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]
@@ -1883,7 +1963,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/chart-of-accounts?page=1&per_page=100",
+                            "raw": "{{base_url}}/chart-of-accounts?page=1&per_page=100&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -1900,6 +1980,11 @@
                                     "key": "per_page",
                                     "value": "100",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
                                 }
                             ]
                         },
@@ -1912,7 +1997,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/journal-entries?page=1&per_page=15&start_date=2026-09-01&end_date=2026-09-30",
+                            "raw": "{{base_url}}/journal-entries?page=1&per_page=15&start_date=2026-09-01&end_date=2026-09-30&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -1939,10 +2024,15 @@
                                     "key": "end_date",
                                     "value": "2026-09-30",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
                                 }
                             ]
                         },
-                        "description": "Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting."
+                        "description": "Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting. Exported rows summarize lines into one column rather than one row per line."
                     }
                 },
                 {
@@ -2023,7 +2113,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/analytics/expiry?page=1&per_page=15",
+                            "raw": "{{base_url}}/analytics/expiry?page=1&per_page=15&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -2041,6 +2131,11 @@
                                     "key": "per_page",
                                     "value": "15",
                                     "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
                                 }
                             ]
                         },
@@ -2053,7 +2148,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/analytics/stock?page=1&per_page=15",
+                            "raw": "{{base_url}}/analytics/stock?page=1&per_page=15&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -2070,6 +2165,11 @@
                                 {
                                     "key": "per_page",
                                     "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
                                     "disabled": true
                                 }
                             ]
@@ -2172,7 +2272,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/users?page=1&per_page=15&role=&status=",
+                                    "raw": "{{base_url}}/users?page=1&per_page=15&role=&status=&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2199,10 +2299,15 @@
                                             "key": "status",
                                             "value": "",
                                             "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
+                                            "disabled": true
                                         }
                                     ]
                                 },
-                                "description": "Requires `admin.audit`."
+                                "description": "Requires `admin.audit` to view, `admin.export` to export (see the collection description's export note — same distinction as everywhere else)."
                             }
                         },
                         {
@@ -2312,7 +2417,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/audit-log?page=1&per_page=15&module=&entity_type=",
+                                    "raw": "{{base_url}}/audit-log?page=1&per_page=15&module=&entity_type=&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2339,10 +2444,15 @@
                                             "key": "entity_type",
                                             "value": "",
                                             "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
+                                            "disabled": true
                                         }
                                     ]
                                 },
-                                "description": "Requires `admin.audit`. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7)."
+                                "description": "Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes."
                             }
                         },
                         {
@@ -2394,7 +2504,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Any authenticated user — own inbox (personal + broadcast, `user_id: null`)."
+                                "description": "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data."
                             }
                         },
                         {
@@ -2426,7 +2536,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/discarded-actions?page=1&per_page=15",
+                                    "raw": "{{base_url}}/discarded-actions?page=1&per_page=15&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2442,6 +2552,11 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "export",
+                                            "value": "csv",
                                             "disabled": true
                                         }
                                     ]

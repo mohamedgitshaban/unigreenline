@@ -4,20 +4,33 @@ namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\CRM\Http\Requests\StoreCustomerVisitRequest;
 use Modules\CRM\Http\Resources\CustomerVisitResource;
 use Modules\CRM\Models\CustomerVisit;
 
 class CustomerVisitController extends Controller
 {
+    use Exportable;
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', CustomerVisit::class);
 
-        $visits = CustomerVisit::query()
+        $query = CustomerVisit::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('visit_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('visit_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'crm.export', $query,
+            ['ID', 'Customer', 'Rep', 'Visit Date', 'Type', 'Outcome', 'Next Visit'],
+            fn (CustomerVisit $v) => [$v->id, $v->customer_id, $v->rep_id, $v->visit_date->toDateString(), $v->type, $v->outcome, $v->next_visit?->toDateString()],
+            'visits',
+        )) {
+            return $export;
+        }
+
+        $visits = $query->paginate($request->integer('per_page', 15));
 
         return CustomerVisitResource::collection($visits);
     }

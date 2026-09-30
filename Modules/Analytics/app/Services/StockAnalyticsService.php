@@ -2,6 +2,7 @@
 
 namespace Modules\Analytics\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class StockAnalyticsService
@@ -26,19 +27,7 @@ class StockAnalyticsService
             ->forPage($page, $perPage)
             ->pluck('product_id');
 
-        $rows = DB::table('inventory_batches')
-            ->join('products', 'products.id', '=', 'inventory_batches.product_id')
-            ->join('warehouses', 'warehouses.id', '=', 'inventory_batches.warehouse_id')
-            ->whereIn('inventory_batches.product_id', $productIds)
-            ->where('inventory_batches.qty_cartons', '>', 0)
-            ->selectRaw('
-                products.id as product_id, products.name as product_name, products.sku,
-                warehouses.id as warehouse_id, warehouses.name as warehouse_name,
-                SUM(inventory_batches.qty_cartons) as qty_cartons,
-                SUM(inventory_batches.qty_cartons * products.pack_cost_price * products.carton_qty) as stock_value
-            ')
-            ->groupBy('products.id', 'products.name', 'products.sku', 'warehouses.id', 'warehouses.name')
-            ->get();
+        $rows = $this->rows($tenantId, $productIds);
 
         $data = $rows->groupBy('product_id')->map(function ($productRows) {
             $first = $productRows->first();
@@ -66,5 +55,35 @@ class StockAnalyticsService
                 'last_page' => (int) max(1, ceil($total / $perPage)),
             ],
         ];
+    }
+
+    /**
+     * The flat per-product-per-warehouse rows generate() groups into its
+     * nested response. Exposed separately for the `?export=` path
+     * (AnalyticsController::exportStockIfRequested) — a flat row per
+     * product+warehouse is what a spreadsheet wants, unlike the nested
+     * JSON shape, and unfiltered by $productIds gives every matching row
+     * rather than one paginated page.
+     *
+     * @param  Collection<int, string>|null  $productIds
+     * @return Collection<int, object>
+     */
+    public function rows(string $tenantId, ?Collection $productIds = null): Collection
+    {
+        return DB::table('inventory_batches')
+            ->join('products', 'products.id', '=', 'inventory_batches.product_id')
+            ->join('warehouses', 'warehouses.id', '=', 'inventory_batches.warehouse_id')
+            ->where('inventory_batches.tenant_id', $tenantId)
+            ->when($productIds !== null, fn ($q) => $q->whereIn('inventory_batches.product_id', $productIds))
+            ->where('inventory_batches.qty_cartons', '>', 0)
+            ->selectRaw('
+                products.id as product_id, products.name as product_name, products.sku,
+                warehouses.id as warehouse_id, warehouses.name as warehouse_name,
+                SUM(inventory_batches.qty_cartons) as qty_cartons,
+                SUM(inventory_batches.qty_cartons * products.pack_cost_price * products.carton_qty) as stock_value
+            ')
+            ->groupBy('products.id', 'products.name', 'products.sku', 'warehouses.id', 'warehouses.name')
+            ->orderBy('products.id')
+            ->get();
     }
 }

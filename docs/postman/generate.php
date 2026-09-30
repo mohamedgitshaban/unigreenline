@@ -146,7 +146,7 @@ $auth = folder('Auth', [
 $inventory = folder('Inventory', [
     folder('Warehouses', [
         req('GET', 'List warehouses', '/warehouses', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator.",
         ]),
         req('GET', 'Get warehouse', '/warehouses/{{warehouse_id}}', [
@@ -169,7 +169,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Categories', [
         req('GET', 'List categories', '/categories', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `inventory.view`.',
         ]),
         req('POST', 'Create category', '/categories', [
@@ -182,7 +182,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Products', [
         req('GET', 'List products', '/products', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `inventory.view`. Catalog-wide, not warehouse-scoped.',
         ]),
         req('GET', 'Get product', '/products/{{product_id}}', [
@@ -206,7 +206,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Transfers', [
         req('GET', 'List transfers', '/transfers', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `inventory.view`.',
         ]),
         req('POST', 'Create transfer', '/transfers', [
@@ -223,7 +223,7 @@ $inventory = folder('Inventory', [
 $sales = folder('Sales', [
     folder('Sales Orders', [
         req('GET', 'List sales orders', '/sales-orders', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `sales.view`. A Sales Rep only sees their own orders. Newest `order_date` first.',
         ]),
         req('GET', 'Get sales order', '/sales-orders/{{sales_order_id}}', [
@@ -250,7 +250,7 @@ $sales = folder('Sales', [
     ]),
     folder('Invoices', [
         req('GET', 'List invoices', '/invoices', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `accounting.view`. No POST — invoices only come from the sales-order status transition.',
         ]),
         req('GET', 'Get invoice', '/invoices/{{invoice_id}}', [
@@ -259,7 +259,7 @@ $sales = folder('Sales', [
     ]),
     folder('Deliveries', [
         req('GET', 'List deliveries', '/deliveries', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `sales.view` (+ ownership if Sales Rep).',
         ]),
         req('GET', 'Get delivery', '/deliveries/{{delivery_id}}', []),
@@ -269,7 +269,7 @@ $sales = folder('Sales', [
     ]),
     folder('Collections', [
         req('GET', 'List collections', '/collections', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep).',
         ]),
         req('POST', 'Record collection', '/collections', [
@@ -279,7 +279,7 @@ $sales = folder('Sales', [
     ]),
     folder('Returns', [
         req('GET', 'List returns', '/returns', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `purchasing.view`.',
         ]),
         req('POST', 'Create return', '/returns', [
@@ -299,7 +299,7 @@ $sales = folder('Sales', [
 $purchasing = folder('Purchasing', [
     folder('Suppliers', [
         req('GET', 'List suppliers', '/suppliers', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `purchasing.view` (also reachable with `accounting.view`).',
         ]),
         req('POST', 'Create supplier', '/suppliers', [
@@ -312,7 +312,7 @@ $purchasing = folder('Purchasing', [
     ]),
     folder('Purchase Orders', [
         req('GET', 'List purchase orders', '/purchase-orders', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `purchasing.view`.',
         ]),
         req('GET', 'Get purchase order', '/purchase-orders/{{purchase_order_id}}', [
@@ -345,7 +345,7 @@ $purchasing = folder('Purchasing', [
 $crm = folder('CRM', [
     folder('Customers', [
         req('GET', 'List customers', '/customers', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `crm.view`. A Sales Rep sees only their own customers.',
         ]),
         req('GET', 'Get customer', '/customers/{{customer_id}}', [
@@ -363,7 +363,7 @@ $crm = folder('CRM', [
     ]),
     folder('Leads', [
         req('GET', 'List leads', '/leads', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `crm.view`. No update/delete endpoint.',
         ]),
         req('POST', 'Create lead', '/leads', [
@@ -373,7 +373,7 @@ $crm = folder('CRM', [
     ]),
     folder('Visits', [
         req('GET', 'List visits', '/visits', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create visit', '/visits', [
@@ -383,7 +383,7 @@ $crm = folder('CRM', [
     ]),
     folder('Complaints', [
         req('GET', 'List complaints', '/complaints', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create complaint', '/complaints', [
@@ -398,7 +398,7 @@ $crm = folder('CRM', [
     ]),
     folder('Campaigns', [
         req('GET', 'List campaigns', '/campaigns', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create campaign', '/campaigns', [
@@ -418,12 +418,12 @@ $crm = folder('CRM', [
 
 $accounting = folder('Accounting', [
     req('GET', 'Chart of accounts', '/chart-of-accounts', [
-        'query' => ['page' => 1, 'per_page' => 100],
+        'query' => ['page' => 1, 'per_page' => 100, 'export' => 'csv'],
         'description' => 'Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.',
     ]),
     req('GET', 'Journal entries', '/journal-entries', [
-        'query' => ['page' => 1, 'per_page' => 15, 'start_date' => '2026-09-01', 'end_date' => '2026-09-30'],
-        'description' => 'Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting.',
+        'query' => ['page' => 1, 'per_page' => 15, 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
+        'description' => 'Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting. Exported rows summarize lines into one column rather than one row per line.',
     ]),
     req('GET', 'Balance sheet', '/reports/balance-sheet', [
         'description' => 'Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. `balanced: false` is expected in this build (no period-close process sweeps net income into Retained Earnings).',
@@ -444,11 +444,11 @@ $analytics = folder('Analytics', [
         'description' => 'Requires `analytics.view`. The 8 KPI cards from spec §8 (monthly_sales, active_customers, collected_amount, outstanding_ar, overdue_amount, inventory_value, critical_expiry_count, pending_deliveries).',
     ]),
     req('GET', 'Expiry tracking', '/analytics/expiry', [
-        'query' => ['page' => 1, 'per_page' => 15],
+        'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
         'description' => 'Requires `analytics.view`. Paginated, soonest-expiring first. `days_left` is signed (negative = already expired). Excludes exhausted batches.',
     ]),
     req('GET', 'Stock rollup', '/analytics/stock', [
-        'query' => ['page' => 1, 'per_page' => 15],
+        'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
         'description' => 'Requires `analytics.view`. Per-product stock across every warehouse — paginated by product, not by row.',
     ]),
     req('GET', 'Sales report (export)', '/reports/sales', [
@@ -468,8 +468,8 @@ $analytics = folder('Analytics', [
 $admin = folder('Admin', [
     folder('Users', [
         req('GET', 'List users', '/users', [
-            'query' => ['page' => 1, 'per_page' => 15, 'role' => '', 'status' => ''],
-            'description' => 'Requires `admin.audit`.',
+            'query' => ['page' => 1, 'per_page' => 15, 'role' => '', 'status' => '', 'export' => 'csv'],
+            'description' => 'Requires `admin.audit` to view, `admin.export` to export (see the collection description\'s export note — same distinction as everywhere else).',
         ]),
         req('GET', 'Get user', '/users/{{demo_user_id}}', [
             'description' => "Requires `admin.audit`. Includes `warehouse_ids`. Targets `{{demo_user_id}}` (captured by Create user below), **not** `{{user_id}}` — `user_id` is whoever Login authenticated as, and this folder deliberately never reads or writes that id, so running it can't lock you out of your own session.",
@@ -486,8 +486,8 @@ $admin = folder('Admin', [
     ]),
     folder('Audit Log', [
         req('GET', 'List audit log', '/audit-log', [
-            'query' => ['page' => 1, 'per_page' => 15, 'module' => '', 'entity_type' => ''],
-            'description' => 'Requires `admin.audit`. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7).',
+            'query' => ['page' => 1, 'per_page' => 15, 'module' => '', 'entity_type' => '', 'export' => 'csv'],
+            'description' => 'Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.',
         ]),
         req('POST', 'Verify audit chain integrity', '/audit-log/verify-integrity', [
             'description' => 'Requires `admin.audit`. Re-walks the whole hash chain, returns `{ intact, broken_at }`. HTTP equivalent of the `audit:verify` console command.',
@@ -496,7 +496,7 @@ $admin = folder('Admin', [
     folder('Notifications', [
         req('GET', 'List notifications', '/notifications', [
             'query' => ['page' => 1, 'per_page' => 15],
-            'description' => 'Any authenticated user — own inbox (personal + broadcast, `user_id: null`).',
+            'description' => "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data.",
         ]),
         req('PUT', 'Mark all notifications read', '/notifications/read-all', [
             'description' => '`unread` is a single flag per row (spec §4.14 has no per-viewer read state) — marking a broadcast notification read here affects every user, not just the caller. See docs/api/admin.md for the full trade-off.',
@@ -504,7 +504,7 @@ $admin = folder('Admin', [
     ]),
     folder('Discarded Actions', [
         req('GET', 'List discarded actions', '/discarded-actions', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
             'description' => 'Requires `admin.view`. Tenant-wide — the admin review screen, not scoped to the caller.',
         ]),
         req('POST', 'Save discarded action', '/discarded-actions', [
@@ -517,7 +517,7 @@ $admin = folder('Admin', [
 $collection = [
     'info' => [
         'name' => 'VetPharma ERP API',
-        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     ],
     'auth' => [

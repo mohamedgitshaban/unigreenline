@@ -4,6 +4,7 @@ namespace Modules\Purchasing\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchasing\Http\Resources\PurchaseOrderResource;
@@ -13,6 +14,8 @@ use Modules\Purchasing\Services\ReceivePurchaseOrderService;
 
 class PurchaseOrderController extends Controller
 {
+    use Exportable;
+
     public function __construct(
         private readonly CreatePurchaseOrderService $createPurchaseOrder,
         private readonly ReceivePurchaseOrderService $receivePurchaseOrder,
@@ -22,10 +25,20 @@ class PurchaseOrderController extends Controller
     {
         $this->authorize('viewAny', PurchaseOrder::class);
 
-        $orders = PurchaseOrder::query()
+        $query = PurchaseOrder::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('order_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('order_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'purchasing.export', $query,
+            ['ID', 'Supplier', 'Warehouse', 'Status', 'Subtotal', 'Tax', 'Total', 'Order Date', 'Expected Date', 'Received Date'],
+            fn (PurchaseOrder $po) => [$po->id, $po->supplier_id, $po->warehouse_id, $po->status, $po->subtotal, $po->tax_amount, $po->total, $po->order_date->toDateString(), $po->expected_date?->toDateString(), $po->received_date?->toDateString()],
+            'purchase-orders',
+        )) {
+            return $export;
+        }
+
+        $orders = $query->paginate($request->integer('per_page', 15));
 
         return PurchaseOrderResource::collection($orders);
     }

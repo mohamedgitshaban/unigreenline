@@ -4,19 +4,31 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Inventory\Http\Requests\StoreProductCategoryRequest;
 use Modules\Inventory\Http\Resources\ProductCategoryResource;
 use Modules\Inventory\Models\ProductCategory;
 
 class ProductCategoryController extends Controller
 {
+    use Exportable;
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', ProductCategory::class);
 
-        $categories = ProductCategory::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->paginate($request->integer('per_page', 15));
+        $query = ProductCategory::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($export = $this->exportIfRequested(
+            $request, 'inventory.export', $query,
+            ['ID', 'Name', 'Code', 'Description', 'Active'],
+            fn (ProductCategory $c) => [$c->id, $c->name, $c->code, $c->description, $c->active ? 'Yes' : 'No'],
+            'categories',
+        )) {
+            return $export;
+        }
+
+        $categories = $query->paginate($request->integer('per_page', 15));
 
         return ProductCategoryResource::collection($categories);
     }

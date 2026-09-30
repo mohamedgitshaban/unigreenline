@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Http\Requests\StoreCustomerRequest;
 use Modules\CRM\Http\Requests\UpdateCustomerRequest;
@@ -14,19 +15,31 @@ use Modules\Sales\Models\SalesOrder;
 
 class CustomerController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Customer::class);
 
-        $customers = Customer::query()
+        $query = Customer::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when(
                 $request->user()->hasRole('Sales Rep'),
                 fn ($query) => $query->where('sales_rep_id', $request->user()->id)
-            )
-            ->paginate($request->integer('per_page', 15));
+            );
+
+        if ($export = $this->exportIfRequested(
+            $request, 'crm.export', $query,
+            ['ID', 'Name', 'Type', 'Classification', 'Phone', 'Email', 'City', 'Credit Limit', 'Balance', 'Status'],
+            fn (Customer $c) => [$c->id, $c->name, $c->type, $c->classification, $c->phone, $c->email, $c->city, $c->credit_limit, $c->balance, $c->status],
+            'customers',
+        )) {
+            return $export;
+        }
+
+        $customers = $query->paginate($request->integer('per_page', 15));
 
         return CustomerResource::collection($customers);
     }

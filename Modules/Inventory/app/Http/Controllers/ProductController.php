@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreProductRequest;
 use Modules\Inventory\Http\Requests\UpdateProductRequest;
@@ -12,15 +13,26 @@ use Modules\Inventory\Models\Product;
 
 class ProductController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Product::class);
 
-        $products = Product::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->paginate($request->integer('per_page', 15));
+        $query = Product::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($export = $this->exportIfRequested(
+            $request, 'inventory.export', $query,
+            ['ID', 'SKU', 'Name', 'Brand', 'Pack Unit', 'Carton Qty', 'Cost Price', 'Selling Price', 'Tax %', 'Active'],
+            fn (Product $p) => [$p->id, $p->sku, $p->name, $p->brand, $p->pack_unit, $p->carton_qty, $p->cost_price, $p->selling_price, $p->tax_pct, $p->active ? 'Yes' : 'No'],
+            'products',
+        )) {
+            return $export;
+        }
+
+        $products = $query->paginate($request->integer('per_page', 15));
 
         return ProductResource::collection($products);
     }

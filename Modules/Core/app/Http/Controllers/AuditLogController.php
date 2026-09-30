@@ -4,24 +4,37 @@ namespace Modules\Core\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Resources\AuditLogResource;
 use Modules\Core\Models\AuditLog;
 use Modules\Core\Services\AuditLogService;
 
 class AuditLogController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('admin.audit');
 
-        $entries = AuditLog::query()
+        $query = AuditLog::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('module'), fn ($query) => $query->where('module', $request->query('module')))
             ->when($request->filled('entity_type'), fn ($query) => $query->where('entity_type', $request->query('entity_type')))
-            ->orderByDesc('id')
-            ->paginate($request->integer('per_page', 15));
+            ->orderByDesc('id');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'admin.export', $query,
+            ['ID', 'Occurred At', 'User', 'Module', 'Entity Type', 'Entity ID', 'Operation', 'IP Address', 'Prev Hash', 'Entry Hash'],
+            fn (AuditLog $a) => [$a->id, $a->occurred_at->toDateTimeString(), $a->user_name, $a->module, $a->entity_type, $a->entity_id, $a->operation, $a->ip_address, $a->prev_hash, $a->entry_hash],
+            'audit-log',
+        )) {
+            return $export;
+        }
+
+        $entries = $query->paginate($request->integer('per_page', 15));
 
         return AuditLogResource::collection($entries);
     }

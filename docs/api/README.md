@@ -34,6 +34,34 @@ Unauthenticated requests return `401`:
 { "message": "Unauthenticated." }
 ```
 
+## Exporting a list as CSV or Excel
+
+Every list (index) endpoint documented below accepts `?export=csv` or
+`?export=xlsx` in addition to its normal filters — same filtered result set as
+the JSON response, but **every matching row, not just one page** (pagination
+params are ignored once `export` is set). The response is a real file
+download (`Content-Disposition: attachment`), not JSON — a real `.xlsx`
+(PhpSpreadsheet via `maatwebsite/excel`), not CSV with a renamed extension.
+
+```
+GET /api/v1/customers?export=csv
+GET /api/v1/sales-orders?export=xlsx&pay_type=credit   (any other filters the endpoint supports still apply)
+```
+
+**Requires `{module}.export` specifically — not just `{module}.view`.**
+Spec §2 treats Export as one of the eight capability types, distinct from
+View, and several roles have one without the other (e.g. `Sales Rep` and
+`Purchasing` can view their module's data but not export it; check the
+`permissions` array from login rather than assuming view implies export).
+An unrecognized `export` value (anything other than `csv`/`xlsx`) is ignored
+and falls back to the normal paginated JSON — it's not a validation error.
+
+Not exportable: `GET /notifications` (a personal inbox, not business data),
+`GET /analytics/dashboard` (a single object, not a list), and the two
+existing `/reports/*` endpoints (already dedicated JSON exports — see
+[analytics.md](./analytics.md)). `GET /analytics/stock`'s file export is
+flattened to one row per product+warehouse, unlike its nested JSON response.
+
 ## Endpoint groups (by build step)
 
 | Group | Status | Doc |

@@ -5,26 +5,39 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Sales\Http\Resources\DeliveryResource;
 use Modules\Sales\Models\Delivery;
 
 class DeliveryController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Delivery::class);
 
-        $deliveries = Delivery::query()
+        $query = Delivery::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when(
                 $request->user()->hasRole('Sales Rep'),
                 fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
             )
-            ->latest('delivery_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('delivery_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'sales.export', $query,
+            ['ID', 'Sales Order', 'Invoice', 'Customer', 'Driver', 'Delivery Date', 'Status', 'Delivered At'],
+            fn (Delivery $d) => [$d->id, $d->so_id, $d->invoice_id, $d->customer_id, $d->driver, $d->delivery_date?->toDateString(), $d->status, $d->delivered_at?->toDateTimeString()],
+            'deliveries',
+        )) {
+            return $export;
+        }
+
+        $deliveries = $query->paginate($request->integer('per_page', 15));
 
         return DeliveryResource::collection($deliveries);
     }

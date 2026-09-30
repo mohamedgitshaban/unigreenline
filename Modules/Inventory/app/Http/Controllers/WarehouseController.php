@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreWarehouseRequest;
@@ -13,16 +14,28 @@ use Modules\Inventory\Models\Warehouse;
 
 class WarehouseController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Warehouse::class);
 
-        $warehouses = Warehouse::query()
+        $query = Warehouse::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->visibleTo($request->user())
-            ->paginate($request->integer('per_page', 15));
+            ->visibleTo($request->user());
+
+        if ($export = $this->exportIfRequested(
+            $request, 'inventory.export', $query,
+            ['ID', 'Name', 'City', 'Governorate', 'Temperature', 'Capacity', 'Status', 'Stock Value'],
+            fn (Warehouse $w) => [$w->id, $w->name, $w->city, $w->governorate, $w->temperature, $w->capacity, $w->status, $w->stock_value],
+            'warehouses',
+        )) {
+            return $export;
+        }
+
+        $warehouses = $query->paginate($request->integer('per_page', 15));
 
         return WarehouseResource::collection($warehouses);
     }

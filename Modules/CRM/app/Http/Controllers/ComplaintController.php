@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\CRM\Http\Requests\ResolveComplaintRequest;
 use Modules\CRM\Http\Requests\StoreComplaintRequest;
 use Modules\CRM\Http\Resources\ComplaintResource;
@@ -11,14 +12,26 @@ use Modules\CRM\Models\Complaint;
 
 class ComplaintController extends Controller
 {
+    use Exportable;
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Complaint::class);
 
-        $complaints = Complaint::query()
+        $query = Complaint::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('complaint_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('complaint_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'crm.export', $query,
+            ['ID', 'Customer', 'Product', 'Type', 'Description', 'Priority', 'Status', 'Complaint Date', 'Resolved Date'],
+            fn (Complaint $c) => [$c->id, $c->customer_id, $c->product_id, $c->type, $c->description, $c->priority, $c->status, $c->complaint_date->toDateString(), $c->resolved_date?->toDateString()],
+            'complaints',
+        )) {
+            return $export;
+        }
+
+        $complaints = $query->paginate($request->integer('per_page', 15));
 
         return ComplaintResource::collection($complaints);
     }

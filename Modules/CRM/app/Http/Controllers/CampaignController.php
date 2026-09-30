@@ -4,20 +4,33 @@ namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\CRM\Http\Requests\StoreCampaignRequest;
 use Modules\CRM\Http\Resources\CampaignResource;
 use Modules\CRM\Models\Campaign;
 
 class CampaignController extends Controller
 {
+    use Exportable;
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Campaign::class);
 
-        $campaigns = Campaign::query()
+        $query = Campaign::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('start_date')
-            ->paginate($request->integer('per_page', 15));
+            ->latest('start_date');
+
+        if ($export = $this->exportIfRequested(
+            $request, 'crm.export', $query,
+            ['ID', 'Name', 'Type', 'Target', 'Discount', 'Start Date', 'End Date', 'Status', 'Reach', 'Revenue'],
+            fn (Campaign $c) => [$c->id, $c->name, $c->type, $c->target, $c->discount, $c->start_date->toDateString(), $c->end_date?->toDateString(), $c->status, $c->reach, $c->revenue],
+            'campaigns',
+        )) {
+            return $export;
+        }
+
+        $campaigns = $query->paginate($request->integer('per_page', 15));
 
         return CampaignResource::collection($campaigns);
     }

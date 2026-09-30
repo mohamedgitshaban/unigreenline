@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Requests\StoreUserRequest;
 use Modules\Core\Http\Requests\UpdateUserRequest;
 use Modules\Core\Http\Resources\UserResource;
@@ -14,17 +15,33 @@ use Modules\Core\Services\AuditLogService;
 
 class UserController extends Controller
 {
+    use Exportable;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', User::class);
 
-        $users = User::query()
+        $query = User::query()
+            ->with('roles')
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('role'), fn ($query) => $query->role($request->query('role')))
-            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->query('status')))
-            ->paginate($request->integer('per_page', 15));
+            ->when($request->filled('status'), fn ($query) => $query->where('status', $request->query('status')));
+
+        if ($export = $this->exportIfRequested(
+            $request, 'admin.export', $query,
+            ['ID', 'Name', 'Email', 'Role', 'Status', 'Last Login', 'Created At'],
+            // Password is never touched here — resolved from getRoleNames(),
+            // never a raw column, so there's no risk of it leaking into a
+            // future column addition by accident.
+            fn (User $u) => [$u->id, $u->name, $u->email, $u->getRoleNames()->first(), $u->status, $u->last_login?->toDateTimeString(), $u->created_at->toDateTimeString()],
+            'users',
+        )) {
+            return $export;
+        }
+
+        $users = $query->paginate($request->integer('per_page', 15));
 
         return UserResource::collection($users);
     }
