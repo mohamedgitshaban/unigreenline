@@ -41,7 +41,19 @@ function req(string $method, string $name, string $path, array $opts = []): arra
         $request['description'] = $opts['description'];
     }
 
-    if (isset($opts['body'])) {
+    if (isset($opts['files'])) {
+        // Any request carrying a file goes out as multipart/form-data; no
+        // explicit Content-Type header, since Postman must add the boundary
+        // itself. PHP only parses multipart bodies on POST, so PUT/PATCH are
+        // sent as POST with Laravel's `_method` spoofing field.
+        $fields = $opts['body'] ?? [];
+        if (in_array($method, ['PUT', 'PATCH'], true)) {
+            $fields = ['_method' => $method] + $fields;
+            $request['method'] = 'POST';
+        }
+
+        $request['body'] = ['mode' => 'formdata', 'formdata' => formFields($fields, $opts['files'])];
+    } elseif (isset($opts['body'])) {
         $request['header'][] = ['key' => 'Content-Type', 'value' => 'application/json'];
         $request['body'] = [
             'mode' => 'raw',
@@ -64,6 +76,36 @@ function req(string $method, string $name, string $path, array $opts = []): arra
     }
 
     return $item;
+}
+
+/**
+ * Postman form-data entries: text fields flattened to bracket notation
+ * (`lines[0][qty]`, which Laravel parses back into arrays), booleans as
+ * 1/0, then one file entry per `$files` key (field => description).
+ *
+ * @param  array<string, mixed>  $fields
+ * @param  array<string, string>  $files
+ * @return list<array{key: string, type: string, value?: string, src?: array<never>, description?: string}>
+ */
+function formFields(array $fields, array $files, string $prefix = ''): array
+{
+    $entries = [];
+
+    foreach ($fields as $key => $value) {
+        $name = $prefix === '' ? (string) $key : "{$prefix}[{$key}]";
+
+        if (is_array($value)) {
+            array_push($entries, ...formFields($value, [], $name));
+        } else {
+            $entries[] = ['key' => $name, 'value' => is_bool($value) ? (string) (int) $value : (string) $value, 'type' => 'text'];
+        }
+    }
+
+    foreach ($files as $key => $description) {
+        $entries[] = ['key' => $key, 'type' => 'file', 'src' => [], 'description' => $description];
+    }
+
+    return $entries;
 }
 
 function folder(string $name, array $items, ?string $description = null): array
