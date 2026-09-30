@@ -77,6 +77,10 @@ class Product extends Model
     {
         return $this->hasMany(InventoryBatch::class);
     }
+    public function supplier(): BelongsTo
+    {
+        return $this->belongsTo(\Modules\Purchasing\Models\Supplier::class, 'supplier_id');
+    }
 
     protected static function newFactory(): ProductFactory
     {
