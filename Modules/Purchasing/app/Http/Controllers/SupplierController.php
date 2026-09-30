@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Purchasing\Http\Requests\StoreSupplierRequest;
+use Modules\Purchasing\Http\Requests\UpdateSupplierRequest;
 use Modules\Purchasing\Http\Resources\SupplierResource;
 use Modules\Purchasing\Models\Supplier;
 
@@ -41,5 +42,12 @@ class SupplierController extends Controller
         $supplier = Supplier::create($data);
 
         return (new SupplierResource($supplier))->response()->setStatusCode(201);
+    }
+
+    public function update(UpdateSupplierRequest $request, Supplier $supplier)
+    {
+        $supplier->update($request->validated());
+
+        return new SupplierResource($supplier);
     }
 }

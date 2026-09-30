@@ -32,6 +32,21 @@ Requires `purchasing.add`. Only `name` is required.
 them (per spec §4.5) — it starts at 0 and moves further negative every time
 a PO from this supplier is received.
 
+## `PUT /api/v1/suppliers/{id}`
+
+Requires `purchasing.edit`, and the supplier must belong to your account
+(**403** otherwise). Partial update — send only the fields you're changing;
+same fields and rules as `POST`. `name` stays unique per account, but keeping
+a supplier's own current name is fine.
+
+```json
+{ "contact": "Ahmed Hassan", "rating": 5, "status": "inactive" }
+```
+
+**200** — the updated supplier. **422** if `name` is taken by another
+supplier. `balance` is not editable — it's ignored if sent; only receiving a
+PO moves it.
+
 ---
 
 ## `GET /api/v1/purchase-orders`, `GET /api/v1/purchase-orders/{id}`

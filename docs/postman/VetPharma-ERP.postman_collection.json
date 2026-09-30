@@ -1373,6 +1373,38 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "Update supplier",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/{{supplier_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "{{supplier_id}}"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"contact\": \"Postman Demo Contact\",\n    \"phone\": \"+20 2 1234 5678\",\n    \"rating\": 4\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     ]
                 },

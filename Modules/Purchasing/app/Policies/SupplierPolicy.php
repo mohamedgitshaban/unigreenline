@@ -3,6 +3,7 @@
 namespace Modules\Purchasing\Policies;
 
 use Modules\Core\Models\User;
+use Modules\Purchasing\Models\Supplier;
 
 /**
  * AP aging reads this same viewAny ability — Accountant (accounting.view,
@@ -19,5 +20,10 @@ class SupplierPolicy
     public function create(User $user): bool
     {
         return $user->can('purchasing.add');
+    }
+
+    public function update(User $user, Supplier $supplier): bool
+    {
+        return $user->can('purchasing.edit') && $supplier->tenant_id === $user->tenant_id;
     }
 }

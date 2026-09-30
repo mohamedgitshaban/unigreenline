@@ -8,6 +8,7 @@ use Modules\Purchasing\Http\Controllers\SupplierController;
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('suppliers', [SupplierController::class, 'index']);
     Route::post('suppliers', [SupplierController::class, 'store']);
+    Route::put('suppliers/{supplier}', [SupplierController::class, 'update']);
 
     Route::get('purchase-orders', [PurchaseOrderController::class, 'index']);
     Route::post('purchase-orders', [PurchaseOrderController::class, 'store']);

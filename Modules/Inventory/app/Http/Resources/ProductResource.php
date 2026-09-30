@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Purchasing\Http\Resources\SupplierResource;
 
 class ProductResource extends JsonResource
 {
@@ -11,8 +12,8 @@ class ProductResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'category_id' => $this->category_id,
-            'supplier_id' => $this->supplier_id,
+            'category' => ProductCategoryResource::make($this->whenLoaded('category')),
+            'supplier' => SupplierResource::make($this->whenLoaded('supplier')),
             'name' => $this->name,
             'sku' => $this->sku,
             'brand' => $this->brand,

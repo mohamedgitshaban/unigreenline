@@ -355,6 +355,10 @@ $purchasing = folder('Purchasing', [
             'body' => ['name' => 'Postman Demo Pharmaceutical Supplier', 'country' => 'Egypt', 'city' => 'Cairo', 'contact' => null, 'email' => null, 'phone' => null, 'pay_terms' => 'Net 30', 'currency' => 'EGP', 'rating' => null, 'status' => 'active'],
             'tests' => saveId('supplier_id'),
         ]),
+        req('PUT', 'Update supplier', '/suppliers/{{supplier_id}}', [
+            'description' => "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it.",
+            'body' => ['contact' => 'Postman Demo Contact', 'phone' => '+20 2 1234 5678', 'rating' => 4],
+        ]),
     ]),
     folder('Purchase Orders', [
         req('GET', 'List purchase orders', '/purchase-orders', [
