@@ -20,6 +20,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('categories', [ProductCategoryController::class, 'index']);
     Route::post('categories', [ProductCategoryController::class, 'store']);
+    Route::put('categories/{category}', [ProductCategoryController::class, 'update']);
 
     Route::post('inventory/grn', [GoodsReceiptController::class, 'store']);
 

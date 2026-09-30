@@ -144,7 +144,18 @@ Requires `inventory.add`. Only `name` is required; unique per account.
 { "name": "Antibiotics", "code": null, "description": null, "active": true }
 ```
 
-There is no `PUT /categories/{id}` yet — not in this step's scope.
+## `PUT /api/v1/categories/{id}`
+
+Requires `inventory.edit`, and the category must belong to your account
+(**403** otherwise). Partial update — send only the fields you're changing;
+same fields and rules as `POST`. `name` stays unique per account, but keeping
+a category's own current name is fine.
+
+```json
+{ "name": "Antibiotics & Antimicrobials", "active": false }
+```
+
+**200** — the updated category. **422** if `name` is taken by another category.
 
 ---
 

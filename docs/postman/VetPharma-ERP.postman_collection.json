@@ -484,7 +484,7 @@
                                         "categories"
                                     ]
                                 },
-                                "description": "Requires `inventory.add`. Only `name` required, unique per tenant. No PUT endpoint exists for categories.",
+                                "description": "Requires `inventory.add`. Only `name` required, unique per tenant.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n    \"name\": \"Postman Demo Category\",\n    \"code\": null,\n    \"description\": null,\n    \"active\": true\n}",
@@ -510,6 +510,38 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "Update category",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/categories/{{category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories",
+                                        "{{category_id}}"
+                                    ]
+                                },
+                                "description": "Requires `inventory.edit`, and the category must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the category itself.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"code\": \"PM-DEMO\",\n    \"description\": \"Updated from Postman\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
                         }
                     ]
                 },

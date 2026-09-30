@@ -215,11 +215,15 @@ $inventory = folder('Inventory', [
             'description' => 'Requires `inventory.view`.',
         ]),
         req('POST', 'Create category', '/categories', [
-            'description' => 'Requires `inventory.add`. Only `name` required, unique per tenant. No PUT endpoint exists for categories.',
+            'description' => 'Requires `inventory.add`. Only `name` required, unique per tenant.',
             // Not one of the 6 seeded category names (spec §7) — a real
             // name collision here is a 422 (unique per tenant).
             'body' => ['name' => 'Postman Demo Category', 'code' => null, 'description' => null, 'active' => true],
             'tests' => saveId('category_id'),
+        ]),
+        req('PUT', 'Update category', '/categories/{{category_id}}', [
+            'description' => "Requires `inventory.edit`, and the category must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the category itself.",
+            'body' => ['code' => 'PM-DEMO', 'description' => 'Updated from Postman'],
         ]),
     ]),
     folder('Products', [

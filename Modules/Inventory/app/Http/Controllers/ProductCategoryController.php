@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Inventory\Http\Requests\StoreProductCategoryRequest;
+use Modules\Inventory\Http\Requests\UpdateProductCategoryRequest;
 use Modules\Inventory\Http\Resources\ProductCategoryResource;
 use Modules\Inventory\Models\ProductCategory;
 
@@ -38,6 +39,13 @@ class ProductCategoryController extends Controller
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
         $category = ProductCategory::create($data);
+
+        return new ProductCategoryResource($category);
+    }
+
+    public function update(UpdateProductCategoryRequest $request, ProductCategory $category)
+    {
+        $category->update($request->validated());
 
         return new ProductCategoryResource($category);
     }
