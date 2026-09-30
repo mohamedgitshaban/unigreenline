@@ -5,20 +5,25 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Resources\NotificationResource;
 use Modules\Core\Models\Notification;
 
 class NotificationController extends Controller
 {
+    use Sortable;
+
     public function index(Request $request)
     {
         $user = $request->user();
 
-        $notifications = Notification::query()
+        $query = Notification::query()
             ->where('tenant_id', $user->tenant_id)
-            ->where(fn (Builder $query) => $query->where('user_id', $user->id)->orWhereNull('user_id'))
-            ->orderByDesc('created_at')
-            ->paginate($request->integer('per_page', 15));
+            ->where(fn (Builder $query) => $query->where('user_id', $user->id)->orWhereNull('user_id'));
+
+        $this->applySorting($request, $query);
+
+        $notifications = $query->paginate($request->integer('per_page', 15));
 
         return NotificationResource::collection($notifications);
     }

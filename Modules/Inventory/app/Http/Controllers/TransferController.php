@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Inventory\Http\Requests\StoreTransferRequest;
 use Modules\Inventory\Http\Resources\TransferResource;
 use Modules\Inventory\Models\Transfer;
@@ -12,7 +13,7 @@ use Modules\Inventory\Services\TransferStockService;
 
 class TransferController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly TransferStockService $transferStock) {}
 
@@ -21,8 +22,9 @@ class TransferController extends Controller
         $this->authorize('viewAny', Transfer::class);
 
         $query = Transfer::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('transfer_date');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'inventory.export', $query,

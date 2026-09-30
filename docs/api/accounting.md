@@ -14,7 +14,8 @@ own design, not spec-mandated.
 
 ## `GET /api/v1/chart-of-accounts`
 
-Flat list ordered by `code`, not nested — `parent_id` and `level` let the
+Flat list, not nested — newest first by default like every list; pass
+`?sort_by=code&sort_dir=asc` for chart order. `parent_id` and `level` let the
 frontend build a tree if it wants one. Defaults to 100/page (paginated, but
 there are usually few enough accounts that one page covers it).
 

@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Requests\StoreReturnRequest;
 use Modules\Sales\Http\Resources\ReturnRecordResource;
 use Modules\Sales\Models\ReturnRecord;
@@ -12,7 +13,7 @@ use Modules\Sales\Services\ProcessReturnService;
 
 class ReturnController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly ProcessReturnService $processReturn) {}
 
@@ -21,8 +22,9 @@ class ReturnController extends Controller
         $this->authorize('viewAny', ReturnRecord::class);
 
         $query = ReturnRecord::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('return_date');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, ['sales.export', 'purchasing.export'], $query,

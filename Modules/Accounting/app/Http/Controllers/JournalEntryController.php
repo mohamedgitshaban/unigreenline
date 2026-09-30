@@ -7,10 +7,11 @@ use Illuminate\Http\Request;
 use Modules\Accounting\Http\Resources\JournalEntryResource;
 use Modules\Accounting\Models\JournalEntry;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 
 class JournalEntryController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
@@ -20,8 +21,9 @@ class JournalEntryController extends Controller
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('start_date'), fn ($q) => $q->whereDate('entry_date', '>=', $request->date('start_date')))
             ->when($request->filled('end_date'), fn ($q) => $q->whereDate('entry_date', '<=', $request->date('end_date')))
-            ->with('lines')
-            ->latest('entry_date');
+            ->with('lines');
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'accounting.export', $query,

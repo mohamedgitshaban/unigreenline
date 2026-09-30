@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\ResolveComplaintRequest;
 use Modules\CRM\Http\Requests\StoreComplaintRequest;
 use Modules\CRM\Http\Resources\ComplaintResource;
@@ -12,15 +13,16 @@ use Modules\CRM\Models\Complaint;
 
 class ComplaintController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Complaint::class);
 
         $query = Complaint::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('complaint_date');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'crm.export', $query,

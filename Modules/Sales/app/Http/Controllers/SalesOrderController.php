@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
 use Modules\Sales\Http\Requests\UpdateSalesOrderStatusRequest;
 use Modules\Sales\Http\Resources\SalesOrderResource;
@@ -14,7 +15,7 @@ use Modules\Sales\Services\UpdateSalesOrderStatusService;
 
 class SalesOrderController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(
         private readonly CreateSalesOrderService $createSalesOrder,
@@ -27,8 +28,9 @@ class SalesOrderController extends Controller
 
         $query = SalesOrder::query()
             ->where('tenant_id', $request->user()->tenant_id)
-            ->visibleTo($request->user())
-            ->latest('order_date');
+            ->visibleTo($request->user());
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'sales.export', $query,

@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Http\Requests\StoreCustomerRequest;
 use Modules\CRM\Http\Requests\UpdateCustomerRequest;
@@ -15,7 +16,7 @@ use Modules\Sales\Models\SalesOrder;
 
 class CustomerController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -29,6 +30,8 @@ class CustomerController extends Controller
                 $request->user()->hasRole('Sales Rep'),
                 fn ($query) => $query->where('sales_rep_id', $request->user()->id)
             );
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'crm.export', $query,

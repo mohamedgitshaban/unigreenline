@@ -5,12 +5,13 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Resources\InvoiceResource;
 use Modules\Sales\Models\Invoice;
 
 class InvoiceController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
@@ -21,8 +22,9 @@ class InvoiceController extends Controller
             ->when(
                 $request->user()->hasRole('Sales Rep'),
                 fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
-            )
-            ->latest('issued_date');
+            );
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, ['sales.export', 'accounting.export'], $query,

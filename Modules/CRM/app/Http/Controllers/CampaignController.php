@@ -5,21 +5,23 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\StoreCampaignRequest;
 use Modules\CRM\Http\Resources\CampaignResource;
 use Modules\CRM\Models\Campaign;
 
 class CampaignController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Campaign::class);
 
         $query = Campaign::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('start_date');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'crm.export', $query,

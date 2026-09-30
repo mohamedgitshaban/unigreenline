@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Requests\StoreCollectionRequest;
 use Modules\Sales\Http\Resources\CollectionResource;
 use Modules\Sales\Models\Collection;
@@ -12,7 +13,7 @@ use Modules\Sales\Services\CreateCollectionService;
 
 class CollectionController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly CreateCollectionService $createCollection) {}
 
@@ -28,8 +29,9 @@ class CollectionController extends Controller
                     'invoice.salesOrder',
                     fn ($q) => $q->where('sales_rep_id', $request->user()->id)
                 )
-            )
-            ->latest('payment_date');
+            );
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, ['sales.export', 'accounting.export'], $query,

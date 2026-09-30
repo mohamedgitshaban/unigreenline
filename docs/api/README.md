@@ -62,6 +62,29 @@ existing `/reports/*` endpoints (already dedicated JSON exports — see
 [analytics.md](./analytics.md)). `GET /analytics/stock`'s file export is
 flattened to one row per product+warehouse, unlike its nested JSON response.
 
+## Sorting a list
+
+Every list (index) endpoint accepts `?sort_by=` and `?sort_dir=`. The default
+is **`sort_by=id&sort_dir=desc`** — ids are ULIDs (time-ordered), so that's
+newest first. Exports (`?export=`) use the same order.
+
+```
+GET /api/v1/products?sort_by=name&sort_dir=asc
+GET /api/v1/sales-orders?sort_by=order_date          (sort_dir defaults to desc)
+GET /api/v1/chart-of-accounts?sort_by=code&sort_dir=asc
+```
+
+- `sort_by` is any column of that resource's table (the field names in its
+  JSON response, for fields stored as columns). Hidden columns such as a
+  user's password are not sortable.
+- `sort_dir` is `asc` or `desc` (lowercase).
+- Anything else is a **422** validation error on `sort_by`/`sort_dir` —
+  unlike `export`, an unrecognized value is not silently ignored.
+- When sorting by a column other than `id`, `id desc` is applied as a
+  tie-breaker so rows with equal values keep a stable order across pages.
+
+Not sortable: `GET /analytics/*` and `/reports/*` (fixed report orderings).
+
 ## Endpoint groups (by build step)
 
 | Group | Status | Doc |

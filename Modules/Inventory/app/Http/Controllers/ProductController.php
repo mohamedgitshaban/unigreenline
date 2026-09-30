@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreProductRequest;
 use Modules\Inventory\Http\Requests\UpdateProductRequest;
@@ -13,7 +14,7 @@ use Modules\Inventory\Models\Product;
 
 class ProductController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -22,6 +23,8 @@ class ProductController extends Controller
         $this->authorize('viewAny', Product::class);
 
         $query = Product::query()->where('tenant_id', $request->user()->tenant_id)->with(['category', 'supplier']);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'inventory.export', $query,

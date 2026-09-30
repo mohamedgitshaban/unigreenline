@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Inventory\Http\Requests\StoreProductCategoryRequest;
 use Modules\Inventory\Http\Requests\UpdateProductCategoryRequest;
 use Modules\Inventory\Http\Resources\ProductCategoryResource;
@@ -12,13 +13,15 @@ use Modules\Inventory\Models\ProductCategory;
 
 class ProductCategoryController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ProductCategory::class);
 
         $query = ProductCategory::query()->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'inventory.export', $query,

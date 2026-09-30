@@ -6,13 +6,14 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Sales\Http\Resources\DeliveryResource;
 use Modules\Sales\Models\Delivery;
 
 class DeliveryController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -25,8 +26,9 @@ class DeliveryController extends Controller
             ->when(
                 $request->user()->hasRole('Sales Rep'),
                 fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
-            )
-            ->latest('delivery_date');
+            );
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'sales.export', $query,

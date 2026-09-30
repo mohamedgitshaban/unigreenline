@@ -98,7 +98,7 @@ user's own inbox.
 
 ### `GET /api/v1/notifications`
 
-Paginated, newest first. Returns notifications where `user_id` is the
+Paginated, newest first (sortable — see README's "Sorting a list"). Returns notifications where `user_id` is the
 caller's own id, or `user_id` is `null` (broadcast — spec §4.14).
 
 ### `PUT /api/v1/notifications/read-all`

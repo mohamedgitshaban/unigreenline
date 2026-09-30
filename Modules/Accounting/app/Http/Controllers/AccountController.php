@@ -7,18 +7,20 @@ use Illuminate\Http\Request;
 use Modules\Accounting\Http\Resources\AccountResource;
 use Modules\Accounting\Models\Account;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 
 class AccountController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Account::class);
 
         $query = Account::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->orderBy('code');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'accounting.export', $query,

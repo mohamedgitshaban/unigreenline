@@ -256,7 +256,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/warehouses?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/warehouses?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -272,6 +272,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -437,7 +447,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/categories?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/categories?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -453,6 +463,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -554,7 +574,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/products?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/products?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -570,6 +590,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -721,7 +751,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/transfers?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/transfers?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -737,6 +767,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -797,7 +837,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/customers?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/customers?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -813,6 +853,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -932,7 +982,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/leads?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/leads?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -948,6 +998,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1002,7 +1062,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/visits?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/visits?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1018,6 +1078,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1072,7 +1142,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/complaints?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/complaints?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1088,6 +1158,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1190,7 +1270,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/campaigns?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/campaigns?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1206,6 +1286,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1300,7 +1390,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/suppliers?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/suppliers?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1316,6 +1406,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1417,7 +1517,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/purchase-orders?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/purchase-orders?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1433,6 +1533,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1581,7 +1691,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/sales-orders?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/sales-orders?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1597,6 +1707,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1734,7 +1854,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/invoices?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/invoices?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1750,6 +1870,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1791,7 +1921,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/deliveries?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/deliveries?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1807,6 +1937,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1866,7 +2006,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/collections?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/collections?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1882,6 +2022,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -1936,7 +2086,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/returns?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/returns?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -1952,6 +2102,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -2027,7 +2187,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/chart-of-accounts?page=1&per_page=100&export=csv",
+                            "raw": "{{base_url}}/chart-of-accounts?page=1&per_page=100&sort_by=id&sort_dir=desc&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -2046,6 +2206,16 @@
                                     "disabled": true
                                 },
                                 {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
+                                    "disabled": true
+                                },
+                                {
                                     "key": "export",
                                     "value": "csv",
                                     "disabled": true
@@ -2061,7 +2231,7 @@
                         "method": "GET",
                         "header": [],
                         "url": {
-                            "raw": "{{base_url}}/journal-entries?page=1&per_page=15&start_date=2026-09-01&end_date=2026-09-30&export=csv",
+                            "raw": "{{base_url}}/journal-entries?page=1&per_page=15&sort_by=id&sort_dir=desc&start_date=2026-09-01&end_date=2026-09-30&export=csv",
                             "host": [
                                 "{{base_url}}"
                             ],
@@ -2077,6 +2247,16 @@
                                 {
                                     "key": "per_page",
                                     "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
                                     "disabled": true
                                 },
                                 {
@@ -2336,7 +2516,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/users?page=1&per_page=15&role=&status=&export=csv",
+                                    "raw": "{{base_url}}/users?page=1&per_page=15&sort_by=id&sort_dir=desc&role=&status=&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2352,6 +2532,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -2481,7 +2671,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/audit-log?page=1&per_page=15&module=&entity_type=&export=csv",
+                                    "raw": "{{base_url}}/audit-log?page=1&per_page=15&sort_by=id&sort_dir=desc&module=&entity_type=&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2497,6 +2687,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {
@@ -2548,7 +2748,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/notifications?page=1&per_page=15",
+                                    "raw": "{{base_url}}/notifications?page=1&per_page=15&sort_by=id&sort_dir=desc",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2564,6 +2764,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         }
                                     ]
@@ -2600,7 +2810,7 @@
                                 "method": "GET",
                                 "header": [],
                                 "url": {
-                                    "raw": "{{base_url}}/discarded-actions?page=1&per_page=15&export=csv",
+                                    "raw": "{{base_url}}/discarded-actions?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
                                     "host": [
                                         "{{base_url}}"
                                     ],
@@ -2616,6 +2826,16 @@
                                         {
                                             "key": "per_page",
                                             "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
                                             "disabled": true
                                         },
                                         {

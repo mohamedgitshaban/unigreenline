@@ -5,21 +5,23 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Requests\StoreDiscardedActionRequest;
 use Modules\Core\Http\Resources\DiscardedActionResource;
 use Modules\Core\Models\DiscardedAction;
 
 class DiscardedActionController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('admin.view');
 
         $query = DiscardedAction::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->orderByDesc('created_at');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'admin.export', $query,

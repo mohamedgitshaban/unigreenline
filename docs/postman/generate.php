@@ -188,7 +188,7 @@ $auth = folder('Auth', [
 $inventory = folder('Inventory', [
     folder('Warehouses', [
         req('GET', 'List warehouses', '/warehouses', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator.",
         ]),
         req('GET', 'Get warehouse', '/warehouses/{{warehouse_id}}', [
@@ -211,7 +211,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Categories', [
         req('GET', 'List categories', '/categories', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `inventory.view`.',
         ]),
         req('POST', 'Create category', '/categories', [
@@ -228,7 +228,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Products', [
         req('GET', 'List products', '/products', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `inventory.view`. Catalog-wide, not warehouse-scoped.',
         ]),
         req('GET', 'Get product', '/products/{{product_id}}', [
@@ -252,7 +252,7 @@ $inventory = folder('Inventory', [
     ]),
     folder('Transfers', [
         req('GET', 'List transfers', '/transfers', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `inventory.view`.',
         ]),
         req('POST', 'Create transfer', '/transfers', [
@@ -269,7 +269,7 @@ $inventory = folder('Inventory', [
 $sales = folder('Sales', [
     folder('Sales Orders', [
         req('GET', 'List sales orders', '/sales-orders', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `sales.view`. A Sales Rep only sees their own orders. Newest `order_date` first.',
         ]),
         req('GET', 'Get sales order', '/sales-orders/{{sales_order_id}}', [
@@ -296,7 +296,7 @@ $sales = folder('Sales', [
     ]),
     folder('Invoices', [
         req('GET', 'List invoices', '/invoices', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `accounting.view`. No POST — invoices only come from the sales-order status transition.',
         ]),
         req('GET', 'Get invoice', '/invoices/{{invoice_id}}', [
@@ -305,7 +305,7 @@ $sales = folder('Sales', [
     ]),
     folder('Deliveries', [
         req('GET', 'List deliveries', '/deliveries', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `sales.view` (+ ownership if Sales Rep).',
         ]),
         req('GET', 'Get delivery', '/deliveries/{{delivery_id}}', []),
@@ -315,7 +315,7 @@ $sales = folder('Sales', [
     ]),
     folder('Collections', [
         req('GET', 'List collections', '/collections', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep).',
         ]),
         req('POST', 'Record collection', '/collections', [
@@ -325,7 +325,7 @@ $sales = folder('Sales', [
     ]),
     folder('Returns', [
         req('GET', 'List returns', '/returns', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `sales.view` or `purchasing.view`.',
         ]),
         req('POST', 'Create return', '/returns', [
@@ -345,7 +345,7 @@ $sales = folder('Sales', [
 $purchasing = folder('Purchasing', [
     folder('Suppliers', [
         req('GET', 'List suppliers', '/suppliers', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `purchasing.view` (also reachable with `accounting.view`).',
         ]),
         req('POST', 'Create supplier', '/suppliers', [
@@ -362,7 +362,7 @@ $purchasing = folder('Purchasing', [
     ]),
     folder('Purchase Orders', [
         req('GET', 'List purchase orders', '/purchase-orders', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `purchasing.view`.',
         ]),
         req('GET', 'Get purchase order', '/purchase-orders/{{purchase_order_id}}', [
@@ -395,7 +395,7 @@ $purchasing = folder('Purchasing', [
 $crm = folder('CRM', [
     folder('Customers', [
         req('GET', 'List customers', '/customers', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `crm.view`. A Sales Rep sees only their own customers.',
         ]),
         req('GET', 'Get customer', '/customers/{{customer_id}}', [
@@ -413,7 +413,7 @@ $crm = folder('CRM', [
     ]),
     folder('Leads', [
         req('GET', 'List leads', '/leads', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `crm.view`. No update/delete endpoint.',
         ]),
         req('POST', 'Create lead', '/leads', [
@@ -423,7 +423,7 @@ $crm = folder('CRM', [
     ]),
     folder('Visits', [
         req('GET', 'List visits', '/visits', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create visit', '/visits', [
@@ -433,7 +433,7 @@ $crm = folder('CRM', [
     ]),
     folder('Complaints', [
         req('GET', 'List complaints', '/complaints', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create complaint', '/complaints', [
@@ -448,7 +448,7 @@ $crm = folder('CRM', [
     ]),
     folder('Campaigns', [
         req('GET', 'List campaigns', '/campaigns', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `crm.view`.',
         ]),
         req('POST', 'Create campaign', '/campaigns', [
@@ -468,11 +468,11 @@ $crm = folder('CRM', [
 
 $accounting = folder('Accounting', [
     req('GET', 'Chart of accounts', '/chart-of-accounts', [
-        'query' => ['page' => 1, 'per_page' => 100, 'export' => 'csv'],
+        'query' => ['page' => 1, 'per_page' => 100, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
         'description' => 'Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.',
     ]),
     req('GET', 'Journal entries', '/journal-entries', [
-        'query' => ['page' => 1, 'per_page' => 15, 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
+        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
         'description' => 'Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting. Exported rows summarize lines into one column rather than one row per line.',
     ]),
     req('GET', 'Balance sheet', '/reports/balance-sheet', [
@@ -518,7 +518,7 @@ $analytics = folder('Analytics', [
 $admin = folder('Admin', [
     folder('Users', [
         req('GET', 'List users', '/users', [
-            'query' => ['page' => 1, 'per_page' => 15, 'role' => '', 'status' => '', 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'role' => '', 'status' => '', 'export' => 'csv'],
             'description' => 'Requires `admin.audit` to view, `admin.export` to export (see the collection description\'s export note — same distinction as everywhere else).',
         ]),
         req('GET', 'Get user', '/users/{{demo_user_id}}', [
@@ -536,7 +536,7 @@ $admin = folder('Admin', [
     ]),
     folder('Audit Log', [
         req('GET', 'List audit log', '/audit-log', [
-            'query' => ['page' => 1, 'per_page' => 15, 'module' => '', 'entity_type' => '', 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'module' => '', 'entity_type' => '', 'export' => 'csv'],
             'description' => 'Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.',
         ]),
         req('POST', 'Verify audit chain integrity', '/audit-log/verify-integrity', [
@@ -545,7 +545,7 @@ $admin = folder('Admin', [
     ]),
     folder('Notifications', [
         req('GET', 'List notifications', '/notifications', [
-            'query' => ['page' => 1, 'per_page' => 15],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
             'description' => "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data.",
         ]),
         req('PUT', 'Mark all notifications read', '/notifications/read-all', [
@@ -554,7 +554,7 @@ $admin = folder('Admin', [
     ]),
     folder('Discarded Actions', [
         req('GET', 'List discarded actions', '/discarded-actions', [
-            'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `admin.view`. Tenant-wide — the admin review screen, not scoped to the caller.',
         ]),
         req('POST', 'Save discarded action', '/discarded-actions', [

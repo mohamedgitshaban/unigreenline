@@ -5,13 +5,14 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Resources\AuditLogResource;
 use Modules\Core\Models\AuditLog;
 use Modules\Core\Services\AuditLogService;
 
 class AuditLogController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -22,8 +23,9 @@ class AuditLogController extends Controller
         $query = AuditLog::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('module'), fn ($query) => $query->where('module', $request->query('module')))
-            ->when($request->filled('entity_type'), fn ($query) => $query->where('entity_type', $request->query('entity_type')))
-            ->orderByDesc('id');
+            ->when($request->filled('entity_type'), fn ($query) => $query->where('entity_type', $request->query('entity_type')));
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'admin.export', $query,

@@ -5,6 +5,7 @@ namespace Modules\Purchasing\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Purchasing\Http\Requests\StoreSupplierRequest;
 use Modules\Purchasing\Http\Requests\UpdateSupplierRequest;
 use Modules\Purchasing\Http\Resources\SupplierResource;
@@ -12,13 +13,15 @@ use Modules\Purchasing\Models\Supplier;
 
 class SupplierController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Supplier::class);
 
         $query = Supplier::query()->where('tenant_id', $request->user()->tenant_id);
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, ['purchasing.export', 'accounting.export'], $query,

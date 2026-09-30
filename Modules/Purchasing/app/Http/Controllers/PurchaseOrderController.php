@@ -5,6 +5,7 @@ namespace Modules\Purchasing\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchasing\Http\Resources\PurchaseOrderResource;
@@ -14,7 +15,7 @@ use Modules\Purchasing\Services\ReceivePurchaseOrderService;
 
 class PurchaseOrderController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(
         private readonly CreatePurchaseOrderService $createPurchaseOrder,
@@ -26,8 +27,9 @@ class PurchaseOrderController extends Controller
         $this->authorize('viewAny', PurchaseOrder::class);
 
         $query = PurchaseOrder::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->latest('order_date');
+            ->where('tenant_id', $request->user()->tenant_id)->with('supplier', 'warehouse', 'lines');
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'purchasing.export', $query,

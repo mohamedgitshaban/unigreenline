@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreWarehouseRequest;
@@ -14,7 +15,7 @@ use Modules\Inventory\Models\Warehouse;
 
 class WarehouseController extends Controller
 {
-    use Exportable;
+    use Exportable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -25,6 +26,8 @@ class WarehouseController extends Controller
         $query = Warehouse::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->visibleTo($request->user());
+
+        $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
             $request, 'inventory.export', $query,
