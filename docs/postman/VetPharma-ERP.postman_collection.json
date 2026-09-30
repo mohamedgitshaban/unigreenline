@@ -106,6 +106,11 @@
             "type": "string"
         },
         {
+            "key": "deletable_purchase_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
             "key": "complaint_id",
             "value": "",
             "type": "string"
@@ -1654,6 +1659,102 @@
                                         }
                                     }
                                 }
+                            }
+                        },
+                        {
+                            "name": "Create purchase order (to edit and delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders"
+                                    ]
+                                },
+                                "description": "A throwaway draft PO for the Update and Delete requests below — the main PO above has already been received by this point in the run, so it can no longer be edited or deleted.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"supplier_id\": \"{{supplier_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"expected_date\": null,\n    \"notes\": \"Postman demo — deleted by the next request\",\n    \"order_date\": \"2026-09-19\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 1,\n            \"cost_per_carton\": 40\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_purchase_order_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Update purchase order",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{deletable_purchase_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{deletable_purchase_order_id}}"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.edit`. **Only if not received** — a received PO returns 422. Partial update: send only the fields to change. `lines`, if sent, **replaces every line** and subtotal/tax/total are recalculated (omit it to keep the current lines). `status` accepts draft/sent/pending/cancelled — `received` only comes from the receive endpoint. A PO from another tenant is 404.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"sent\",\n    \"expected_date\": \"2026-10-15\",\n    \"notes\": \"Updated from Postman\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 2,\n            \"cost_per_carton\": 40\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Delete purchase order",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{deletable_purchase_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{deletable_purchase_order_id}}"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.delete` (only Administrator has it by default). **Only if not received** — a received PO (`stock_added: true`) returns 422, since its stock, supplier balance and journal entry can't be undone by a delete. Returns 204 and removes the PO with its lines; audit-logged as DELETE. A PO from another tenant is 404."
                             }
                         }
                     ]

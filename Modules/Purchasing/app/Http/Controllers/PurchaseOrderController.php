@@ -8,10 +8,13 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
+use Modules\Purchasing\Http\Requests\UpdatePurchaseOrderRequest;
 use Modules\Purchasing\Http\Resources\PurchaseOrderResource;
 use Modules\Purchasing\Models\PurchaseOrder;
 use Modules\Purchasing\Services\CreatePurchaseOrderService;
+use Modules\Purchasing\Services\DeletePurchaseOrderService;
 use Modules\Purchasing\Services\ReceivePurchaseOrderService;
+use Modules\Purchasing\Services\UpdatePurchaseOrderService;
 
 class PurchaseOrderController extends Controller
 {
@@ -20,6 +23,8 @@ class PurchaseOrderController extends Controller
     public function __construct(
         private readonly CreatePurchaseOrderService $createPurchaseOrder,
         private readonly ReceivePurchaseOrderService $receivePurchaseOrder,
+        private readonly DeletePurchaseOrderService $deletePurchaseOrder,
+        private readonly UpdatePurchaseOrderService $updatePurchaseOrder,
     ) {}
 
     public function index(Request $request)
@@ -66,6 +71,17 @@ class PurchaseOrderController extends Controller
         return (new PurchaseOrderResource($order))->response()->setStatusCode(201);
     }
 
+    public function update(UpdatePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder)
+    {
+        $order = $this->updatePurchaseOrder->update($purchaseOrder, $request->validated(), [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return new PurchaseOrderResource($order);
+    }
+
     public function receive(ReceivePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder)
     {
         $order = $this->receivePurchaseOrder->receive($purchaseOrder, $request->validated('receipts'), [
@@ -75,5 +91,22 @@ class PurchaseOrderController extends Controller
         ]);
 
         return new PurchaseOrderResource($order);
+    }
+
+    public function destroy(Request $request, PurchaseOrder $purchaseOrder)
+    {
+        // Checked outside the policy: Administrator's Gate::before bypass
+        // would otherwise let a destructive action cross tenants.
+        abort_unless($purchaseOrder->tenant_id === $request->user()->tenant_id, 404);
+
+        $this->authorize('delete', $purchaseOrder);
+
+        $this->deletePurchaseOrder->delete($purchaseOrder, [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return response()->noContent();
     }
 }

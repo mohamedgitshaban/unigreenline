@@ -4,12 +4,14 @@ namespace Modules\Purchasing\Services;
 
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\AuditLogService;
-use Modules\Inventory\Models\Product;
 use Modules\Purchasing\Models\PurchaseOrder;
 
 class CreatePurchaseOrderService
 {
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly PurchaseOrderTotalsCalculator $totals,
+    ) {}
 
     /**
      * @param  array{
@@ -21,18 +23,11 @@ class CreatePurchaseOrderService
      */
     public function create(array $data): PurchaseOrder
     {
-        $products = Product::query()->whereIn('id', array_column($data['lines'], 'product_id'))->get()->keyBy('id');
-
-        $computedLines = array_map(function (array $line) use ($products) {
-            $total = round($line['qty_cartons'] * $line['cost_per_carton'], 2);
-            $tax = round($total * (float) $products[$line['product_id']]->tax_pct / 100, 2);
-
-            return [...$line, 'total' => $total, 'tax' => $tax];
-        }, $data['lines']);
-
-        $subtotal = round(array_sum(array_column($computedLines, 'total')), 2);
-        $taxAmount = round(array_sum(array_column($computedLines, 'tax')), 2);
-        $total = round($subtotal + $taxAmount, 2);
+        $totals = $this->totals->calculate($data['lines']);
+        $computedLines = $totals['lines'];
+        $subtotal = $totals['subtotal'];
+        $taxAmount = $totals['tax_amount'];
+        $total = $totals['total'];
 
         return DB::transaction(function () use ($data, $computedLines, $subtotal, $taxAmount, $total) {
             $po = PurchaseOrder::create([

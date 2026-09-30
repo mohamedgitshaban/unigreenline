@@ -28,4 +28,21 @@ class PurchaseOrderPolicy
     {
         return $user->can('purchasing.approve');
     }
+
+    /**
+     * Tenant scoping is enforced in UpdatePurchaseOrderRequest, not here.
+     */
+    public function update(User $user): bool
+    {
+        return $user->can('purchasing.edit');
+    }
+
+    /**
+     * Tenant scoping for delete is enforced in the controller, not here —
+     * see PurchaseOrderController::destroy().
+     */
+    public function delete(User $user): bool
+    {
+        return $user->can('purchasing.delete');
+    }
 }

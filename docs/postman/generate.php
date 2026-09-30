@@ -382,6 +382,18 @@ $purchasing = folder('Purchasing', [
             'description' => "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by the Create Purchase Order request above — for a PO with more than one line, replace it with the specific line id you're receiving.",
             'body' => ['receipts' => [['line_id' => '{{purchase_order_line_id}}', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]]],
         ]),
+        req('POST', 'Create purchase order (to edit and delete)', '/purchase-orders', [
+            'description' => 'A throwaway draft PO for the Update and Delete requests below — the main PO above has already been received by this point in the run, so it can no longer be edited or deleted.',
+            'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'expected_date' => null, 'notes' => 'Postman demo — deleted by the next request', 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 1, 'cost_per_carton' => 40]]],
+            'tests' => saveId('deletable_purchase_order_id'),
+        ]),
+        req('PUT', 'Update purchase order', '/purchase-orders/{{deletable_purchase_order_id}}', [
+            'description' => 'Requires `purchasing.edit`. **Only if not received** — a received PO returns 422. Partial update: send only the fields to change. `lines`, if sent, **replaces every line** and subtotal/tax/total are recalculated (omit it to keep the current lines). `status` accepts draft/sent/pending/cancelled — `received` only comes from the receive endpoint. A PO from another tenant is 404.',
+            'body' => ['status' => 'sent', 'expected_date' => '2026-10-15', 'notes' => 'Updated from Postman', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 2, 'cost_per_carton' => 40]]],
+        ]),
+        req('DELETE', 'Delete purchase order', '/purchase-orders/{{deletable_purchase_order_id}}', [
+            'description' => "Requires `purchasing.delete` (only Administrator has it by default). **Only if not received** — a received PO (`stock_added: true`) returns 422, since its stock, supplier balance and journal entry can't be undone by a delete. Returns 204 and removes the PO with its lines; audit-logged as DELETE. A PO from another tenant is 404.",
+        ]),
     ]),
     req('GET', 'AP aging report', '/reports/ap-aging', [
         'description' => "Requires `purchasing.view` or `accounting.view`. **Not date-bucketed** (unlike AR) — `purchase_orders` has no due-date/payment tracking, so this is every supplier's current outstanding balance sorted by amount owed.",
@@ -595,6 +607,7 @@ $collection = [
             'delivery_id' => '',
             'purchase_order_id' => '',
             'purchase_order_line_id' => '',
+            'deletable_purchase_order_id' => '',
             'complaint_id' => '',
             'campaign_id' => '',
         ]),

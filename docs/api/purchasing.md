@@ -77,6 +77,46 @@ No discount field at this level — POs don't have one in the spec.
 
 ---
 
+## `PUT /api/v1/purchase-orders/{id}`
+
+Requires `purchasing.edit`. **Only while not received** — same rule as delete.
+Partial update: send only the fields you're changing.
+
+```json
+{
+  "supplier_id": "01m...", "warehouse_id": "01m...",
+  "order_date": "2026-09-19", "expected_date": "2026-10-15",
+  "notes": "Call before delivery", "status": "sent",
+  "lines": [ { "product_id": "01m...", "qty_cartons": 20, "cost_per_carton": 40 } ]
+}
+```
+
+- `lines` is optional. **If sent, it replaces every existing line** (line ids
+  change) and `subtotal`/`tax_amount`/`total` are recalculated exactly like on
+  create. Omit it to keep the current lines and totals.
+- `status` accepts `draft`, `sent`, `pending`, `cancelled`. `received` is
+  rejected (422) — only `POST .../receive` sets it.
+
+- **200** — the updated PO with `lines`.
+- **422** `{"message": "This purchase order has already been received."}` — a
+  received PO can't be edited.
+- **404** — the PO belongs to another account.
+
+## `DELETE /api/v1/purchase-orders/{id}`
+
+Requires `purchasing.delete` — by default only **Administrator** has it
+(`Purchasing` has view/add/edit/approve/print, not delete).
+
+**Only while not received.** Creating a PO has no stock, supplier-balance or
+journal side effects, so a draft/sent/pending/cancelled PO is simply removed
+along with its lines.
+
+- **204** — deleted (audit-logged as `DELETE`).
+- **422** `{"message": "This purchase order has already been received."}` — a
+  received PO (`stock_added: true`) can't be deleted; its stock, AP balance
+  and journal entry would need reversing, not deleting.
+- **404** — the PO belongs to another account.
+
 ## `POST /api/v1/purchase-orders/{id}/receive`
 
 Requires `purchasing.approve`. Adds stock for every line — this is where
@@ -138,8 +178,8 @@ negative `balance` (i.e. money we owe them), sorted by amount owed —
 
 ## Not built in this step
 
-- No `PUT /purchase-orders/{id}` (edit) or cancel — not in the spec's
-  endpoint table for POs either.
+- No separate cancel endpoint — set `status: "cancelled"` via `PUT`, or
+  delete the PO, while it's unreceived.
 - No partial/split receiving — a PO is received all at once, all lines.
 - No supplier-payment flow (paying down what we owe) — the spec describes
   collections (customer payments) in detail but nothing equivalent for
