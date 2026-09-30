@@ -12,8 +12,8 @@ class ProductResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'category' => ProductCategoryResource::make($this->whenLoaded('category')),
-            'supplier' => SupplierResource::make($this->whenLoaded('supplier')),
+            'category' => ProductCategoryResource::make($this->category),
+            'supplier' => SupplierResource::make($this->supplier),
             'name' => $this->name,
             'sku' => $this->sku,
             'brand' => $this->brand,
@@ -28,7 +28,7 @@ class ProductResource extends JsonResource
             'min_stock_cartons' => $this->min_stock_cartons,
             'reorder_level' => $this->reorder_level,
             'active' => $this->active,
-            'batches' => InventoryBatchResource::collection($this->whenLoaded('batches')),
+            'batches' => InventoryBatchResource::collection($this->batches),
         ];
     }
 }

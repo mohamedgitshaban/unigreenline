@@ -21,7 +21,7 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
 
-        $query = Product::query()->where('tenant_id', $request->user()->tenant_id);
+        $query = Product::query()->where('tenant_id', $request->user()->tenant_id)->with(['category', 'supplier']);
 
         if ($export = $this->exportIfRequested(
             $request, 'inventory.export', $query,
@@ -41,7 +41,7 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
 
-        return new ProductResource($product->load('batches'));
+        return new ProductResource($product->with(['batches', 'category', 'supplier']));
     }
 
     public function store(StoreProductRequest $request)
