@@ -45,7 +45,7 @@ class SalesOrderController extends Controller
             'salesRep.permissions',
         ]);
 
-        $this->applyFilters($request, $query, ['id', 'notes', 'customer.name', 'salesRep.name', 'warehouse.name']);
+        $this->applyFilters($request, $query, ['id', 'notes', 'customer_name', 'salesRep_name', 'warehouse_name']);
 
         $this->applySorting($request, $query);
 

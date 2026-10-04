@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\AuditLogController;
 use Modules\Core\Http\Controllers\Auth\AuthController;
+use Modules\Core\Http\Controllers\CityController;
 use Modules\Core\Http\Controllers\DiscardedActionController;
 use Modules\Core\Http\Controllers\NotificationController;
 use Modules\Core\Http\Controllers\UserController;
@@ -31,4 +32,6 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('discarded-actions', [DiscardedActionController::class, 'index']);
     Route::post('discarded-actions', [DiscardedActionController::class, 'store']);
+
+    Route::get('cities/egypt', [CityController::class, 'egypt']);
 });
