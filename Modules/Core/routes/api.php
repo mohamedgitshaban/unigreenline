@@ -33,5 +33,6 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('discarded-actions', [DiscardedActionController::class, 'index']);
     Route::post('discarded-actions', [DiscardedActionController::class, 'store']);
 
-    Route::get('cities/egypt', [CityController::class, 'egypt']);
+    Route::get('governorates', [CityController::class, 'governorates']);
+    Route::get('governorates/{governorate}/cities', [CityController::class, 'cities']);
 });
