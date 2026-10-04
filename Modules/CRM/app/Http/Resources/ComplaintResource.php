@@ -4,6 +4,8 @@ namespace Modules\CRM\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
+use Modules\Inventory\Http\Resources\ProductResource;
 
 class ComplaintResource extends JsonResource
 {
@@ -11,9 +13,9 @@ class ComplaintResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'customer_id' => $this->customer_id,
-            'product_id' => $this->product_id,
-            'assigned_to' => $this->assigned_to,
+            'customer' => CustomerResource::make($this->customer),
+            'product' => ProductResource::make($this->product),
+            'assigned_to' => UserResource::make($this->assignedTo),
             'batch_no' => $this->batch_no,
             'type' => $this->type,
             'description' => $this->description,

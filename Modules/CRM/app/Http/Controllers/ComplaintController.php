@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\ResolveComplaintRequest;
 use Modules\CRM\Http\Requests\StoreComplaintRequest;
@@ -13,7 +14,7 @@ use Modules\CRM\Models\Complaint;
 
 class ComplaintController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
@@ -21,6 +22,21 @@ class ComplaintController extends Controller
 
         $query = Complaint::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'customer',
+            'customer.salesRep',
+            'customer.salesRep.roles.permissions',
+            'customer.salesRep.permissions',
+            'product',
+            'product.category',
+            'product.supplier',
+            'assignedTo',
+            'assignedTo.roles.permissions',
+            'assignedTo.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'batch_no', 'type', 'description', 'customer.name', 'product.name']);
 
         $this->applySorting($request, $query);
 
@@ -33,7 +49,7 @@ class ComplaintController extends Controller
             return $export;
         }
 
-        $complaints = $query->paginate($request->integer('per_page', 15));
+        $complaints = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return ComplaintResource::collection($complaints);
     }

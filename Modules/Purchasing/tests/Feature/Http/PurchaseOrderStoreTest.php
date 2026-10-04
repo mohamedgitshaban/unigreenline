@@ -38,7 +38,7 @@ class PurchaseOrderStoreTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('data.status', 'draft');
-        $response->assertJsonPath('data.created_by', $user->id);
+        $response->assertJsonPath('data.created_by.id', $user->id);
     }
 
     public function test_warehouse_manager_cannot_create_a_purchase_order(): void

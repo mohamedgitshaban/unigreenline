@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 
 class LeadResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class LeadResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'assigned_to' => $this->assigned_to,
+            'assigned_to' => UserResource::make($this->assignedTo),
             'name' => $this->name,
             'type' => $this->type,
             'contact' => $this->contact,

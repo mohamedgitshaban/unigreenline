@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\StoreCampaignRequest;
 use Modules\CRM\Http\Resources\CampaignResource;
@@ -12,7 +13,7 @@ use Modules\CRM\Models\Campaign;
 
 class CampaignController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
@@ -20,6 +21,14 @@ class CampaignController extends Controller
 
         $query = Campaign::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'createdBy',
+            'createdBy.roles.permissions',
+            'createdBy.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['name', 'type', 'target', 'description']);
 
         $this->applySorting($request, $query);
 
@@ -32,7 +41,7 @@ class CampaignController extends Controller
             return $export;
         }
 
-        $campaigns = $query->paginate($request->integer('per_page', 15));
+        $campaigns = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return CampaignResource::collection($campaigns);
     }

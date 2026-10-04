@@ -85,6 +85,51 @@ GET /api/v1/chart-of-accounts?sort_by=code&sort_dir=asc
 
 Not sortable: `GET /analytics/*` and `/reports/*` (fixed report orderings).
 
+## Searching and filtering a list
+
+Every list (index) endpoint accepts `?search=` and `?filter[...]=`. Both
+combine with sorting, pagination and `?export=` (exports contain every
+matching row). Pagination `links` keep the query string.
+
+```
+GET /api/v1/products?search=amox
+GET /api/v1/sales-orders?filter[status]=invoiced&filter[total][gte]=1000
+GET /api/v1/invoices?filter[status][in]=outstanding,overdue&filter[due_date][lt]=2026-10-01
+GET /api/v1/customers?filter[name][like]=pharma&filter[city]=Cairo
+GET /api/v1/complaints?filter[resolved_date][null]=true
+```
+
+**`search`** is a case-insensitive "contains" match across a fixed set of
+text columns per resource (names, codes, phones, references, and related
+names such as the customer, product or supplier). `%` and `_` match
+literally. Max 255 characters.
+
+**`filter[column]=value`** is an exact match. `filter[column][op]=value`
+applies an operator:
+
+| op | Meaning |
+|---|---|
+| `eq` / `ne` | equal / not equal |
+| `gt` / `gte` / `lt` / `lte` | comparison (numbers, dates) |
+| `like` | contains (case-insensitive) |
+| `in` / `not_in` | comma-separated list |
+| `null` | `true` = is empty, `false` = has a value |
+
+- `column` is any column of that resource's table, the same set as `sort_by`.
+  Hidden columns such as a user's password can't be used. An unknown column
+  or operator returns a **422**.
+- Several filters are combined with AND, including two operators on the same
+  column (a range).
+- Booleans accept `true`/`false` (or `1`/`0`).
+- A date-only value (`YYYY-MM-DD`) against a timestamp column such as
+  `created_at` compares by calendar day, so `lte=2026-10-01` includes that
+  whole day.
+- An empty value (`filter[status]=`) is ignored.
+
+Endpoint-specific filters that already existed still work: `role`/`status`
+on users, `module`/`entity_type` on the audit log, `start_date`/`end_date` on
+journal entries.
+
 ## Endpoint groups (by build step)
 
 | Group | Status | Doc |

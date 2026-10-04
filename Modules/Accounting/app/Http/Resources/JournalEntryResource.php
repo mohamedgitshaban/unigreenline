@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 
 class JournalEntryResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class JournalEntryResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'created_by' => $this->created_by,
+            'created_by' => UserResource::make($this->createdBy),
             'ref' => $this->ref,
             'description' => $this->description,
             'entry_date' => $this->entry_date->toDateString(),

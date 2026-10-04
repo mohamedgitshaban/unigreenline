@@ -5,6 +5,7 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Resources\AuditLogResource;
 use Modules\Core\Models\AuditLog;
@@ -12,7 +13,7 @@ use Modules\Core\Services\AuditLogService;
 
 class AuditLogController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -25,6 +26,14 @@ class AuditLogController extends Controller
             ->when($request->filled('module'), fn ($query) => $query->where('module', $request->query('module')))
             ->when($request->filled('entity_type'), fn ($query) => $query->where('entity_type', $request->query('entity_type')));
 
+        $query->with([
+            'user',
+            'user.roles.permissions',
+            'user.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['user_name', 'module', 'entity_type', 'entity_id', 'operation', 'ip_address', 'request_id']);
+
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
@@ -36,7 +45,7 @@ class AuditLogController extends Controller
             return $export;
         }
 
-        $entries = $query->paginate($request->integer('per_page', 15));
+        $entries = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return AuditLogResource::collection($entries);
     }

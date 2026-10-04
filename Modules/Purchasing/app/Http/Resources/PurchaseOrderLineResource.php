@@ -4,6 +4,7 @@ namespace Modules\Purchasing\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Inventory\Http\Resources\ProductResource;
 
 class PurchaseOrderLineResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class PurchaseOrderLineResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'product_id' => $this->product_id,
+            'product' => ProductResource::make($this->product),
             'qty_cartons' => $this->qty_cartons,
             'cost_per_carton' => $this->cost_per_carton,
             'total' => $this->total,

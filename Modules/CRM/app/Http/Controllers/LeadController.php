@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\StoreLeadRequest;
 use Modules\CRM\Http\Resources\LeadResource;
@@ -12,13 +13,21 @@ use Modules\CRM\Models\Lead;
 
 class LeadController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Lead::class);
 
         $query = Lead::query()->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'assignedTo',
+            'assignedTo.roles.permissions',
+            'assignedTo.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['name', 'contact', 'phone', 'email', 'source', 'notes']);
 
         $this->applySorting($request, $query);
 
@@ -31,7 +40,7 @@ class LeadController extends Controller
             return $export;
         }
 
-        $leads = $query->paginate($request->integer('per_page', 15));
+        $leads = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return LeadResource::collection($leads);
     }

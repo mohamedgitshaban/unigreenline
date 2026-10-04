@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Inventory\Http\Requests\StoreTransferRequest;
 use Modules\Inventory\Http\Resources\TransferResource;
@@ -13,7 +14,7 @@ use Modules\Inventory\Services\TransferStockService;
 
 class TransferController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly TransferStockService $transferStock) {}
 
@@ -23,6 +24,25 @@ class TransferController extends Controller
 
         $query = Transfer::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'product',
+            'product.category',
+            'product.supplier',
+            'fromWarehouse',
+            'fromWarehouse.manager',
+            'fromWarehouse.manager.roles.permissions',
+            'fromWarehouse.manager.permissions',
+            'toWarehouse',
+            'toWarehouse.manager',
+            'toWarehouse.manager.roles.permissions',
+            'toWarehouse.manager.permissions',
+            'createdBy',
+            'createdBy.roles.permissions',
+            'createdBy.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'batch_no', 'notes', 'product.name', 'fromWarehouse.name', 'toWarehouse.name']);
 
         $this->applySorting($request, $query);
 
@@ -35,7 +55,7 @@ class TransferController extends Controller
             return $export;
         }
 
-        $transfers = $query->paginate($request->integer('per_page', 15));
+        $transfers = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return TransferResource::collection($transfers);
     }

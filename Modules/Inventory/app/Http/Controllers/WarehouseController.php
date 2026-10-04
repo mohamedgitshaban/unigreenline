@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
@@ -15,7 +16,7 @@ use Modules\Inventory\Models\Warehouse;
 
 class WarehouseController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -26,6 +27,14 @@ class WarehouseController extends Controller
         $query = Warehouse::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->visibleTo($request->user());
+
+        $query->with([
+            'manager',
+            'manager.roles.permissions',
+            'manager.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['name', 'city', 'governorate', 'address', 'manager_name', 'phone']);
 
         $this->applySorting($request, $query);
 
@@ -38,7 +47,7 @@ class WarehouseController extends Controller
             return $export;
         }
 
-        $warehouses = $query->paginate($request->integer('per_page', 15));
+        $warehouses = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return WarehouseResource::collection($warehouses);
     }
@@ -47,7 +56,7 @@ class WarehouseController extends Controller
     {
         $this->authorize('view', $warehouse);
 
-        return new WarehouseResource($warehouse->load('batches'));
+        return new WarehouseResource($warehouse->load('batches.product'));
     }
 
     public function store(StoreWarehouseRequest $request)

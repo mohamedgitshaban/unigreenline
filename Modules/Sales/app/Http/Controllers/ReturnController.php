@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Requests\StoreReturnRequest;
 use Modules\Sales\Http\Resources\ReturnRecordResource;
@@ -13,7 +14,7 @@ use Modules\Sales\Services\ProcessReturnService;
 
 class ReturnController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly ProcessReturnService $processReturn) {}
 
@@ -23,6 +24,40 @@ class ReturnController extends Controller
 
         $query = ReturnRecord::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'invoice',
+            'invoice.salesOrder',
+            'invoice.salesOrder.customer',
+            'invoice.salesOrder.customer.salesRep',
+            'invoice.salesOrder.customer.salesRep.roles.permissions',
+            'invoice.salesOrder.customer.salesRep.permissions',
+            'invoice.salesOrder.warehouse',
+            'invoice.salesOrder.warehouse.manager',
+            'invoice.salesOrder.warehouse.manager.roles.permissions',
+            'invoice.salesOrder.warehouse.manager.permissions',
+            'invoice.salesOrder.salesRep',
+            'invoice.salesOrder.salesRep.roles.permissions',
+            'invoice.salesOrder.salesRep.permissions',
+            'invoice.customer',
+            'invoice.customer.salesRep',
+            'invoice.customer.salesRep.roles.permissions',
+            'invoice.customer.salesRep.permissions',
+            'customer',
+            'customer.salesRep',
+            'customer.salesRep.roles.permissions',
+            'customer.salesRep.permissions',
+            'supplier',
+            'product',
+            'product.category',
+            'product.supplier',
+            'warehouse',
+            'warehouse.manager',
+            'warehouse.manager.roles.permissions',
+            'warehouse.manager.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'batch_no', 'reason', 'product.name', 'customer.name', 'supplier.name']);
 
         $this->applySorting($request, $query);
 
@@ -35,7 +70,7 @@ class ReturnController extends Controller
             return $export;
         }
 
-        $returns = $query->paginate($request->integer('per_page', 15));
+        $returns = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return ReturnRecordResource::collection($returns);
     }

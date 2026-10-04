@@ -11,8 +11,8 @@ class InventoryBatchResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'product_id' => $this->product_id,
-            'warehouse_id' => $this->warehouse_id,
+            'product' => ProductResource::make($this->whenLoaded('product')),
+            'warehouse' => WarehouseResource::make($this->whenLoaded('warehouse')),
             'batch_no' => $this->batch_no,
             'mfg_date' => $this->mfg_date?->toDateString(),
             'exp_date' => $this->exp_date->toDateString(),

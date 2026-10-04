@@ -4,6 +4,7 @@ namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Inventory\Http\Resources\ProductResource;
 
 class SalesOrderLineResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class SalesOrderLineResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'product_id' => $this->product_id,
+            'product' => ProductResource::make($this->product),
             'batch_no' => $this->batch_no,
             'qty' => $this->qty,
             'unit' => $this->unit,

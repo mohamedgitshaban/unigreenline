@@ -4,6 +4,8 @@ namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
+use Modules\CRM\Http\Resources\CustomerResource;
 
 class CollectionResource extends JsonResource
 {
@@ -11,9 +13,9 @@ class CollectionResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'invoice_id' => $this->invoice_id,
-            'customer_id' => $this->customer_id,
-            'collected_by' => $this->collected_by,
+            'invoice' => InvoiceResource::make($this->invoice),
+            'customer' => CustomerResource::make($this->customer),
+            'collected_by' => UserResource::make($this->collectedBy),
             'amount' => $this->amount,
             'method' => $this->method,
             'reference' => $this->reference,

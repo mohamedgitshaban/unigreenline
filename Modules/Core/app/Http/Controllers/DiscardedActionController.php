@@ -5,6 +5,7 @@ namespace Modules\Core\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Requests\StoreDiscardedActionRequest;
 use Modules\Core\Http\Resources\DiscardedActionResource;
@@ -12,7 +13,7 @@ use Modules\Core\Models\DiscardedAction;
 
 class DiscardedActionController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
@@ -20,6 +21,14 @@ class DiscardedActionController extends Controller
 
         $query = DiscardedAction::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'user',
+            'user.roles.permissions',
+            'user.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['user_name', 'type', 'label']);
 
         $this->applySorting($request, $query);
 
@@ -32,7 +41,7 @@ class DiscardedActionController extends Controller
             return $export;
         }
 
-        $actions = $query->paginate($request->integer('per_page', 15));
+        $actions = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return DiscardedActionResource::collection($actions);
     }

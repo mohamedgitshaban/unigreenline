@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Requests\StoreUserRequest;
 use Modules\Core\Http\Requests\UpdateUserRequest;
@@ -16,7 +17,7 @@ use Modules\Core\Services\AuditLogService;
 
 class UserController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -29,6 +30,8 @@ class UserController extends Controller
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('role'), fn ($query) => $query->role($request->query('role')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->query('status')));
+
+        $this->applyFilters($request, $query, ['name', 'email']);
 
         $this->applySorting($request, $query);
 
@@ -44,7 +47,7 @@ class UserController extends Controller
             return $export;
         }
 
-        $users = $query->paginate($request->integer('per_page', 15));
+        $users = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return UserResource::collection($users);
     }

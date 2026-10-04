@@ -29,7 +29,7 @@ class CampaignTest extends TestCase
 
         $response->assertCreated();
         $response->assertJsonPath('data.status', 'active');
-        $response->assertJsonPath('data.created_by', $user->id);
+        $response->assertJsonPath('data.created_by.id', $user->id);
     }
 
     public function test_ending_a_campaign_marks_it_completed(): void

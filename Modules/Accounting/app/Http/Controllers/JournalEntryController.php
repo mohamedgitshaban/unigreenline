@@ -7,11 +7,12 @@ use Illuminate\Http\Request;
 use Modules\Accounting\Http\Resources\JournalEntryResource;
 use Modules\Accounting\Models\JournalEntry;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 
 class JournalEntryController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
@@ -20,8 +21,16 @@ class JournalEntryController extends Controller
         $query = JournalEntry::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('start_date'), fn ($q) => $q->whereDate('entry_date', '>=', $request->date('start_date')))
-            ->when($request->filled('end_date'), fn ($q) => $q->whereDate('entry_date', '<=', $request->date('end_date')))
-            ->with('lines');
+            ->when($request->filled('end_date'), fn ($q) => $q->whereDate('entry_date', '<=', $request->date('end_date')));
+
+        $query->with([
+            'lines.account',
+            'createdBy',
+            'createdBy.roles.permissions',
+            'createdBy.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'ref', 'description', 'lines.account_code']);
 
         $this->applySorting($request, $query);
 
@@ -40,7 +49,7 @@ class JournalEntryController extends Controller
             return $export;
         }
 
-        $entries = $query->paginate($request->integer('per_page', 15));
+        $entries = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return JournalEntryResource::collection($entries);
     }

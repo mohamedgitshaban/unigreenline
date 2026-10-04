@@ -4,6 +4,7 @@ namespace Modules\Purchasing\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 use Modules\Inventory\Http\Resources\WarehouseResource;
 
 class PurchaseOrderResource extends JsonResource
@@ -14,7 +15,7 @@ class PurchaseOrderResource extends JsonResource
             'id' => $this->id,
             'supplier' => SupplierResource::make($this->supplier),
             'warehouse' => WarehouseResource::make($this->warehouse),
-            'created_by' => $this->created_by,
+            'created_by' => UserResource::make($this->createdBy),
             'status' => $this->status,
             'stock_added' => $this->stock_added,
             'order_date' => $this->order_date->toDateString(),

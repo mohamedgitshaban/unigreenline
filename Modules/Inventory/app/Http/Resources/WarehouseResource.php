@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 
 class WarehouseResource extends JsonResource
 {
@@ -15,7 +16,7 @@ class WarehouseResource extends JsonResource
             'city' => $this->city,
             'governorate' => $this->governorate,
             'address' => $this->address,
-            'manager_id' => $this->manager_id,
+            'manager' => UserResource::make($this->manager),
             'manager_name' => $this->manager_name,
             'temperature' => $this->temperature,
             'capacity' => $this->capacity,

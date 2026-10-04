@@ -30,6 +30,6 @@ class CustomerVisitStoreTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.rep_id', $rep->id);
+        $response->assertJsonPath('data.rep.id', $rep->id);
     }
 }

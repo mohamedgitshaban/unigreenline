@@ -41,7 +41,7 @@ class SalesOrderStoreTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.sales_rep_id', $rep->id);
+        $response->assertJsonPath('data.sales_rep.id', $rep->id);
     }
 
     public function test_sales_rep_cannot_create_an_order_under_another_reps_name(): void

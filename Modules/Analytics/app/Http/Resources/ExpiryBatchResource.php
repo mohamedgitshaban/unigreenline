@@ -4,6 +4,8 @@ namespace Modules\Analytics\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Inventory\Http\Resources\ProductResource;
+use Modules\Inventory\Http\Resources\WarehouseResource;
 
 class ExpiryBatchResource extends JsonResource
 {
@@ -11,10 +13,8 @@ class ExpiryBatchResource extends JsonResource
     {
         return [
             'batch_id' => $this->id,
-            'product_id' => $this->product_id,
-            'product_name' => $this->product?->name,
-            'warehouse_id' => $this->warehouse_id,
-            'warehouse_name' => $this->warehouse?->name,
+            'product' => ProductResource::make($this->product),
+            'warehouse' => WarehouseResource::make($this->warehouse),
             'batch_no' => $this->batch_no,
             'exp_date' => $this->exp_date->toDateString(),
             'qty_cartons' => $this->qty_cartons,

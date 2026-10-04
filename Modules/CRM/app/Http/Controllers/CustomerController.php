@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Http\Requests\StoreCustomerRequest;
@@ -16,7 +17,7 @@ use Modules\Sales\Models\SalesOrder;
 
 class CustomerController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -31,6 +32,14 @@ class CustomerController extends Controller
                 fn ($query) => $query->where('sales_rep_id', $request->user()->id)
             );
 
+        $query->with([
+            'salesRep',
+            'salesRep.roles.permissions',
+            'salesRep.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['name', 'phone', 'email', 'governorate', 'province', 'city', 'area', 'address']);
+
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
@@ -42,7 +51,7 @@ class CustomerController extends Controller
             return $export;
         }
 
-        $customers = $query->paginate($request->integer('per_page', 15));
+        $customers = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return CustomerResource::collection($customers);
     }

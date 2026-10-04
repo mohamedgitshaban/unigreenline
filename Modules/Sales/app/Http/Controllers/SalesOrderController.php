@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
 use Modules\Sales\Http\Requests\UpdateSalesOrderStatusRequest;
@@ -15,7 +16,7 @@ use Modules\Sales\Services\UpdateSalesOrderStatusService;
 
 class SalesOrderController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(
         private readonly CreateSalesOrderService $createSalesOrder,
@@ -30,6 +31,22 @@ class SalesOrderController extends Controller
             ->where('tenant_id', $request->user()->tenant_id)
             ->visibleTo($request->user());
 
+        $query->with([
+            'customer',
+            'customer.salesRep',
+            'customer.salesRep.roles.permissions',
+            'customer.salesRep.permissions',
+            'warehouse',
+            'warehouse.manager',
+            'warehouse.manager.roles.permissions',
+            'warehouse.manager.permissions',
+            'salesRep',
+            'salesRep.roles.permissions',
+            'salesRep.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'notes', 'customer.name', 'salesRep.name', 'warehouse.name']);
+
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
@@ -41,7 +58,7 @@ class SalesOrderController extends Controller
             return $export;
         }
 
-        $orders = $query->paginate($request->integer('per_page', 15));
+        $orders = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return SalesOrderResource::collection($orders);
     }

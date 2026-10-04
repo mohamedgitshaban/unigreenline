@@ -4,6 +4,7 @@ namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\CRM\Http\Resources\CustomerResource;
 
 class DeliveryResource extends JsonResource
 {
@@ -11,9 +12,9 @@ class DeliveryResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'so_id' => $this->so_id,
-            'invoice_id' => $this->invoice_id,
-            'customer_id' => $this->customer_id,
+            'sales_order' => SalesOrderResource::make($this->salesOrder),
+            'invoice' => InvoiceResource::make($this->invoice),
+            'customer' => CustomerResource::make($this->customer),
             'driver' => $this->driver,
             'delivery_date' => $this->delivery_date?->toDateString(),
             'status' => $this->status,

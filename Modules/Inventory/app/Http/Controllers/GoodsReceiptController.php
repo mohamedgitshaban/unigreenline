@@ -43,6 +43,6 @@ class GoodsReceiptController extends Controller
             return $batch;
         });
 
-        return (new InventoryBatchResource($batch))->response()->setStatusCode(201);
+        return (new InventoryBatchResource($batch->load(['product', 'warehouse'])))->response()->setStatusCode(201);
     }
 }

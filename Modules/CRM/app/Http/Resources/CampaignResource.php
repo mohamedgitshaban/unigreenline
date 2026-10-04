@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 
 class CampaignResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class CampaignResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'created_by' => $this->created_by,
+            'created_by' => UserResource::make($this->createdBy),
             'name' => $this->name,
             'type' => $this->type,
             'target' => $this->target,

@@ -4,6 +4,7 @@ namespace Modules\CRM\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
 
 class CustomerResource extends JsonResource
 {
@@ -11,7 +12,7 @@ class CustomerResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'sales_rep_id' => $this->sales_rep_id,
+            'sales_rep' => UserResource::make($this->salesRep),
             'name' => $this->name,
             'type' => $this->type,
             'classification' => $this->classification,

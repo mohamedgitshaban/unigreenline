@@ -4,6 +4,9 @@ namespace Modules\Sales\Http\Resources;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Modules\Core\Http\Resources\UserResource;
+use Modules\CRM\Http\Resources\CustomerResource;
+use Modules\Inventory\Http\Resources\WarehouseResource;
 
 class SalesOrderResource extends JsonResource
 {
@@ -11,9 +14,9 @@ class SalesOrderResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'customer_id' => $this->customer_id,
-            'sales_rep_id' => $this->sales_rep_id,
-            'warehouse_id' => $this->warehouse_id,
+            'customer' => CustomerResource::make($this->customer),
+            'sales_rep' => UserResource::make($this->salesRep),
+            'warehouse' => WarehouseResource::make($this->warehouse),
             'status' => $this->status,
             'pay_type' => $this->pay_type,
             'grace_period' => $this->grace_period,

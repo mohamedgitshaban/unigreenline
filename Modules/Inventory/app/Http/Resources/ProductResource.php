@@ -28,7 +28,7 @@ class ProductResource extends JsonResource
             'min_stock_cartons' => $this->min_stock_cartons,
             'reorder_level' => $this->reorder_level,
             'active' => $this->active,
-            'batches' => InventoryBatchResource::collection($this->batches),
+            'batches' => InventoryBatchResource::collection($this->whenLoaded('batches')),
         ];
     }
 }

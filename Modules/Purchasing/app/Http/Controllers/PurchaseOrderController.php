@@ -5,6 +5,7 @@ namespace Modules\Purchasing\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
@@ -18,7 +19,7 @@ use Modules\Purchasing\Services\UpdatePurchaseOrderService;
 
 class PurchaseOrderController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(
         private readonly CreatePurchaseOrderService $createPurchaseOrder,
@@ -32,7 +33,23 @@ class PurchaseOrderController extends Controller
         $this->authorize('viewAny', PurchaseOrder::class);
 
         $query = PurchaseOrder::query()
-            ->where('tenant_id', $request->user()->tenant_id)->with('supplier', 'warehouse', 'lines');
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'supplier',
+            'warehouse',
+            'warehouse.manager',
+            'warehouse.manager.roles.permissions',
+            'warehouse.manager.permissions',
+            'createdBy',
+            'createdBy.roles.permissions',
+            'createdBy.permissions',
+            'lines.product',
+            'lines.product.category',
+            'lines.product.supplier',
+        ]);
+
+        $this->applyFilters($request, $query, ['id', 'notes', 'supplier.name', 'warehouse.name']);
 
         $this->applySorting($request, $query);
 
@@ -45,7 +62,7 @@ class PurchaseOrderController extends Controller
             return $export;
         }
 
-        $orders = $query->paginate($request->integer('per_page', 15));
+        $orders = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return PurchaseOrderResource::collection($orders);
     }

@@ -12,7 +12,7 @@ class AuditLogResource extends JsonResource
         return [
             'id' => $this->id,
             'occurred_at' => $this->occurred_at,
-            'user_id' => $this->user_id,
+            'user' => UserResource::make($this->user),
             'user_name' => $this->user_name,
             'module' => $this->module,
             'entity_type' => $this->entity_type,

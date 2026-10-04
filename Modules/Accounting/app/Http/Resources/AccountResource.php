@@ -15,7 +15,7 @@ class AccountResource extends JsonResource
             'name' => $this->name,
             'type' => $this->type,
             'level' => $this->level,
-            'parent_id' => $this->parent_id,
+            'parent' => AccountResource::make($this->parent),
             'balance' => $this->balance,
             'active' => $this->active,
         ];

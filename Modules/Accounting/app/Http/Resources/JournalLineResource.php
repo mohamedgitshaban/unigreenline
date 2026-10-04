@@ -11,7 +11,7 @@ class JournalLineResource extends JsonResource
     {
         return [
             'id' => $this->id,
-            'account_id' => $this->account_id,
+            'account' => AccountResource::make($this->account),
             'account_code' => $this->account_code,
             'account_name' => $this->account_name,
             'debit' => $this->debit,

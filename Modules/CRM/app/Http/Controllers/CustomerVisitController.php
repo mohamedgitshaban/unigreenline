@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\StoreCustomerVisitRequest;
 use Modules\CRM\Http\Resources\CustomerVisitResource;
@@ -12,7 +13,7 @@ use Modules\CRM\Models\CustomerVisit;
 
 class CustomerVisitController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function index(Request $request)
     {
@@ -20,6 +21,18 @@ class CustomerVisitController extends Controller
 
         $query = CustomerVisit::query()
             ->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'customer',
+            'customer.salesRep',
+            'customer.salesRep.roles.permissions',
+            'customer.salesRep.permissions',
+            'rep',
+            'rep.roles.permissions',
+            'rep.permissions',
+        ]);
+
+        $this->applyFilters($request, $query, ['type', 'notes', 'customer.name', 'rep.name']);
 
         $this->applySorting($request, $query);
 
@@ -32,7 +45,7 @@ class CustomerVisitController extends Controller
             return $export;
         }
 
-        $visits = $query->paginate($request->integer('per_page', 15));
+        $visits = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return CustomerVisitResource::collection($visits);
     }

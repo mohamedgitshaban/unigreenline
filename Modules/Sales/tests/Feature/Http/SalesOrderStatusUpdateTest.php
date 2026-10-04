@@ -64,7 +64,7 @@ class SalesOrderStatusUpdateTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('invoices', ['so_id' => $order->id]);
-        $response->assertJsonPath('data.invoices.0.so_id', $order->id);
+        $response->assertJsonPath('data.invoices.0.sales_order.id', $order->id);
     }
 
     /**
@@ -83,8 +83,8 @@ class SalesOrderStatusUpdateTest extends TestCase
         $response = $this->putJson("/api/v1/sales-orders/{$order->id}/status", ['status' => 'delivered']);
 
         $response->assertOk();
-        $response->assertJsonPath('data.invoices.0.so_id', $order->id);
-        $response->assertJsonPath('data.delivery.so_id', $order->id);
+        $response->assertJsonPath('data.invoices.0.sales_order.id', $order->id);
+        $response->assertJsonPath('data.delivery.sales_order.id', $order->id);
         $response->assertJsonPath('data.delivery.status', 'delivered');
     }
 

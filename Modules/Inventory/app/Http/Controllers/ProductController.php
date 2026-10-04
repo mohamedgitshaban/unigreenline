@@ -5,6 +5,7 @@ namespace Modules\Inventory\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
+use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreProductRequest;
@@ -14,7 +15,7 @@ use Modules\Inventory\Models\Product;
 
 class ProductController extends Controller
 {
-    use Exportable, Sortable;
+    use Exportable, Filterable, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -22,7 +23,15 @@ class ProductController extends Controller
     {
         $this->authorize('viewAny', Product::class);
 
-        $query = Product::query()->where('tenant_id', $request->user()->tenant_id)->with(['category', 'supplier']);
+        $query = Product::query()->where('tenant_id', $request->user()->tenant_id);
+
+        $query->with([
+            'category',
+            'supplier',
+            'batches.warehouse',
+        ]);
+
+        $this->applyFilters($request, $query, ['name', 'sku', 'brand', 'category.name', 'supplier.name']);
 
         $this->applySorting($request, $query);
 
@@ -35,7 +44,7 @@ class ProductController extends Controller
             return $export;
         }
 
-        $products = $query->paginate($request->integer('per_page', 15));
+        $products = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return ProductResource::collection($products);
     }
@@ -44,7 +53,7 @@ class ProductController extends Controller
     {
         $this->authorize('view', $product);
 
-        return new ProductResource($product->with(['batches', 'category', 'supplier']));
+        return new ProductResource($product->load(['category', 'supplier', 'batches.warehouse']));
     }
 
     public function store(StoreProductRequest $request)
