@@ -70,6 +70,23 @@ class UpdateSalesOrderStatusServiceTest extends TestCase
         $this->assertSame((string) $invoice->tax_amount, $vat->fresh()->balance);
     }
 
+    public function test_invoice_discount_is_taken_off_revenue_so_the_entry_balances(): void
+    {
+        [$tenant, $customer, $warehouse, $product, $batch, $order] = $this->orderWithStock();
+        $order->update(['invoice_discount' => 14, 'total' => 727]);
+
+        $this->service()->transition($order, 'delivered');
+
+        $ar = Account::query()->where('tenant_id', $tenant->id)->where('code', '1200')->first();
+        $revenue = Account::query()->where('tenant_id', $tenant->id)->where('code', '4100')->first();
+        $vat = Account::query()->where('tenant_id', $tenant->id)->where('code', '2300')->first();
+
+        $this->assertSame('delivered', $order->fresh()->status);
+        $this->assertSame('727.00', $ar->fresh()->balance);
+        $this->assertSame('636.00', $revenue->fresh()->balance);
+        $this->assertSame('91.00', $vat->fresh()->balance);
+    }
+
     public function test_invoicing_a_credit_order_increases_the_customers_balance(): void
     {
         [$tenant, $customer, $warehouse, $product, $batch, $order] = $this->orderWithStock(payType: 'credit');

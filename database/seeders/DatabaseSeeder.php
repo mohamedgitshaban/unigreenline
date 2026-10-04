@@ -6,6 +6,7 @@ use Illuminate\Database\Seeder;
 use Modules\Accounting\Database\Seeders\AccountingDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\CRM\Database\Seeders\CrmDatabaseSeeder;
+use Modules\Expenses\Database\Seeders\ExpensesDatabaseSeeder;
 use Modules\Inventory\Database\Seeders\InventoryDatabaseSeeder;
 use Modules\Purchasing\Database\Seeders\PurchasingDatabaseSeeder;
 
@@ -18,6 +19,7 @@ class DatabaseSeeder extends Seeder
             InventoryDatabaseSeeder::class,
             PurchasingDatabaseSeeder::class,
             AccountingDatabaseSeeder::class,
+            ExpensesDatabaseSeeder::class,
             CrmDatabaseSeeder::class,
         ]);
     }

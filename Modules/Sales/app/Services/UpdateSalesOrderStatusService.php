@@ -118,12 +118,17 @@ class UpdateSalesOrderStatusService
             'status' => 'outstanding',
         ]);
 
+        // Revenue is credited net of the order's invoice_discount — the
+        // invoice total already has it subtracted (see CreateSalesOrderService),
+        // so crediting the gross subtotal would leave the entry unbalanced.
+        $netRevenue = round((float) $invoice->subtotal - (float) $order->invoice_discount, 2);
+
         // A journal line with a zero amount is meaningless and violates the
         // debit-xor-credit CHECK constraint — e.g. a tax-exempt invoice has
         // no VAT Payable line at all, not a $0 one.
         $lines = array_values(array_filter([
             ['account_code' => '1200', 'debit' => (float) $invoice->total],
-            ['account_code' => '4100', 'credit' => (float) $invoice->subtotal],
+            ['account_code' => '4100', 'credit' => $netRevenue],
             ['account_code' => '2300', 'credit' => (float) $invoice->tax_amount],
         ], fn (array $line) => ($line['debit'] ?? 0) > 0 || ($line['credit'] ?? 0) > 0));
 

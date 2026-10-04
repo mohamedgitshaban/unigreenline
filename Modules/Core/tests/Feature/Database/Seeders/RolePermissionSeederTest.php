@@ -27,7 +27,7 @@ class RolePermissionSeederTest extends TestCase
 
         $administrator = Role::findByName('Administrator');
 
-        $this->assertSame(56, $administrator->permissions()->count());
+        $this->assertSame(64, $administrator->permissions()->count());
     }
 
     /**
@@ -54,9 +54,37 @@ class RolePermissionSeederTest extends TestCase
         $auditor = Role::findByName('Auditor');
         $permissions = $auditor->permissions()->pluck('name')->sort()->values()->all();
 
-        $this->assertCount(21, $permissions);
+        $this->assertCount(24, $permissions);
         $this->assertContains('inventory.view', $permissions);
         $this->assertContains('accounting.audit', $permissions);
         $this->assertNotContains('inventory.add', $permissions);
+    }
+
+    public function test_only_accountant_gets_expenses_approve_among_non_administrator_roles(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        $approvers = Role::query()
+            ->whereHas('permissions', fn ($query) => $query->where('name', 'expenses.approve'))
+            ->orderBy('name')
+            ->pluck('name')
+            ->all();
+
+        $this->assertSame(['Accountant', 'Administrator'], $approvers);
+        $this->assertFalse(Role::findByName('Accountant')->hasPermissionTo('accounting.approve'));
+    }
+
+    public function test_purchasing_can_record_but_not_approve_expenses(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+
+        $expensePermissions = Role::findByName('Purchasing')->permissions()
+            ->where('name', 'like', 'expenses.%')
+            ->pluck('name')
+            ->sort()
+            ->values()
+            ->all();
+
+        $this->assertSame(['expenses.add', 'expenses.edit', 'expenses.view'], $expensePermissions);
     }
 }
