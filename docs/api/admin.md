@@ -1,7 +1,7 @@
 # Admin
 
-Covers user management, the audit log viewer, notifications, and discarded
-actions. All endpoints require authentication; most additionally require an
+Covers user management, the audit log viewer, notifications, discarded
+actions, and the governorate/city reference lists. All endpoints require authentication; most additionally require an
 `admin.*` permission — **only `Administrator`, `Owner`, and `Auditor` hold
 any `admin.*` permission** (spec §2's own role table never grants it to an
 operational role), and only `Administrator` holds `admin.add`/`admin.edit`
@@ -140,6 +140,33 @@ Any authenticated user — saves their own abandoned form.
 
 Requires `admin.view`. Tenant-wide list (not scoped to the caller) — the
 admin screen for reviewing everyone's discarded drafts.
+
+---
+
+## Reference data (governorates / cities)
+
+Any authenticated user — no permission needed. Static lists for address
+dropdowns (the `governorate` / `city` fields on customers and warehouses),
+backed by `Modules/Core/config/cities.php`, not a database table.
+
+### `GET /api/v1/governorates`
+
+All 27 Egyptian governorates, sorted by name. Show `name`; use `slug` for
+the cities request.
+
+```json
+{ "data": [ { "slug": "alexandria", "name": "Alexandria" }, { "slug": "cairo", "name": "Cairo" } ] }
+```
+
+### `GET /api/v1/governorates/{slug}/cities`
+
+The cities of one governorate, sorted by name.
+
+```json
+{ "data": ["15th of May", "Ain Shams", "Al-Rehab"] }
+```
+
+**404** — unknown slug.
 
 ---
 

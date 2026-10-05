@@ -140,8 +140,9 @@ journal entries.
 | Purchasing (Suppliers / Purchase Orders / Receiving) | Done | [purchasing.md](./purchasing.md) |
 | CRM (Customers / Leads / Visits / Complaints / Campaigns) | Done | [crm.md](./crm.md) |
 | Accounting (Chart of Accounts / Journal Entries / Balance Sheet / Income Statement) | Done | [accounting.md](./accounting.md) |
+| Expenses (Expense Categories / Expenses / Receipts / Approval) | Done | [expenses.md](./expenses.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
-| Admin (users, audit log, notifications, discarded actions) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
+| Admin (users, audit log, notifications, discarded actions, governorates/cities) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
 
 This file is updated as each module ships.
 
@@ -151,7 +152,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all 72 endpoints below, organized to match this doc's module split, with
+all 91 endpoints below, organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —

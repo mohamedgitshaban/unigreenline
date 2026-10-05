@@ -212,6 +212,12 @@ status transition to `delivered`.
 Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep, via
 the invoice's originating order).
 
+### `GET /api/v1/collections/{id}`
+
+Same permissions as the list. Includes the nested `invoice`, `customer` and
+`collected_by` user. `403` for a Sales Rep requesting a collection on
+another rep's order.
+
 ### `POST /api/v1/collections`
 
 Requires `sales.add` or `accounting.add`. Records a payment against an
