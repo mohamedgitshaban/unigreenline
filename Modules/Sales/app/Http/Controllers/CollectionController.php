@@ -89,4 +89,11 @@ class CollectionController extends Controller
 
         return (new CollectionResource($collection))->response()->setStatusCode(201);
     }
+
+    public function show(Collection $collection)
+    {
+        $this->authorize('view', $collection);
+
+        return new CollectionResource($collection->load(['invoice', 'customer', 'collectedBy']));
+    }
 }

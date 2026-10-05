@@ -23,6 +23,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('collections', [CollectionController::class, 'index']);
     Route::post('collections', [CollectionController::class, 'store']);
+    Route::get('collections/{collection}', [CollectionController::class, 'show']);
 
     Route::get('returns', [ReturnController::class, 'index']);
     Route::post('returns', [ReturnController::class, 'store']);

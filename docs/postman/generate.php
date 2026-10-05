@@ -182,6 +182,19 @@ $auth = folder('Auth', [
 ], 'Spec §6. Bearer token via Sanctum. Run **Login** first — it captures `{{token}}` automatically for every other folder. **Logout lives at the very end of this collection, not here** — running it this early would revoke the token every other folder needs.');
 
 // ---------------------------------------------------------------------
+// Reference data
+// ---------------------------------------------------------------------
+
+$reference = folder('Reference', [
+    req('GET', 'List governorates', '/governorates', [
+        'description' => 'Any authenticated user. All 27 Egyptian governorates as `{ slug, name }`, sorted by name — use `slug` for the cities request, show `name`.',
+    ]),
+    req('GET', 'List cities of a governorate', '/governorates/cairo/cities', [
+        'description' => 'Any authenticated user. Replace `cairo` with a `slug` from List governorates (e.g. `kafr-el-sheikh`). Returns a sorted array of city names; an unknown slug is 404.',
+    ]),
+], 'Static lookup lists for address dropdowns (governorate → city). Backed by Modules/Core/config/cities.php, not a database table.');
+
+// ---------------------------------------------------------------------
 // Inventory
 // ---------------------------------------------------------------------
 
@@ -321,6 +334,10 @@ $sales = folder('Sales', [
         req('POST', 'Record collection', '/collections', [
             'description' => "Requires `sales.add` or `accounting.add`. Records a payment against an invoice: updates the invoice's paid/balance/status, decreases the customer's AR balance, posts a balanced journal entry. 422 if amount ≤ 0, exceeds the remaining balance, or the invoice is already paid.",
             'body' => ['invoice_id' => '{{invoice_id}}', 'amount' => 300, 'method' => 'Bank Transfer', 'reference' => null, 'payment_date' => '2026-09-18', 'notes' => null],
+            'tests' => saveId('collection_id'),
+        ]),
+        req('GET', 'Get collection', '/collections/{{collection_id}}', [
+            'description' => 'Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep).',
         ]),
     ]),
     folder('Returns', [
@@ -481,7 +498,13 @@ $crm = folder('CRM', [
 $accounting = folder('Accounting', [
     req('GET', 'Chart of accounts', '/chart-of-accounts', [
         'query' => ['page' => 1, 'per_page' => 100, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => 'Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.',
+        'description' => "Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.\n\nSaves the id of account `6200` (General & Administrative Expense) into `{{expense_account_id}}` for Expenses > Create expense category.",
+        'tests' => [
+            'if (pm.response.code === 200) {',
+            "    const account = (pm.response.json().data || []).find(a => a.code === '6200');",
+            "    if (account) { pm.collectionVariables.set('expense_account_id', account.id); }",
+            '}',
+        ],
     ]),
     req('GET', 'Journal entries', '/journal-entries', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
@@ -496,6 +519,74 @@ $accounting = folder('Accounting', [
         'description' => 'Requires `accounting.view`. `start_date`/`end_date` are both required (422 without) — unlike every other `?filter=` param in this collection, these two are enabled by default rather than disabled, since omitting them isn\'t just "no filter," it\'s a 422.',
     ]),
 ], "Spec §6 only lists chart-of-accounts and journal-entries; the two reports above and the aging reports (see Sales/Purchasing folders) fill a gap between the spec's endpoint table and its build-order narrative (§10.7) — shapes here are this build's own design, not spec-mandated. See docs/api/accounting.md.");
+
+// ---------------------------------------------------------------------
+// Expenses
+// ---------------------------------------------------------------------
+
+$expenses = folder('Expenses', [
+    folder('Categories', [
+        req('GET', 'List expense categories', '/expense-categories', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `expenses.view`. Each category carries the Expense-type chart-of-accounts `account` it posts to.',
+        ]),
+        req('POST', 'Create expense category', '/expense-categories', [
+            'description' => "Requires `expenses.add`. `account_id` must be an **Expense-type** account in the caller's tenant — approval debits it. `name` is unique per tenant. Uses `{{expense_account_id}}`, captured by Accounting > Chart of accounts.",
+            'body' => ['name' => 'Postman Demo Category', 'account_id' => '{{expense_account_id}}', 'description' => null, 'active' => true],
+            'tests' => saveId('expense_category_id'),
+        ]),
+        req('PUT', 'Update expense category', '/expense-categories/{{expense_category_id}}', [
+            'description' => 'Requires `expenses.edit`. Partial update. There is no delete — set `active: false` to retire a category; inactive categories can\'t take new expenses.',
+            'body' => ['description' => 'Updated from Postman'],
+        ]),
+    ]),
+    folder('Expenses', [
+        req('POST', 'Upload receipt', '/expenses/receipts', [
+            'description' => 'Requires `expenses.add`. **Step 1 of attaching a receipt** — jpg/png/pdf, max 5 MB. Returns `receipt_path`, saved into `{{expense_receipt_path}}`, which you then send on Create/Update expense. Attach a file to the `receipt` field before sending — in an unattended collection run this returns 422 and the expense below is simply created without a receipt.',
+            'files' => ['receipt' => 'Receipt image or PDF (jpg, png, pdf — max 5 MB).'],
+            'tests' => saveId('expense_receipt_path', 'data.receipt_path'),
+        ]),
+        req('POST', 'Create expense', '/expenses', [
+            'description' => 'Requires `expenses.add` (Accountant, Purchasing). Always starts as `draft` — nothing is posted to the journal until approval. `payment_method` is `cash` or `bank` (decides whether approval credits 1110 Cash or 1120 Bank). `warehouse_id`, `supplier_id`, `payee`, `reference`, `description` and `receipt_path` are optional; `receipt_path` must come from Upload receipt (same tenant, not already attached to another expense).',
+            'body' => ['category_id' => '{{expense_category_id}}', 'warehouse_id' => '{{warehouse_id}}', 'supplier_id' => '{{supplier_id}}', 'payee' => null, 'payment_method' => 'cash', 'expense_date' => '2026-10-01', 'amount' => '1250.50', 'reference' => 'INV-77', 'description' => 'Office rent — October', 'receipt_path' => '{{expense_receipt_path}}'],
+            'tests' => saveId('expense_id'),
+        ]),
+        req('GET', 'List expenses', '/expenses', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'search' => '', 'filter[status]' => 'draft', 'export' => 'csv'],
+            'description' => 'Requires `expenses.view`. `search` matches id/payee/reference/description/category/supplier/warehouse names. Export needs `expenses.export` or `accounting.export`.',
+        ]),
+        req('GET', 'Get expense', '/expenses/{{expense_id}}', [
+            'description' => 'Requires `expenses.view`. `receipt_url` (when a receipt is attached) points at Download receipt.',
+        ]),
+        req('PUT', 'Update expense', '/expenses/{{expense_id}}', [
+            'description' => 'Requires `expenses.edit`. **Drafts only** — approved/rejected expenses return 422. Partial update. Send a new `receipt_path` (from Upload receipt) to replace the receipt — the old file is deleted — or `null` to remove it. `status` can\'t be set here.',
+            'body' => ['amount' => '1300.00', 'payee' => 'Building management'],
+        ]),
+        req('GET', 'Download receipt', '/expenses/{{expense_id}}/receipt', [
+            'description' => 'Requires `expenses.view`. File download; 404 if the expense has no receipt.',
+        ]),
+        req('POST', 'Approve expense', '/expenses/{{expense_id}}/approve', [
+            'description' => 'Requires `expenses.approve` — **Accountant or Administrator only** (Owner and Purchasing are 403). Drafts only. Posts a journal entry dated on `expense_date`: Dr the category\'s expense account / Cr 1110 Cash or 1120 Bank, and sets `journal_entry_id`, `approved_by`, `approved_at`. A second approve is 422.',
+        ]),
+        req('POST', 'Create expense (to reject)', '/expenses', [
+            'description' => 'A second draft for Reject expense below — the one above is approved by now.',
+            'body' => ['category_id' => '{{expense_category_id}}', 'payment_method' => 'bank', 'expense_date' => '2026-10-02', 'amount' => '80.00', 'payee' => 'Taxi', 'description' => 'Postman demo — rejected by the next request'],
+            'tests' => saveId('rejectable_expense_id'),
+        ]),
+        req('POST', 'Reject expense', '/expenses/{{rejectable_expense_id}}/reject', [
+            'description' => 'Requires `expenses.approve` (Accountant or Administrator). Drafts only. `reason` is optional. Posts nothing to the journal; a rejected expense can no longer be edited, approved or deleted.',
+            'body' => ['reason' => 'No receipt attached'],
+        ]),
+        req('POST', 'Create expense (to delete)', '/expenses', [
+            'description' => 'A throwaway draft for Delete expense below.',
+            'body' => ['category_id' => '{{expense_category_id}}', 'payment_method' => 'cash', 'expense_date' => '2026-10-03', 'amount' => '15.00', 'description' => 'Postman demo — deleted by the next request'],
+            'tests' => saveId('deletable_expense_id'),
+        ]),
+        req('DELETE', 'Delete expense', '/expenses/{{deletable_expense_id}}', [
+            'description' => 'Requires `expenses.delete` (Administrator only by default). **Drafts only** — approved ones need a reversing entry, not a delete (422). Returns 204, removes the receipt file too; audit-logged as DELETE.',
+        ]),
+    ]),
+], 'Draft → approved (posts to the journal) or rejected. Accountant and Purchasing record expenses; only Accountant or Administrator approve/reject. Run after Accounting — Create expense category needs `{{expense_account_id}}` from Chart of accounts.');
 
 // ---------------------------------------------------------------------
 // Analytics
@@ -576,10 +667,31 @@ $admin = folder('Admin', [
     ]),
 ], "Spec §6/§9.4. See docs/api/admin.md — also documents why there's no Settings endpoint (no backing schema anywhere in the spec).");
 
+// Order matters if you "Run collection" end to end: Inventory creates the
+// warehouse/product a sales order needs, CRM creates the customer a
+// sales order needs, Purchasing creates the supplier a PO needs — all
+// before Sales, which is the first folder that consumes them. Expenses
+// follows Accounting, whose Chart of accounts captures the expense
+// account a category needs (and reuses the warehouse/supplier). Logout
+// runs dead last for the same reason — it revokes {{token}}, so nothing
+// after it in a full collection run could authenticate.
+$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $analytics, $admin, folder('Session end', [
+    req('POST', 'Logout', '/auth/logout', [
+        'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid.',
+    ]),
+])];
+
+$requestCount = 0;
+array_walk_recursive($items, function ($v, $k) use (&$requestCount) {
+    if ($k === 'method') {
+        $requestCount++;
+    }
+});
+
 $collection = [
     'info' => [
         'name' => 'VetPharma ERP API',
-        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 73 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has {$requestCount} requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     ],
     'auth' => [
@@ -605,25 +717,22 @@ $collection = [
             'sales_order_id' => '',
             'invoice_id' => '',
             'delivery_id' => '',
+            'collection_id' => '',
             'purchase_order_id' => '',
             'purchase_order_line_id' => '',
             'deletable_purchase_order_id' => '',
             'complaint_id' => '',
             'campaign_id' => '',
+            'expense_account_id' => '',
+            'expense_category_id' => '',
+            'expense_receipt_path' => '',
+            'expense_id' => '',
+            'rejectable_expense_id' => '',
+            'deletable_expense_id' => '',
         ]),
         $vars
     ),
-    // Order matters if you "Run collection" end to end: Inventory creates the
-    // warehouse/product a sales order needs, CRM creates the customer a
-    // sales order needs, Purchasing creates the supplier a PO needs — all
-    // before Sales, which is the first folder that consumes them. Logout
-    // runs dead last for the same reason — it revokes {{token}}, so nothing
-    // after it in a full collection run could authenticate.
-    'item' => [$auth, $inventory, $crm, $purchasing, $sales, $accounting, $analytics, $admin, folder('Session end', [
-        req('POST', 'Logout', '/auth/logout', [
-            'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid.',
-        ]),
-    ])],
+    'item' => $items,
 ];
 
 $environment = [
@@ -653,11 +762,4 @@ file_put_contents(
     json_encode($environment, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."\n"
 );
 
-$count = 0;
-array_walk_recursive($collection['item'], function ($v, $k) use (&$count) {
-    if ($k === 'method') {
-        $count++;
-    }
-});
-
-echo "Generated collection with {$count} requests.\n";
+echo "Generated collection with {$requestCount} requests.\n";
