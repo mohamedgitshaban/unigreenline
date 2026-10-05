@@ -216,6 +216,12 @@ up (`PUT /sales-orders/{id}/status`). Any endpoint that uses it can return
 
 Requires `inventory.view`.
 
+## `GET /api/v1/transfers/{id}`
+
+Requires `inventory.view`. Includes the nested `product`, `from_warehouse`,
+`to_warehouse` and `created_by`. **404** — the transfer belongs to another
+account.
+
 ## `POST /api/v1/transfers`
 
 Requires `inventory.add` + both warehouses visible to this user (unlike

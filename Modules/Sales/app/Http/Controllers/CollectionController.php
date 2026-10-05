@@ -90,8 +90,10 @@ class CollectionController extends Controller
         return (new CollectionResource($collection))->response()->setStatusCode(201);
     }
 
-    public function show(Collection $collection)
+    public function show(Request $request, Collection $collection)
     {
+        abort_unless($collection->tenant_id === $request->user()->tenant_id, 404);
+
         $this->authorize('view', $collection);
 
         return new CollectionResource($collection->load(['invoice', 'customer', 'collectedBy']));

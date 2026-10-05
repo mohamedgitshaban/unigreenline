@@ -152,7 +152,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all 91 endpoints below, organized to match this doc's module split, with
+all 92 endpoints below, organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —

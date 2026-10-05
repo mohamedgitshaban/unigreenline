@@ -60,6 +60,15 @@ class TransferController extends Controller
         return TransferResource::collection($transfers);
     }
 
+    public function show(Request $request, Transfer $transfer)
+    {
+        abort_unless($transfer->tenant_id === $request->user()->tenant_id, 404);
+
+        $this->authorize('view', $transfer);
+
+        return new TransferResource($transfer->load(['product', 'fromWarehouse', 'toWarehouse', 'createdBy']));
+    }
+
     public function store(StoreTransferRequest $request)
     {
         $data = $request->validated();

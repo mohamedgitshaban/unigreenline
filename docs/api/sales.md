@@ -216,7 +216,7 @@ the invoice's originating order).
 
 Same permissions as the list. Includes the nested `invoice`, `customer` and
 `collected_by` user. `403` for a Sales Rep requesting a collection on
-another rep's order.
+another rep's order. **404** — the collection belongs to another account.
 
 ### `POST /api/v1/collections`
 

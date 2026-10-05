@@ -26,4 +26,5 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('transfers', [TransferController::class, 'index']);
     Route::post('transfers', [TransferController::class, 'store']);
+    Route::get('transfers/{transfer}', [TransferController::class, 'show']);
 });

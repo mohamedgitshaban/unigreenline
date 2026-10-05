@@ -56,4 +56,18 @@ class CollectionShowTest extends TestCase
         $response->assertJsonPath('data.invoice.id', $invoice->id);
         $response->assertJsonPath('data.collected_by.id', $user->id);
     }
+
+    public function test_a_collection_from_another_tenant_is_not_found(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $user = User::factory()->create();
+        $user->assignRole('Administrator');
+        Sanctum::actingAs($user);
+
+        $collection = Collection::factory()->create();
+
+        $response = $this->getJson("/api/v1/collections/{$collection->id}");
+
+        $response->assertNotFound();
+    }
 }

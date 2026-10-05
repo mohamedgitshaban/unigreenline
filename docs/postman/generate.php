@@ -271,6 +271,10 @@ $inventory = folder('Inventory', [
         req('POST', 'Create transfer', '/transfers', [
             'description' => "Requires `inventory.add` + **both** warehouses visible to the caller. Executes immediately and atomically — `status` is always `completed` in the response, there's no separate confirm step. Expiry date carries over to the destination batch.",
             'body' => ['product_id' => '{{product_id}}', 'from_warehouse_id' => '{{warehouse_id}}', 'to_warehouse_id' => '{{warehouse_id_2}}', 'batch_no' => 'BATCH-001', 'qty_cartons' => 20, 'transfer_date' => '2026-09-20', 'notes' => null],
+            'tests' => saveId('transfer_id'),
+        ]),
+        req('GET', 'Get transfer', '/transfers/{{transfer_id}}', [
+            'description' => 'Requires `inventory.view`. 404 for another tenant\'s transfer.',
         ]),
     ]),
 ], 'Spec §6, §5.1/§5.8. Warehouse-scoped for every non-Owner/Auditor/Administrator role — see docs/api/inventory.md. Any endpoint using FEFO deduction can return 422 with a `shortfalls` array if stock is insufficient.');
@@ -718,6 +722,7 @@ $collection = [
             'invoice_id' => '',
             'delivery_id' => '',
             'collection_id' => '',
+            'transfer_id' => '',
             'purchase_order_id' => '',
             'purchase_order_line_id' => '',
             'deletable_purchase_order_id' => '',
