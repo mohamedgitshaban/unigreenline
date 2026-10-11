@@ -118,6 +118,60 @@ function folder(string $name, array $items, ?string $description = null): array
     return $folder;
 }
 
+/**
+ * Change flags. Anything added or altered after the original collection is
+ * marked so it can be spotted at a glance (name prefix + description banner):
+ *   🆕 NEW      — a new endpoint (or folder)
+ *   🔄 CHANGED  — an existing endpoint that now accepts/returns more
+ * To retire a flag once a change has been reviewed, drop the nw()/chg() call.
+ */
+function flagged(array $item, string $badge, string $banner): array
+{
+    $item['name'] = $badge.' '.$item['name'];
+
+    if (isset($item['request'])) {
+        $existing = $item['request']['description'] ?? null;
+        $item['request']['description'] = "**{$badge} — {$banner}**".($existing === null ? '' : "\n\n".$existing);
+    } else {
+        $existing = $item['description'] ?? null;
+        $item['description'] = "**{$badge} — {$banner}**".($existing === null ? '' : "\n\n".$existing);
+    }
+
+    return $item;
+}
+
+function nw(array $item): array
+{
+    return flagged($item, '🆕', 'NEW');
+}
+
+function chg(array $item, string $what): array
+{
+    return flagged($item, '🔄', 'CHANGED: '.$what);
+}
+
+/**
+ * "Create a throwaway record, then delete it" — so a DELETE request never
+ * destroys the id later requests in a full run still depend on. The create
+ * step is the existing endpoint (unflagged); the delete is the new one.
+ *
+ * @param  array<string, mixed>  $createBody
+ * @return list<array<string, mixed>>
+ */
+function deleteFlow(string $label, string $createPath, array $createBody, string $var, string $deletePath, string $deleteDescription, string $createDescription = 'A throwaway record for the Delete request below.'): array
+{
+    return [
+        req('POST', "Create {$label} (to delete)", $createPath, [
+            'description' => $createDescription,
+            'body' => $createBody,
+            'tests' => saveId($var),
+        ]),
+        nw(req('DELETE', "Delete {$label}", str_replace('{id}', '{{'.$var.'}}', $deletePath), [
+            'description' => $deleteDescription,
+        ])),
+    ];
+}
+
 /** Standard "save this id for later requests" test script. */
 function saveId(string $varName, string $jsonPath = 'data.id'): array
 {
@@ -199,6 +253,42 @@ $reference = folder('Reference', [
 // ---------------------------------------------------------------------
 
 $inventory = folder('Inventory', [
+    nw(folder('Units', [
+        nw(req('GET', 'List units', '/units', [
+            'query' => ['page' => 1, 'per_page' => 50, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `inventory.view`, `purchasing.view` or `sales.view`. The packaging unit names (Packet, Package, Carton by default — seeded by UnitSeeder). Supports `search` on name.',
+        ])),
+        nw(req('POST', 'Create unit (Packet)', '/units', [
+            'description' => 'Requires `inventory.add`. Adds a unit name an admin can then use in any product packaging ladder. `name` is unique per tenant. The Postman names are prefixed so they do not clash with the seeded Packet/Package/Carton.',
+            'body' => ['name' => 'Postman Packet', 'active' => true],
+            'tests' => saveId('unit_id_packet'),
+        ])),
+        nw(req('POST', 'Create unit (Package)', '/units', [
+            'description' => 'Requires `inventory.add`. See Create unit (Packet).',
+            'body' => ['name' => 'Postman Package'],
+            'tests' => saveId('unit_id_package'),
+        ])),
+        nw(req('POST', 'Create unit (Carton)', '/units', [
+            'description' => 'Requires `inventory.add`. See Create unit (Packet).',
+            'body' => ['name' => 'Postman Carton'],
+            'tests' => saveId('unit_id_carton'),
+        ])),
+        nw(req('GET', 'Get unit', '/units/{{unit_id_packet}}', [
+            'description' => 'Requires the same permissions as List units. 404 for another tenant.',
+        ])),
+        nw(req('PUT', 'Update unit', '/units/{{unit_id_packet}}', [
+            'description' => 'Requires `inventory.edit`. Rename it or set `active: false` to stop offering it.',
+            'body' => ['active' => true],
+        ])),
+        nw(req('POST', 'Create unit (to delete)', '/units', [
+            'description' => 'A throwaway unit for the Delete request below.',
+            'body' => ['name' => 'Postman Delete Me Unit'],
+            'tests' => saveId('deletable_unit_id'),
+        ])),
+        nw(req('DELETE', 'Delete unit', '/units/{{deletable_unit_id}}', [
+            'description' => 'Requires `inventory.delete`. 204. **409** if any product is packaged in the unit — set `active: false` instead.',
+        ])),
+    ], 'Admin-managed packaging unit names. What each unit holds is set per product (Products > Create product with packaging units).')),
     folder('Warehouses', [
         req('GET', 'List warehouses', '/warehouses', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
@@ -225,6 +315,15 @@ $inventory = folder('Inventory', [
             'description' => 'Requires `inventory.edit` + visibility. All fields optional.',
             'body' => ['status' => 'active'],
         ]),
+        nw(req('POST', 'Import warehouses', '/warehouses/import', [
+            'description' => 'Requires `inventory.add`. Bulk-creates warehouses from a spreadsheet. Matched by name. `manager_email` must be an existing user.'."\n\n".'**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.',
+            'files' => ['file' => 'Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows).'],
+            'body' => ['update_existing' => false],
+        ])),
+        nw(req('GET', 'Download warehouses import template', '/warehouses/import-template', [
+            'description' => 'Requires `inventory.add`. An .xlsx with the exact column headings and one example row.',
+        ])),
+        ...deleteFlow('warehouse', '/warehouses', ['name' => 'Postman Delete Me Warehouse', 'city' => 'Cairo', 'governorate' => 'Cairo'], 'deletable_warehouse_id', '/warehouses/{id}', 'Requires `inventory.delete` + the warehouse visible to the caller. 204. **409** while it holds batches, has transfers or purchase/sales orders. Audit-logged as DELETE.'),
     ]),
     folder('Categories', [
         req('GET', 'List categories', '/categories', [
@@ -245,6 +344,7 @@ $inventory = folder('Inventory', [
             'description' => "Requires `inventory.edit`, and the category must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the category itself.",
             'body' => ['code' => 'PM-DEMO', 'description' => 'Updated from Postman'],
         ]),
+        ...deleteFlow('category', '/categories', ['name' => 'Postman Delete Me Category', 'active' => true], 'deletable_category_id', '/categories/{id}', 'Requires `inventory.delete`. 204. **409** while any product uses the category — set `active: false` instead.'),
     ]),
     folder('Products', [
         req('GET', 'List products', '/products', [
@@ -258,17 +358,34 @@ $inventory = folder('Inventory', [
             'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'exp_date', 'sort_dir' => 'asc', 'filter[warehouse_id]' => '{{warehouse_id}}', 'filter[qty_cartons][gt]' => 0],
             'description' => "Requires `inventory.view`. The product's batches as a paginated list (default 10 per page) — use this instead of the nested `batches` on Get product when a product has many batches. Follow `links.next` for the next page. Supports the usual `search` (batch_no, warehouse name), `filter[...]` and `sort_by`; `sort_by=exp_date&sort_dir=asc` gives FEFO order. 404 for another tenant's product.",
         ]),
-        req('POST', 'Create product', '/products', [
+        chg(req('POST', 'Create product', '/products', [
             'description' => "Requires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
             // SKU is not one of the 6 seeded products' (PRD-00001..6) — a
             // real collision here is a 422 (unique per tenant).
-            'body' => ['category_id' => '{{category_id}}', 'supplier_id' => null, 'name' => 'Oxytetracycline 20% Injectable (Postman Demo)', 'sku' => 'POSTMAN-DEMO-0001', 'brand' => 'EgyVet', 'pack_unit' => 'Vial 100ml', 'carton_qty' => 20, 'pack_cost_price' => 45.00, 'pack_selling_price' => 65.00, 'discount_pct' => 0, 'tax_pct' => 14, 'min_stock_cartons' => 10, 'reorder_level' => 20],
+            'body' => ['category_id' => '{{category_id}}', 'supplier_id' => null, 'name' => 'Oxytetracycline 20% Injectable (Postman Demo)', 'sku' => 'POSTMAN-DEMO-0001', 'brand' => 'EgyVet', 'pack_unit' => 'Vial 100ml', 'carton_qty' => 20, 'pack_cost_price' => 45.00, 'pack_selling_price' => 65.00, 'min_selling_price' => 1.00, 'discount_pct' => 0, 'tax_pct' => 14, 'min_stock_cartons' => 10, 'reorder_level' => 20],
             'tests' => saveId('product_id'),
-        ]),
-        req('PUT', 'Update product', '/products/{{product_id}}', [
+        ]), 'takes `min_selling_price` (per smallest unit, never above `pack_selling_price`; sales-order lines may not be priced below it) and an optional `units` packaging ladder (see Units). Cost fields (`pack_cost_price`, `cost_price`) are only returned to Administrators.'),
+        chg(req('PUT', 'Update product', '/products/{{product_id}}', [
             'description' => 'Requires `inventory.edit`. All fields optional.',
-            'body' => ['pack_selling_price' => 70.00],
-        ]),
+            'body' => ['pack_selling_price' => 70.00, 'min_selling_price' => 2.00],
+        ]), 'accepts `min_selling_price` and `units` (replaces the whole packaging ladder; `carton_qty` is re-derived from it).'),
+        nw(req('GET', 'Product availability by warehouse', '/products/{{product_id}}/availability', [
+            'description' => 'Requires `inventory.view` or `sales.view`. Every active warehouse holding unexpired stock of the product — `available_cartons`, `available_base_units`, `batches_count`, `nearest_expiry` — largest first, plus totals. Use it to let a seller pick the warehouse for each sales-order line.',
+        ])),
+        nw(req('POST', 'Create product with packaging units', '/products', [
+            'description' => 'Requires `inventory.add`. Packaging ladder smallest unit first; each larger unit says how many of the previous one it holds — here Packet, Package (10 packets), Carton (3 packages) = **30 packets per carton**, so `carton_qty` is derived (do not send it) and stock is stored by the carton. Uses the units from Units > Create unit.',
+            'body' => ['category_id' => '{{category_id}}', 'name' => 'Packaged Product X (Postman Demo)', 'sku' => 'POSTMAN-UNITS-0001', 'pack_cost_price' => 5.00, 'pack_selling_price' => 10.00, 'min_selling_price' => 8.00, 'units' => [['unit_id' => '{{unit_id_packet}}'], ['unit_id' => '{{unit_id_package}}', 'contains' => 10], ['unit_id' => '{{unit_id_carton}}', 'contains' => 3]]],
+            'tests' => saveId('unit_product_id'),
+        ])),
+        nw(req('POST', 'Import products', '/products/import', [
+            'description' => 'Requires `inventory.add`. Bulk-creates products from a spreadsheet. Matched by SKU. Category (name or code) and Supplier (name) must already exist; optional `Min Selling Price` column.'."\n\n".'**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.',
+            'files' => ['file' => 'Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows).'],
+            'body' => ['update_existing' => false],
+        ])),
+        nw(req('GET', 'Download products import template', '/products/import-template', [
+            'description' => 'Requires `inventory.add`. An .xlsx with the exact column headings and one example row.',
+        ])),
+        ...deleteFlow('product', '/products', ['category_id' => '{{category_id}}', 'name' => 'Postman Delete Me Product', 'sku' => 'POSTMAN-DEL-0001', 'pack_unit' => 'Vial', 'carton_qty' => 10, 'pack_cost_price' => 1, 'pack_selling_price' => 2], 'deletable_product_id', '/products/{id}', 'Requires `inventory.delete`. 204. **409** if the product still has batches, order lines or transfers — set `active: false` instead.'),
     ]),
     req('POST', 'Goods receipt (manual GRN)', '/inventory/grn', [
         'description' => 'Requires `inventory.add` + destination warehouse visibility. `exp_date` is required — never fabricated. Re-receiving the same `batch_no` for the same product+warehouse tops up quantity instead of duplicating the row.',
@@ -331,6 +448,18 @@ $sales = folder('Sales', [
             'description' => 'The invoice created by the status update above, saved into `{{invoice_id}}`.',
             'tests' => saveId('invoice_id', 'data.0.id'),
         ]),
+        chg(req('POST', 'Create sales order (per-line warehouse + free gift)', '/sales-orders', [
+            'description' => "Requires `sales.add`. Shows the new line options: `warehouse_id` per line (draw each line from a different warehouse — get the choices from Inventory > Product availability by warehouse), `is_gift: true` (sold at 0, no `unit_price` needed, draws only from free-gift stock received via Receive purchase order > free_gifts), and `unit_id` (order in any packaging unit of the product instead of `unit`). A non-gift line priced below the product's `min_selling_price` (per smallest unit, after discount) is a 422 on `lines.N.unit_price`. Saves the id into `{{gift_sales_order_id}}`.",
+            'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65], ['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'is_gift' => true]]],
+            'tests' => saveId('gift_sales_order_id'),
+        ]), 'lines accept `warehouse_id`, `unit_id` and `is_gift`; `unit` and `unit_price` are optional when `unit_id` / `is_gift` are used; minimum selling price is enforced.'),
+        nw(req('PUT', 'Update sales order', '/sales-orders/{{gift_sales_order_id}}', [
+            'description' => 'Requires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** (else 422 "Only draft sales orders can be changed or deleted."). Header fields update in place; `lines`, if sent, **replace every line** and the order is re-priced and re-validated (credit limit, per-warehouse FEFO availability, minimum price). Audit-logged.',
+            'body' => ['notes' => 'Updated from Postman'],
+        ])),
+        nw(req('DELETE', 'Delete sales order', '/sales-orders/{{gift_sales_order_id}}', [
+            'description' => 'Requires `sales.delete` (Administrator by default). **Draft orders only** — a draft has no stock, invoice or journal side effects. 204; lines cascade. Anything further along: cancel it instead.',
+        ])),
     ]),
     folder('Invoices', [
         req('GET', 'List invoices', '/invoices', [
@@ -348,6 +477,30 @@ $sales = folder('Sales', [
             'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
             'description' => 'Same access as Get invoice. Payments recorded against this invoice. Paginated (10 per page by default) — follow `links.next`.',
         ]),
+        nw(req('POST', 'Import invoices', '/invoices/import', [
+            'description' => 'Requires `sales.add`. Bulk-creates invoices from a spreadsheet. Matched by (none — invoices have no natural key, so re-importing creates duplicates). Each row posts the same journal entries a live invoice would (Dr Receivable / Cr Revenue + VAT) and raises the customer balance by what is still owed.'."\n\n".'**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.',
+            'files' => ['file' => 'Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows).'],
+            'body' => ['update_existing' => false],
+        ])),
+        nw(req('GET', 'Download invoices import template', '/invoices/import-template', [
+            'description' => 'Requires `sales.add`. An .xlsx with the exact column headings and one example row.',
+        ])),
+        req('POST', 'Create sales order (to void its invoice)', '/sales-orders', [
+            'description' => 'A throwaway cash order whose invoice the Void request below voids (the main invoice has collections against it, so it cannot be voided).',
+            'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65]]],
+            'tests' => saveId('voidable_sales_order_id'),
+        ]),
+        req('PUT', 'Invoice that order', '/sales-orders/{{voidable_sales_order_id}}/status', [
+            'description' => 'Moves it to `invoiced`, which creates the invoice.',
+            'body' => ['status' => 'invoiced'],
+        ]),
+        req('GET', 'Find that order invoice', '/sales-orders/{{voidable_sales_order_id}}/invoices', [
+            'description' => 'Saves the invoice id into `{{voidable_invoice_id}}`.',
+            'tests' => saveId('voidable_invoice_id', 'data.0.id'),
+        ]),
+        nw(req('POST', 'Void invoice', '/invoices/{{voidable_invoice_id}}/void', [
+            'description' => 'Requires `sales.delete`. Invoices are never hard-deleted — this is their "delete". Marks it `void`, posts the reversing journal entry (Dr Sales Revenue + VAT Payable / Cr Receivable) and gives the balance back to the customer. 422 if already void or if any collection was recorded against it. Returns the invoice.',
+        ])),
     ]),
     folder('Deliveries', [
         req('GET', 'List deliveries', '/deliveries', [
@@ -433,6 +586,15 @@ $purchasing = folder('Purchasing', [
         req('GET', 'Download supplier contract', '/suppliers/{{supplier_id}}/contract', [
             'description' => 'Requires `purchasing.view` or `accounting.view`. File download; 404 if the supplier has no contract, or belongs to another tenant.',
         ]),
+        nw(req('POST', 'Import suppliers', '/suppliers/import', [
+            'description' => 'Requires `purchasing.add`. Bulk-creates suppliers from a spreadsheet. Matched by name. Contract files cannot be imported — attach them afterwards via Upload supplier contract.'."\n\n".'**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.',
+            'files' => ['file' => 'Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows).'],
+            'body' => ['update_existing' => false],
+        ])),
+        nw(req('GET', 'Download suppliers import template', '/suppliers/import-template', [
+            'description' => 'Requires `purchasing.add`. An .xlsx with the exact column headings and one example row.',
+        ])),
+        ...deleteFlow('supplier', '/suppliers', ['name' => 'Postman Delete Me Supplier'], 'deletable_supplier_id', '/suppliers/{id}', 'Requires `purchasing.delete`. 204. **409** while the supplier has purchase orders or expenses; its contract file is not removed by this call. Audit-logged as DELETE.'),
     ]),
     folder('Purchase Orders', [
         req('GET', 'List purchase orders', '/purchase-orders', [
@@ -457,13 +619,17 @@ $purchasing = folder('Purchasing', [
             'files' => ['invoice' => 'Supplier invoice (jpg, png, pdf — max 5 MB).'],
             'tests' => saveId('purchase_order_invoice_path', 'data.file_path'),
         ]),
-        req('POST', 'Receive purchase order', '/purchase-orders/{{purchase_order_id}}/receive', [
+        chg(req('POST', 'Receive purchase order', '/purchase-orders/{{purchase_order_id}}/receive', [
             'description' => "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by List purchase order lines above — for a PO with more than one line, replace it with the specific line id you're receiving.\n\n`invoice_data` (optional) records the supplier's own invoice: `invoice_no` is required when it's sent; `invoice_date`, `amount` and `file_path` (from Upload supplier invoice) are optional. It comes back as `supplier_invoice` on the PO.",
-            'body' => ['invoice_data' => ['invoice_no' => 'SUP-INV-4471', 'invoice_date' => '2026-10-05', 'amount' => '2280.00', 'file_path' => '{{purchase_order_invoice_path}}'], 'receipts' => [['line_id' => '{{purchase_order_line_id}}', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]]],
-        ]),
+            'body' => ['invoice_data' => ['invoice_no' => 'SUP-INV-4471', 'invoice_date' => '2026-10-05', 'amount' => '2280.00', 'file_path' => '{{purchase_order_invoice_path}}'], 'receipts' => [['line_id' => '{{purchase_order_line_id}}', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]], 'free_gifts' => [['product_id' => '{{product_id}}', 'qty' => 2, 'batch_no' => 'PO-GIFT-1', 'exp_date' => '2028-01-01']]],
+        ]), 'optional `free_gifts` — bonus stock the supplier delivered on top of the order. Each entry (`product_id`, optional `unit_id`, `qty`, `batch_no`, `exp_date`, optional `mfg_date`) is added to stock at zero cost as a free-gift batch (`is_free_gift: true`, `source_po_id` = this PO); it does not change the amount owed. A gift batch number may not collide with paid stock. Only gift lines on a sales order can sell it.'),
         req('GET', 'Download supplier invoice', '/purchase-orders/{{purchase_order_id}}/invoice', [
             'description' => 'Requires `purchasing.view`. File download; 404 if the PO has no supplier invoice file, or belongs to another tenant.',
         ]),
+        chg(req('POST', 'Create purchase order (ordered in packages)', '/purchase-orders', [
+            'description' => 'Requires `purchasing.add`. A line can be ordered in any packaging unit of the product instead of cartons: `unit_id` + `qty` + `cost_per_unit`. Here 6 packages x 10 packets = 60 packets = **2 cartons** at 150 per carton (total 300 = 6 x 50). The quantity must come to a whole number of cartons (else 422 on `lines.N.qty`). Uses the product from Products > Create product with packaging units.',
+            'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{unit_product_id}}', 'unit_id' => '{{unit_id_package}}', 'qty' => 6, 'cost_per_unit' => 50]]],
+        ]), 'lines may use `unit_id` + `qty` + `cost_per_unit` instead of `qty_cartons` + `cost_per_carton`.'),
         req('POST', 'Create purchase order (to edit and delete)', '/purchase-orders', [
             'description' => 'A throwaway draft PO for the Update and Delete requests below — the main PO above has already been received by this point in the run, so it can no longer be edited or deleted.',
             'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'expected_date' => null, 'notes' => 'Postman demo — deleted by the next request', 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 1, 'cost_per_carton' => 40]]],
@@ -512,6 +678,15 @@ $crm = folder('CRM', [
             'body' => ['sales_rep_id' => null, 'name' => 'Nile Valley Veterinary Clinic', 'type' => 'Clinic', 'classification' => 'B', 'phone' => null, 'email' => null, 'governorate' => null, 'province' => null, 'city' => null, 'area' => null, 'address' => null, 'credit_limit' => 50000, 'pay_terms' => null, 'status' => 'active'],
             'tests' => saveId('customer_id'),
         ]),
+        nw(req('POST', 'Import customers', '/customers/import', [
+            'description' => 'Requires `crm.add`. Bulk-creates customers from a spreadsheet. Matched by name. `Sales Rep Email` must be an existing user; a Sales Rep can only import under their own name.'."\n\n".'**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.',
+            'files' => ['file' => 'Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows).'],
+            'body' => ['update_existing' => false],
+        ])),
+        nw(req('GET', 'Download customers import template', '/customers/import-template', [
+            'description' => 'Requires `crm.add`. An .xlsx with the exact column headings and one example row.',
+        ])),
+        ...deleteFlow('customer', '/customers', ['name' => 'Postman Delete Me Customer', 'type' => 'Clinic'], 'deletable_customer_id', '/customers/{id}', 'Requires `crm.delete` (+ ownership if Sales Rep). 204. **409** while the customer has sales orders or invoices; its visits and complaints are removed with it. Audit-logged as DELETE.'),
         req('PUT', 'Update customer', '/customers/{{customer_id}}', [
             'description' => 'Requires `crm.edit` (+ ownership if Sales Rep). All fields optional.',
             'body' => ['classification' => 'A'],
@@ -527,6 +702,11 @@ $crm = folder('CRM', [
             'body' => ['assigned_to' => null, 'name' => 'Delta Farms', 'type' => 'Farm', 'contact' => null, 'phone' => null, 'email' => null, 'source' => 'Referral', 'status' => 'new', 'value' => null, 'notes' => null],
             'tests' => saveId('lead_id'),
         ]),
+        nw(req('PUT', 'Update lead', '/leads/{{lead_id}}', [
+            'description' => 'Requires `crm.edit`. Partial update. Audit-logged with the changed fields.',
+            'body' => ['status' => 'qualified', 'value' => 15000],
+        ])),
+        ...deleteFlow('lead', '/leads', ['name' => 'Postman Delete Me Lead', 'type' => 'Farm'], 'deletable_lead_id', '/leads/{id}', 'Requires `crm.delete`. 204.'),
         req('GET', 'Get lead', '/leads/{{lead_id}}', [
             'description' => "Requires `crm.view`. 404 for another tenant's lead.",
         ]),
@@ -541,6 +721,11 @@ $crm = folder('CRM', [
             'body' => ['customer_id' => '{{customer_id}}', 'rep_id' => null, 'visit_date' => '2026-09-20', 'type' => 'Follow-up', 'outcome' => 'positive', 'notes' => null, 'next_visit' => null],
             'tests' => saveId('visit_id'),
         ]),
+        nw(req('PUT', 'Update visit', '/visits/{{visit_id}}', [
+            'description' => 'Requires `crm.edit`. Partial update.',
+            'body' => ['outcome' => 'neutral', 'notes' => 'Updated from Postman'],
+        ])),
+        ...deleteFlow('visit', '/visits', ['customer_id' => '{{customer_id}}', 'visit_date' => '2026-09-21'], 'deletable_visit_id', '/visits/{id}', 'Requires `crm.delete`. 204.'),
         req('GET', 'Get visit', '/visits/{{visit_id}}', [
             'description' => "Requires `crm.view`. Includes nested customer and rep. 404 for another tenant's visit.",
         ]),
@@ -555,6 +740,11 @@ $crm = folder('CRM', [
             'body' => ['customer_id' => '{{customer_id}}', 'product_id' => null, 'assigned_to' => null, 'batch_no' => null, 'type' => 'Quality', 'description' => 'Vial arrived damaged.', 'priority' => 'medium', 'complaint_date' => '2026-09-20'],
             'tests' => saveId('complaint_id'),
         ]),
+        nw(req('PUT', 'Update complaint', '/complaints/{{complaint_id}}', [
+            'description' => 'Requires `crm.edit`. Partial update of the complaint details (resolving stays a separate action — Resolve complaint).',
+            'body' => ['priority' => 'high'],
+        ])),
+        ...deleteFlow('complaint', '/complaints', ['customer_id' => '{{customer_id}}', 'description' => 'Throwaway complaint'], 'deletable_complaint_id', '/complaints/{id}', 'Requires `crm.delete`. 204.'),
         req('GET', 'Get complaint', '/complaints/{{complaint_id}}', [
             'description' => "Requires `crm.view`. 404 for another tenant's complaint.",
         ]),
@@ -573,6 +763,11 @@ $crm = folder('CRM', [
             'body' => ['name' => 'Autumn Vaccine Drive', 'type' => 'Discount', 'target' => 'Clinics', 'discount' => 10, 'start_date' => '2026-10-01', 'end_date' => null, 'description' => null],
             'tests' => saveId('campaign_id'),
         ]),
+        nw(req('PUT', 'Update campaign', '/campaigns/{{campaign_id}}', [
+            'description' => 'Requires `crm.edit`. Partial update (`end_date` must not precede `start_date`). Ending a campaign stays a separate action — End campaign.',
+            'body' => ['discount' => 12, 'description' => 'Updated from Postman'],
+        ])),
+        ...deleteFlow('campaign', '/campaigns', ['name' => 'Postman Delete Me Campaign', 'start_date' => '2026-10-01'], 'deletable_campaign_id', '/campaigns/{id}', 'Requires `crm.delete`. 204.'),
         req('GET', 'Get campaign', '/campaigns/{{campaign_id}}', [
             'description' => "Requires `crm.view`. 404 for another tenant's campaign.",
         ]),
@@ -600,6 +795,18 @@ $accounting = folder('Accounting', [
     req('GET', 'Get account', '/chart-of-accounts/{{expense_account_id}}', [
         'description' => "Requires `accounting.view`. Uses `{{expense_account_id}}` (account 6200), captured by Chart of accounts. 404 for another tenant's account.",
     ]),
+    nw(req('POST', 'Create account', '/chart-of-accounts', [
+        'description' => 'Requires `accounting.add`. `code` unique per tenant; `type` is Asset/Liability/Equity/Revenue/Expense; `parent_id` (optional, same tenant) sets `level` to parent level + 1. Saves the id into `{{new_account_id}}`.',
+        'body' => ['code' => '6999', 'name' => 'Postman Demo Account', 'type' => 'Expense', 'parent_id' => null, 'active' => true],
+        'tests' => saveId('new_account_id'),
+    ])),
+    nw(req('PUT', 'Update account', '/chart-of-accounts/{{new_account_id}}', [
+        'description' => 'Requires `accounting.edit`. Rename, re-parent or deactivate. `code` and `type` are frozen (422) for system accounts (1110, 1120, 1200, 1300, 2100, 2300, 4100, 6300, 6400) and for any account that already has journal lines.',
+        'body' => ['name' => 'Postman Demo Account (renamed)', 'active' => true],
+    ])),
+    nw(req('DELETE', 'Delete account', '/chart-of-accounts/{{new_account_id}}', [
+        'description' => 'Requires `accounting.delete`. 204. **409** for system accounts, accounts with child accounts, or accounts with journal lines.',
+    ])),
     req('GET', 'Journal entries', '/journal-entries', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
         'description' => "Requires `accounting.view`. Includes `lines_count` (lines are paged per entry by List journal entry lines). No POST — entries only come from business events auto-posting. Exported rows still summarize every line into one column.\n\nSaves the first entry's id into `{{journal_entry_id}}` for Get journal entry.",
@@ -641,6 +848,7 @@ $expenses = folder('Expenses', [
             'description' => 'Requires `expenses.edit`. Partial update. `DELETE` (needs `expenses.delete`) only works while no expense uses the category — otherwise set `active: false` to retire it; inactive categories can\'t take new expenses.',
             'body' => ['description' => 'Updated from Postman'],
         ]),
+        ...deleteFlow('expense category', '/expense-categories', ['name' => 'Postman Delete Me Expense Category', 'account_id' => '{{expense_account_id}}'], 'deletable_expense_category_id', '/expense-categories/{id}', 'Requires `expenses.delete`. 204. **409** while any expense uses the category — set `active: false` instead.'),
     ]),
     folder('Expenses', [
         req('POST', 'Upload receipt', '/expenses/receipts', [
@@ -694,7 +902,127 @@ $expenses = folder('Expenses', [
 // Analytics
 // ---------------------------------------------------------------------
 
+$recap = nw(folder('Recap', [
+    req('GET', 'Find a batch to write off', '/products/{{product_id}}/batches', [
+        'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'exp_date', 'sort_dir' => 'asc', 'filter[warehouse_id]' => '{{warehouse_id}}', 'filter[qty_cartons][gt]' => 0],
+        'description' => 'Existing endpoint, used here to capture a batch id into `{{recap_batch_id}}` for the recaps below.',
+        'tests' => saveId('recap_batch_id', 'data.0.id'),
+    ]),
+    nw(req('POST', 'Create recap', '/recaps', [
+        'description' => 'Requires `recap.add` + the warehouse visible to the caller. Drafts a stock write-off (`reason`: expired, damaged, lost, recall, other). Each line names a `batch_id` (of that warehouse, no repeats) and `qty_cartons`. A draft changes no stock and posts nothing; it snapshots the batch cost so `total_value` can be reviewed. Saves the id into `{{recap_id}}`.',
+        'body' => ['warehouse_id' => '{{warehouse_id}}', 'reason' => 'damaged', 'recap_date' => '2026-10-11', 'notes' => 'Damaged in transit', 'lines' => [['batch_id' => '{{recap_batch_id}}', 'qty_cartons' => 1]]],
+        'tests' => saveId('recap_id'),
+    ])),
+    nw(req('GET', 'List recaps', '/recaps', [
+        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+        'description' => 'Requires `recap.view`. `search` matches id, notes, warehouse name. Export needs `recap.export` or `accounting.export`.',
+    ])),
+    nw(req('GET', 'Get recap', '/recaps/{{recap_id}}', [
+        'description' => 'Requires `recap.view`. Includes the lines (batch, product, qty, cost, value). 404 for another tenant.',
+    ])),
+    nw(req('PUT', 'Update recap', '/recaps/{{recap_id}}', [
+        'description' => 'Requires `recap.edit`. **Draft only** (else 422). `lines`, if sent, replace every line; changing `warehouse_id` requires re-sending `lines`.',
+        'body' => ['notes' => 'Damaged in transit — updated'],
+    ])),
+    nw(req('POST', 'Approve recap', '/recaps/{{recap_id}}/approve', [
+        'description' => 'Requires `recap.approve`. **This is the write-off:** locks each batch and removes the cartons (422 if a batch no longer holds enough), re-costs the lines, refreshes the warehouse stock value and posts **Dr 6300 Inventory Write-off Expense / Cr 1300 Inventory** for the total — so the loss hits the income statement and the inventory asset drops. Needs accounts 6300 and 1300 (run AccountSeeder).',
+    ])),
+    req('POST', 'Create recap (to reject)', '/recaps', [
+        'description' => 'A throwaway draft for the Reject request below.',
+        'body' => ['warehouse_id' => '{{warehouse_id}}', 'reason' => 'other', 'lines' => [['batch_id' => '{{recap_batch_id}}', 'qty_cartons' => 1]]],
+        'tests' => saveId('rejectable_recap_id'),
+    ]),
+    nw(req('POST', 'Reject recap', '/recaps/{{rejectable_recap_id}}/reject', [
+        'description' => 'Requires `recap.approve`. Draft → rejected; stock and ledger untouched. Optional `reason`.',
+        'body' => ['reason' => 'Counted wrong'],
+    ])),
+    req('POST', 'Create recap (to delete)', '/recaps', [
+        'description' => 'A throwaway draft for the Delete request below.',
+        'body' => ['warehouse_id' => '{{warehouse_id}}', 'reason' => 'lost', 'lines' => [['batch_id' => '{{recap_batch_id}}', 'qty_cartons' => 1]]],
+        'tests' => saveId('deletable_recap_id'),
+    ]),
+    nw(req('DELETE', 'Delete recap', '/recaps/{{deletable_recap_id}}', [
+        'description' => 'Requires `recap.delete` (Administrator by default). **Draft only** — an approved recap already moved stock and posted a journal entry (422). 204; lines cascade.',
+    ])),
+    nw(req('GET', 'List expired batches', '/recaps/expired-batches', [
+        'query' => ['warehouse_id' => '{{warehouse_id}}'],
+        'requiredQuery' => [],
+        'description' => 'Requires `recap.view`. Batches past their expiry date that still hold stock, with the value each would write off — what the generator below would pick up.',
+    ])),
+    nw(req('POST', 'Draft recaps from expired stock', '/recaps/from-expired', [
+        'description' => 'Requires `recap.add`. Creates one **draft** recap per warehouse covering all expired batches (optionally `warehouse_id`); batches already on a draft are skipped, so it is safe to repeat. 201 with the new drafts, or 200 with an empty list when nothing new expired. The same thing runs daily from the scheduler (`php artisan recap:generate-expired`). Drafts still need approving.',
+        'body' => ['warehouse_id' => null],
+    ])),
+], 'Stock write-offs (expired / damaged / lost / recall). Draft → approved (removes stock and posts Dr 6300 / Cr 1300) or rejected. See docs/api/recap.md.'));
+
+$manufacturing = nw(folder('Manufacturing', [
+    req('POST', 'Create finished product', '/products', [
+        'description' => 'Existing endpoint — the finished good the BOM below makes. Saves the id into `{{finished_product_id}}`.',
+        'body' => ['category_id' => '{{category_id}}', 'name' => 'Postman Finished Good', 'sku' => 'POSTMAN-FG-0001', 'pack_unit' => 'Bottle', 'carton_qty' => 10, 'pack_cost_price' => 10, 'pack_selling_price' => 20],
+        'tests' => saveId('finished_product_id'),
+    ]),
+    nw(req('POST', 'Create BOM', '/boms', [
+        'description' => 'Requires `manufacturing.add`. A recipe: one run consumes the listed component cartons and yields `output_qty_cartons` of the finished product, plus a per-run `conversion_cost` (labour/overhead). Components must be distinct and not the finished product. Saves the id into `{{bom_id}}`.',
+        'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM', 'output_qty_cartons' => 5, 'conversion_cost' => 10, 'notes' => null, 'active' => true, 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1]]],
+        'tests' => saveId('bom_id'),
+    ])),
+    nw(req('GET', 'List BOMs', '/boms', [
+        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+        'description' => 'Requires `manufacturing.view`. `search` matches name, notes, product name/SKU.',
+    ])),
+    nw(req('GET', 'Get BOM', '/boms/{{bom_id}}', [
+        'description' => 'Requires `manufacturing.view`. Includes the finished product and component lines.',
+    ])),
+    nw(req('PUT', 'Update BOM', '/boms/{{bom_id}}', [
+        'description' => 'Requires `manufacturing.edit`. Partial; `lines`, if sent, replace every line. Does not touch production orders already raised.',
+        'body' => ['notes' => 'Updated from Postman'],
+    ])),
+    nw(req('POST', 'Create production order', '/production-orders', [
+        'description' => 'Requires `manufacturing.add` + warehouse visible. `runs` repetitions of the BOM in a warehouse; `output_qty_cartons` and the default `conversion_cost` (BOM cost x runs) are derived. `batch_no` defaults to a generated MO-... number; `exp_date` is required. A draft touches no stock. Saves the id into `{{production_order_id}}`.',
+        'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'runs' => 1, 'batch_no' => 'POSTMAN-MO-1', 'production_date' => '2026-10-11', 'exp_date' => '2028-06-30', 'notes' => null],
+        'tests' => saveId('production_order_id'),
+    ])),
+    nw(req('GET', 'List production orders', '/production-orders', [
+        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+        'description' => 'Requires `manufacturing.view`. Export needs `manufacturing.export` or `accounting.export`.',
+    ])),
+    nw(req('GET', 'Get production order', '/production-orders/{{production_order_id}}', [
+        'description' => 'Requires `manufacturing.view`. After completion includes `consumptions` (which batches were used, at what cost).',
+    ])),
+    nw(req('PUT', 'Update production order', '/production-orders/{{production_order_id}}', [
+        'description' => 'Requires `manufacturing.edit`. **Draft only** (else 422). Changing `runs` or `bom_id` re-derives the output and (unless sent) the conversion cost.',
+        'body' => ['notes' => 'Updated from Postman'],
+    ])),
+    nw(req('POST', 'Complete production order', '/production-orders/{{production_order_id}}/complete', [
+        'description' => 'Requires `manufacturing.approve`. In one transaction: consumes every component x runs from the warehouse **FEFO** (422 with `shortfalls` and nothing written if any is short), costs the output (material + conversion cost, per carton), creates the finished-goods batch, and posts Dr 1300 (finished goods) / Cr 1300 (materials used) / Cr 6400 Manufacturing Overhead Absorbed (conversion cost). 422 if the batch number already exists in the warehouse.',
+    ])),
+    req('POST', 'Create production order (to cancel)', '/production-orders', [
+        'description' => 'A throwaway draft for the Cancel request below.',
+        'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'POSTMAN-MO-CANCEL', 'exp_date' => '2028-06-30'],
+        'tests' => saveId('cancellable_production_order_id'),
+    ]),
+    nw(req('POST', 'Cancel production order', '/production-orders/{{cancellable_production_order_id}}/cancel', [
+        'description' => 'Requires `manufacturing.edit`. Draft → cancelled. 422 for anything not a draft.',
+    ])),
+    nw(req('DELETE', 'Delete production order', '/production-orders/{{cancellable_production_order_id}}', [
+        'description' => 'Requires `manufacturing.delete`. Drafts and cancelled orders only — a completed order cannot be deleted (422). 204.',
+    ])),
+    req('POST', 'Create BOM (to delete)', '/boms', [
+        'description' => 'A throwaway BOM with no production orders, for the Delete request below.',
+        'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM Delete Me', 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1]]],
+        'tests' => saveId('deletable_bom_id'),
+    ]),
+    nw(req('DELETE', 'Delete BOM', '/boms/{{deletable_bom_id}}', [
+        'description' => 'Requires `manufacturing.delete`. 204; lines cascade. **409** when production orders were raised from it — set `active: false` instead.',
+    ])),
+], 'Bills of materials and production orders. Completing an order consumes components FEFO, creates the finished batch and posts the cost. See docs/api/manufacturing.md.'));
+
 $analytics = folder('Analytics', [
+    nw(req('GET', 'Product life cycle', '/products/{{product_id}}/lifecycle', [
+        'query' => ['from' => '2026-01-01', 'to' => '2026-12-31'],
+        'requiredQuery' => [],
+        'description' => 'Requires `analytics.view` or `inventory.view`. One date-ordered timeline for a product: purchase order raised, received into stock, transfers between warehouses, manufacturing use/output, sales (with invoice ids), returns and write-offs, plus a `summary` (purchased / sold / transferred / written-off / produced / on-hand cartons) and the current `stock` by batch. Each event carries its source document id. `from`/`to` (optional) narrow the window. Cost amounts are returned to Administrators only.',
+    ])),
     req('GET', 'Dashboard', '/analytics/dashboard', [
         'description' => 'Requires `analytics.view`. The 8 KPI cards from spec §8 (monthly_sales, active_customers, collected_amount, outstanding_ar, overdue_amount, inventory_value, critical_expiry_count, pending_deliveries).',
     ]),
@@ -738,7 +1066,47 @@ $admin = folder('Admin', [
             'description' => "Requires `admin.edit`. Same shape as create, all fields optional, **except password is not accepted here** — a user changes their own via Auth > Change password. `warehouse_ids` replaces the full set, not a merge.\n\n**Deliberately targets the demo user created above, not `{{user_id}}`** — this body suspends its target account, and `{{user_id}}` is whoever you're currently authenticated as. Pointing this at your own id would lock you out of the rest of the collection.",
             'body' => ['status' => 'suspended'],
         ]),
+        req('POST', 'Create user (to delete)', '/users', [
+            'description' => 'A throwaway user for the Delete request below.',
+            'body' => ['name' => 'Delete Me', 'email' => 'delete.me@vetpharma.com', 'password' => 'a-secure-password', 'role' => 'Warehouse Employee'],
+            'tests' => saveId('deletable_user_id'),
+        ]),
+        nw(req('DELETE', 'Delete user', '/users/{{deletable_user_id}}', [
+            'description' => 'Requires `admin.delete`. 204; the user\'s API tokens are revoked. You cannot delete your own account (422). **409** if the user owns records that must keep an owner (e.g. sales orders as the sales rep).',
+        ])),
     ]),
+    nw(folder('Roles & Permissions', [
+        nw(req('GET', 'List permissions', '/permissions', [
+            'description' => 'Requires `admin.view`. Every assignable permission grouped by module (`sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`, `recap`, `manufacturing`, `analytics`, `admin`) — drives the checkbox grid on a role form. Capabilities: view, add, edit, delete, approve, print, export, audit.',
+        ])),
+        nw(req('GET', 'List roles', '/roles', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `admin.view`. Each role with its `permissions` and `users_count`. Roles are global, not per tenant.',
+        ])),
+        nw(req('POST', 'Create role', '/roles', [
+            'description' => 'Requires `admin.add`. An admin builds a role by choosing permissions — e.g. give a role `sales.edit` and `sales.delete` to let those users edit and delete sales records. `name` unique; every permission must exist (422 otherwise). Saves the id into `{{role_id}}`.',
+            'body' => ['name' => 'Postman Shift Lead', 'permissions' => ['sales.view', 'sales.edit', 'sales.delete', 'crm.view']],
+            'tests' => saveId('role_id'),
+        ])),
+        nw(req('GET', 'Get role', '/roles/{{role_id}}', [
+            'description' => 'Requires `admin.view`.',
+        ])),
+        nw(req('PUT', 'Update role', '/roles/{{role_id}}', [
+            'description' => 'Requires `admin.edit`. Rename and/or replace the full permission set (`permissions` is a sync, not a merge). The **Administrator** role is protected (403). Takes effect on the role users next request.',
+            'body' => ['permissions' => ['sales.view', 'sales.edit', 'sales.delete', 'inventory.view']],
+        ])),
+        nw(req('PUT', 'Assign users to role', '/roles/{{role_id}}/users', [
+            'description' => 'Requires `admin.edit`. Puts the listed same-tenant users on this role, **replacing** whichever role they had. (A user can also be given a role through Create/Update user.) Targets the demo user, never your own login.',
+            'body' => ['user_ids' => ['{{demo_user_id}}']],
+        ])),
+        req('PUT', 'Put demo user back on a seeded role', '/users/{{demo_user_id}}', [
+            'description' => 'Moves the demo user off the custom role so the role can be deleted below.',
+            'body' => ['role' => 'Warehouse Employee'],
+        ]),
+        nw(req('DELETE', 'Delete role', '/roles/{{role_id}}', [
+            'description' => 'Requires `admin.delete`. 204. **409** while any user still has the role; the Administrator role cannot be deleted (403).',
+        ])),
+    ], 'Admin-managed roles: create a role, pick its permissions (including delete/edit per module), connect users to it.')),
     folder('Audit Log', [
         req('GET', 'List audit log', '/audit-log', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'module' => '', 'entity_type' => '', 'export' => 'csv'],
@@ -789,7 +1157,7 @@ $admin = folder('Admin', [
 // account a category needs (and reuses the warehouse/supplier). Logout
 // runs dead last for the same reason — it revokes {{token}}, so nothing
 // after it in a full collection run could authenticate.
-$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $analytics, $admin, folder('Session end', [
+$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $recap, $manufacturing, $analytics, $admin, folder('Session end', [
     req('POST', 'Logout', '/auth/logout', [
         'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid.',
     ]),
@@ -805,7 +1173,7 @@ array_walk_recursive($items, function ($v, $k) use (&$requestCount) {
 $collection = [
     'info' => [
         'name' => 'VetPharma ERP API',
-        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has {$requestCount} requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has {$requestCount} requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (Recap, Manufacturing, Units, Roles & Permissions, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit). The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `RolePermissionSeeder`, `AccountSeeder`, `UnitSeeder`, `ProductUnitSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     ],
     'auth' => [
@@ -854,6 +1222,36 @@ $collection = [
             'expense_id' => '',
             'rejectable_expense_id' => '',
             'deletable_expense_id' => '',
+            'unit_id_packet' => '',
+            'unit_id_package' => '',
+            'unit_id_carton' => '',
+            'deletable_unit_id' => '',
+            'unit_product_id' => '',
+            'deletable_product_id' => '',
+            'deletable_warehouse_id' => '',
+            'deletable_category_id' => '',
+            'deletable_supplier_id' => '',
+            'deletable_customer_id' => '',
+            'deletable_lead_id' => '',
+            'deletable_visit_id' => '',
+            'deletable_complaint_id' => '',
+            'deletable_campaign_id' => '',
+            'deletable_expense_category_id' => '',
+            'new_account_id' => '',
+            'gift_sales_order_id' => '',
+            'voidable_sales_order_id' => '',
+            'voidable_invoice_id' => '',
+            'recap_batch_id' => '',
+            'recap_id' => '',
+            'rejectable_recap_id' => '',
+            'deletable_recap_id' => '',
+            'finished_product_id' => '',
+            'bom_id' => '',
+            'deletable_bom_id' => '',
+            'production_order_id' => '',
+            'cancellable_production_order_id' => '',
+            'deletable_user_id' => '',
+            'role_id' => '',
         ]),
         $vars
     ),

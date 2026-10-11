@@ -37,7 +37,9 @@ class ProductStoreTest extends TestCase
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.cost_price', '200.00');
+        // Cost is administrator-only; a warehouse manager sees prices but not cost.
+        $response->assertJsonMissingPath('data.cost_price');
+        $response->assertJsonMissingPath('data.pack_cost_price');
         $response->assertJsonPath('data.selling_price', '300.00');
         // Regression: tax_pct has a DB default (14) and wasn't submitted —
         // the response must reflect it immediately, not serialize it as null.

@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
@@ -16,12 +17,13 @@ use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\ProductResource;
 use Modules\Inventory\Imports\ProductImport;
 use Modules\Inventory\Models\Product;
+use Modules\Inventory\Services\ProductUnitService;
 
 class ProductController extends Controller
 {
     use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
 
-    private const RELATIONS = ['category', 'supplier'];
+    private const RELATIONS = ['category', 'supplier', 'units.unit'];
 
     private const BATCH_RELATIONS = [
         'warehouse',
@@ -30,7 +32,10 @@ class ProductController extends Controller
         'warehouse.manager.permissions',
     ];
 
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(
+        private readonly AuditLogService $auditLog,
+        private readonly ProductUnitService $productUnits,
+    ) {}
 
     public function index(Request $request)
     {
@@ -94,8 +99,23 @@ class ProductController extends Controller
     {
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
+        $levels = $data['units'] ?? null;
+        unset($data['units']);
 
-        $product = Product::create($data);
+        if ($levels !== null) {
+            $data['carton_qty'] = $this->productUnits->cartonQty($levels);
+            $data['pack_unit'] ??= $this->productUnits->smallestUnitName($levels);
+        }
+
+        $product = DB::transaction(function () use ($data, $levels) {
+            $product = Product::create($data);
+
+            if ($levels !== null) {
+                $this->productUnits->sync($product, $levels);
+            }
+
+            return $product;
+        });
 
         $this->auditLog->record([
             'module' => 'inventory',
@@ -115,9 +135,18 @@ class ProductController extends Controller
     public function update(UpdateProductRequest $request, Product $product)
     {
         $data = $request->validated();
+        $levels = $data['units'] ?? null;
+        unset($data['units']);
+
         $prevValues = $product->only(array_keys($data));
 
-        $product->update($data);
+        DB::transaction(function () use ($product, $data, $levels) {
+            $product->update($data);
+
+            if ($levels !== null) {
+                $this->productUnits->sync($product, $levels);
+            }
+        });
 
         $this->auditLog->record([
             'module' => 'inventory',
@@ -161,5 +190,48 @@ class ProductController extends Controller
         $this->authorize('create', Product::class);
 
         return $this->templateResponse(new ProductImport($request->user()), 'products');
+    }
+
+    /**
+     * Every warehouse holding sellable stock of this product, so an order
+     * line can pick which warehouse to draw from. Open to anyone who can
+     * view inventory or sales, since reps pick warehouses while ordering.
+     */
+    public function availability(Request $request, string $id)
+    {
+        abort_unless($request->user()->canAny(['inventory.view', 'sales.view']), 403);
+
+        $product = Product::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
+
+        $rows = $product->batches()->getQuery()
+            ->join('warehouses', 'warehouses.id', '=', 'inventory_batches.warehouse_id')
+            ->where('inventory_batches.qty_cartons', '>', 0)
+            ->where('warehouses.status', 'active')
+            ->whereDate('inventory_batches.exp_date', '>=', now()->toDateString())
+            ->groupBy('warehouses.id', 'warehouses.name', 'warehouses.city', 'warehouses.governorate')
+            ->orderByDesc(DB::raw('SUM(inventory_batches.qty_cartons)'))
+            ->get([
+                'warehouses.id', 'warehouses.name', 'warehouses.city', 'warehouses.governorate',
+                DB::raw('SUM(inventory_batches.qty_cartons) as available_cartons'),
+                DB::raw('COUNT(*) as batches_count'),
+                DB::raw('MIN(inventory_batches.exp_date) as nearest_expiry'),
+            ]);
+
+        return response()->json(['data' => [
+            'product_id' => $product->id,
+            'carton_qty' => $product->carton_qty,
+            'total_available_cartons' => (int) $rows->sum('available_cartons'),
+            'total_available_base_units' => (int) $rows->sum('available_cartons') * $product->carton_qty,
+            'warehouses' => $rows->map(fn ($row) => [
+                'id' => $row->id,
+                'name' => $row->name,
+                'city' => $row->city,
+                'governorate' => $row->governorate,
+                'available_cartons' => (int) $row->available_cartons,
+                'available_base_units' => (int) $row->available_cartons * $product->carton_qty,
+                'batches_count' => (int) $row->batches_count,
+                'nearest_expiry' => substr((string) $row->nearest_expiry, 0, 10),
+            ])->values(),
+        ]]);
     }
 }

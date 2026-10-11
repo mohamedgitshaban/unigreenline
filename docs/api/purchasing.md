@@ -82,6 +82,26 @@ the current one.
 supplier. `balance` is not editable — it's ignored if sent; only receiving a
 PO moves it.
 
+## `DELETE /api/v1/suppliers/{id}` 🆕 NEW
+
+Requires `purchasing.delete`. **204**, audit-logged as `DELETE`. **409** while
+the supplier has purchase orders or expenses — set `status: inactive` instead.
+The contract file on disk is not removed by this call. Another tenant's supplier
+is **404**.
+
+## `POST /api/v1/suppliers/import` 🆕 NEW
+
+Requires `purchasing.add`. Multipart `file` (+ optional `update_existing`) — see
+[Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
+Matched by **name**. Columns: `Name`*, `Country`, `City`, `Address`, `Contact`,
+`Email`, `Phone`, `Pay Terms`, `Currency` (3 letters), `Rating` (1–5), `Status`.
+Contract files cannot be imported — attach them afterwards with
+`POST /suppliers/contracts`.
+
+## `GET /api/v1/suppliers/import-template` 🆕 NEW
+
+Requires `purchasing.add`. Downloads `suppliers-import-template.xlsx`.
+
 ## `GET /api/v1/suppliers/{id}/contract`
 
 Requires `purchasing.view` or `accounting.view`. Downloads the contract file
@@ -102,9 +122,11 @@ Requires `purchasing.view`. The PO's lines (each with its `product`) as
 their own list. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. A line's `id` is the `line_id` that receive
 expects.
 
-## `POST /api/v1/purchase-orders`
+## `POST /api/v1/purchase-orders` 🔄 CHANGED
 
-Requires `purchasing.add`.
+Requires `purchasing.add`. 🔄 A line can now be ordered **in any packaging unit**
+of its product, not only cartons (see
+[Units & product packaging](./inventory.md#units--product-packaging--new)).
 
 **Request**
 ```json
@@ -116,6 +138,22 @@ Requires `purchasing.add`.
   ]
 }
 ```
+
+**🔄 CHANGED — lines in a unit.** Instead of `qty_cartons` + `cost_per_carton`,
+send `unit_id` + `qty` + `cost_per_unit`:
+
+```json
+{ "product_id": "01m...", "unit_id": "01m...package", "qty": 6, "cost_per_unit": 50 }
+```
+
+For a product where Package = 10 packets and Carton = 30 packets: 6 packages =
+60 packets = **2 cartons**; the line total is `qty × cost_per_unit` = 300, so
+`cost_per_carton` is stored as 150. The quantity **must convert to a whole number
+of cartons** (45 packets of a 30-packet carton is **422** on `lines.N.qty`), and
+`unit_id` must be one of the product's units (**422** on `lines.N.unit_id`).
+Either form works per line; lines come back with `unit_id`, `unit_qty`,
+`cost_per_unit` (null for carton lines) next to `qty_cartons` / `cost_per_carton`,
+and stock is always received in cartons.
 
 **Line math** (mirrors sales orders): `line.total = qty_cartons ×
 cost_per_carton`. `order.subtotal = Σ line.total`, `order.tax_amount = Σ
@@ -129,7 +167,7 @@ line ids from `GET /purchase-orders/{id}/lines`.
 
 ## `PUT /api/v1/purchase-orders/{id}`
 
-Requires `purchasing.edit`. **Only while not received** — same rule as delete.
+Requires `purchasing.edit`. 🔄 `lines` accept the same unit form as create. **Only while not received** — same rule as delete.
 Partial update: send only the fields you're changing.
 
 ```json
@@ -167,7 +205,11 @@ along with its lines.
   and journal entry would need reversing, not deleting.
 - **404** — the PO belongs to another account.
 
-## `POST /api/v1/purchase-orders/{id}/receive`
+## `POST /api/v1/purchase-orders/{id}/receive` 🔄 CHANGED
+
+> 🔄 **CHANGED — free gifts.** The delivery can also carry bonus stock the
+> supplier threw in. Send it as `free_gifts` (below); it goes into stock at zero
+> cost, flagged as a free gift.
 
 Requires `purchasing.approve`. Adds stock for every line — this is where
 inventory actually increases, exactly like manual GRN (same
@@ -186,9 +228,26 @@ matched by `line_id` — partial receiving isn't supported in this build.
   },
   "receipts": [
     { "line_id": "01m...", "batch_no": "PO-BATCH-1", "exp_date": "2028-01-01", "mfg_date": null, "rcv_date": null }
+  ],
+  "free_gifts": [
+    { "product_id": "01m...", "unit_id": "01m...package", "qty": 3, "batch_no": "GIFT-1", "exp_date": "2028-01-01", "mfg_date": null }
   ]
 }
 ```
+
+**`free_gifts`** (🆕 optional): each entry is a product the supplier gave for
+free. `qty` is in the chosen `unit_id` (or in **cartons** when `unit_id` is
+omitted) and must convert to whole cartons. `batch_no` and `exp_date` are
+required. The gift products need not be on the PO. Effects:
+
+- a batch is added to the PO's warehouse with `is_free_gift: true`,
+  `cost_per_carton: 0` and `source_po_id` = this PO;
+- the supplier balance, the PO total and the journal entry are **not** affected
+  (gifts have no cost);
+- only **gift lines** on a sales order can sell this stock — see
+  [sales.md](./sales.md);
+- a gift batch number may not equal a paid batch's number for the same product
+  and warehouse (**422**), and the whole receipt is rolled back on any error.
 
 `invoice_data` is **optional** — the supplier's own invoice that came with the
 goods. When sent, `invoice_no` is required; `invoice_date`, `amount` and

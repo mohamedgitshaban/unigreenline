@@ -87,9 +87,10 @@ class UpdateSalesOrderStatusService
 
         $lines = $order->lines()->with('product')->get()->map(fn ($line) => [
             'product_id' => $line->product_id,
-            'warehouse_id' => $order->warehouse_id,
+            'warehouse_id' => $line->warehouse_id ?? $order->warehouse_id,
+            'gift' => (bool) $line->is_gift,
             'cartons_needed' => CartonCalculator::cartonsNeeded(
-                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty
+                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty, $line->base_qty
             ),
         ])->all();
 

@@ -134,7 +134,7 @@ class PurchaseOrderController extends Controller
             'actor_id' => $request->user()->id,
             'actor_name' => $request->user()->name,
             'ip_address' => $request->ip(),
-        ], $request->validated('invoice_data'));
+        ], $request->validated('invoice_data'), $request->validated('free_gifts', []));
 
         return new PurchaseOrderResource($this->findForTenant($request, $order->id));
     }

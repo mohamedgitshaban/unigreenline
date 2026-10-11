@@ -79,12 +79,16 @@ class UpdateSalesOrderService
                 foreach ($computedLines as $line) {
                     $locked->lines()->create([
                         'product_id' => $line['product_id'],
+                        'warehouse_id' => $line['warehouse_id'],
                         'batch_no' => $line['batch_no'],
                         'qty' => $line['qty'],
                         'unit' => $line['unit'],
+                        'unit_id' => $line['unit_id'],
+                        'base_qty' => $line['base_qty'],
                         'unit_price' => $line['unit_price'],
                         'discount_pct' => $line['discount_pct'],
                         'free_qty' => $line['free_qty'],
+                        'is_gift' => $line['is_gift'],
                         'subtotal' => $line['subtotal'],
                     ]);
                 }
@@ -118,8 +122,10 @@ class UpdateSalesOrderService
     {
         return $order->lines()->with('product')->get()->map(fn ($line) => [
             'product_id' => $line->product_id,
+            'warehouse_id' => $line->warehouse_id,
+            'gift' => (bool) $line->is_gift,
             'cartons_needed' => CartonCalculator::cartonsNeeded(
-                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty
+                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty, $line->base_qty
             ),
         ])->all();
     }

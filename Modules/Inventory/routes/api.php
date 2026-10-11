@@ -5,6 +5,7 @@ use Modules\Inventory\Http\Controllers\GoodsReceiptController;
 use Modules\Inventory\Http\Controllers\ProductCategoryController;
 use Modules\Inventory\Http\Controllers\ProductController;
 use Modules\Inventory\Http\Controllers\TransferController;
+use Modules\Inventory\Http\Controllers\UnitController;
 use Modules\Inventory\Http\Controllers\WarehouseController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
@@ -23,6 +24,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('products', [ProductController::class, 'store']);
     Route::get('products/{id}', [ProductController::class, 'show']);
     Route::get('products/{id}/batches', [ProductController::class, 'batches']);
+    Route::get('products/{id}/availability', [ProductController::class, 'availability']);
     Route::put('products/{product}', [ProductController::class, 'update']);
     Route::delete('products/{product}', [ProductController::class, 'destroy']);
 
@@ -31,6 +33,12 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('categories/{id}', [ProductCategoryController::class, 'show']);
     Route::put('categories/{category}', [ProductCategoryController::class, 'update']);
     Route::delete('categories/{category}', [ProductCategoryController::class, 'destroy']);
+
+    Route::get('units', [UnitController::class, 'index']);
+    Route::post('units', [UnitController::class, 'store']);
+    Route::get('units/{unit}', [UnitController::class, 'show']);
+    Route::put('units/{unit}', [UnitController::class, 'update']);
+    Route::delete('units/{unit}', [UnitController::class, 'destroy']);
 
     Route::post('inventory/grn', [GoodsReceiptController::class, 'store']);
 

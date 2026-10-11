@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Inventory\Models\Product;
 use Modules\Purchasing\Database\Factories\PurchaseOrderLineFactory;
 
-#[Fillable(['po_id', 'product_id', 'qty_cartons', 'cost_per_carton', 'total'])]
+#[Fillable(['po_id', 'product_id', 'unit_id', 'unit_qty', 'cost_per_unit', 'qty_cartons', 'cost_per_carton', 'total'])]
 class PurchaseOrderLine extends Model
 {
     use HasFactory, HasUlids;

@@ -58,6 +58,13 @@ be an `Expense`-type account in the caller's tenant — anything else is `422`.
 
 Requires `expenses.edit`. All fields optional, same rules as create.
 
+### `DELETE /api/v1/expense-categories/{id}` 🆕 NEW
+
+Requires `expenses.delete`. **204**, audit-logged as `DELETE`. **409**
+`This ExpenseCategory is referenced by other records and cannot be deleted.`
+while any expense uses the category — retire it with `active: false` instead.
+Another tenant's category is **404**.
+
 ---
 
 ## Expenses

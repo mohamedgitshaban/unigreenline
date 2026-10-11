@@ -9,9 +9,11 @@ use Maatwebsite\Excel\Excel;
 use Modules\Analytics\Http\Resources\ExpiryBatchResource;
 use Modules\Analytics\Services\DashboardService;
 use Modules\Analytics\Services\ExpiryAnalyticsService;
+use Modules\Analytics\Services\ProductLifecycleService;
 use Modules\Analytics\Services\StockAnalyticsService;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Inventory\Models\InventoryBatch;
+use Modules\Inventory\Models\Product;
 
 class AnalyticsController extends Controller
 {
@@ -93,5 +95,20 @@ class AnalyticsController extends Controller
             'stock-'.now()->format('Y-m-d').'.'.$format,
             $format === 'csv' ? Excel::CSV : Excel::XLSX,
         );
+    }
+
+    /**
+     * A product's journey from purchase through transfers to sale, as one
+     * date-ordered timeline (?from=&to= narrow it).
+     */
+    public function productLifecycle(Request $request, string $id, ProductLifecycleService $lifecycle)
+    {
+        abort_unless($request->user()->canAny(['analytics.view', 'inventory.view']), 403);
+
+        $range = $request->validate(['from' => ['sometimes', 'date'], 'to' => ['sometimes', 'date', 'after_or_equal:from']]);
+
+        $product = Product::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
+
+        return response()->json(['data' => $lifecycle->build($product, $range['from'] ?? null, $range['to'] ?? null, $request->user()->hasRole('Administrator'))]);
     }
 }

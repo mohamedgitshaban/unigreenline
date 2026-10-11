@@ -1,5 +1,10 @@
 # Sales Orders, Invoices, Deliveries & Collections
 
+> **Flags:** 🆕 NEW = new endpoint, 🔄 CHANGED = existing endpoint that now
+> accepts or returns more. Added in this update: per-line warehouse, free-gift
+> lines, ordering in packaging units, **minimum selling price**, edit/delete of
+> draft sales orders, **invoice void**, and **invoice import**.
+
 **Ownership scoping**: a `Sales Rep` only sees/creates their own orders
 (`sales_rep_id`), and only sees invoices/deliveries/collections tied back to
 one of their own orders. Any other role with `sales.view`/`sales.add` (or,
@@ -29,7 +34,12 @@ another rep's order.
 The order's lines (each with its `product`) and invoices, each as its own
 list. Same access as the order show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
 
-## `POST /api/v1/sales-orders`
+## `POST /api/v1/sales-orders` 🔄 CHANGED
+
+> 🔄 **CHANGED.** Order lines gained four things, all optional and backward
+> compatible: a **warehouse per line**, an **`is_gift` flag**, ordering in any
+> **packaging unit**, and a **minimum selling price** check. Details right after
+> the request example below.
 
 Requires `sales.add`. Validates stock availability (FEFO, no deduction yet)
 and, for `pay_type: "credit"`, that the order wouldn't push the customer
@@ -51,6 +61,28 @@ over their `credit_limit` — **before writing anything**.
   ]
 }
 ```
+- `lines.N.warehouse_id` 🆕 (optional): draw this line from a different
+  warehouse than the order's `warehouse_id` (the default). One order can be fed
+  from several warehouses — stock is validated, and later deducted, **per line
+  against that line's warehouse**. Pick warehouses with
+  `GET /products/{id}/availability`
+  ([inventory.md](./inventory.md#get-apiv1productsidavailability--new)).
+  A shortfall names the line's warehouse in `shortfalls[].warehouse_id`.
+- `lines.N.unit_id` 🆕 (optional): order in any packaging unit of the product
+  instead of `unit` (`unit` becomes optional). Stock need = `(qty + free_qty) ×
+  unit base size ÷ carton size`, rounded **up** to whole cartons. `unit_price` is
+  then **per that unit**.
+- `lines.N.is_gift` 🆕 (optional, default `false`): a **free-gift line**. It is
+  sold at **0** (`unit_price` is ignored and not required), adds nothing to the
+  totals, and draws **only from free-gift stock** (bonus stock received through a
+  purchase order's `free_gifts`) — never from paid stock; ordinary lines never
+  touch gift stock. A gift line asking for more than the gift stock holds is the
+  usual 422 `shortfalls`.
+- **Minimum selling price** 🆕: for every non-gift line, `unit_price × (1 −
+  discount_pct/100)` must be **at least** the product's `min_selling_price` for
+  that unit (`min_selling_price × the unit's base size`; per carton for
+  `unit: Carton`). Below it is **422** on `lines.N.unit_price`. Products without
+  a minimum have no floor. The seller can price anywhere at or above it.
 - `sales_rep_id`: omit to default to the authenticated user. A Sales Rep may
   only submit their own id (or omit it) — submitting someone else's is `422`.
 - `unit`: `"Carton"` or `"Pack"`. A Pack-unit line's stock need is rounded
@@ -68,7 +100,16 @@ rounded to 2dp. `line.tax = line.subtotal × product.tax_pct/100`.
 `order.subtotal = Σ line.subtotal`, `order.tax_amount = Σ line.tax`,
 `order.total = subtotal + tax_amount − invoice_discount`.
 
-**201** — the created order with lines (see shapes above).
+**201** — the created order with lines (see shapes above). 🔄 Each line now also
+returns `warehouse_id` (its own or the order's), `unit_id`, `base_qty` and `is_gift`.
+
+**422 — below minimum selling price** 🆕:
+```json
+{
+  "message": "The price after discount cannot be below the minimum selling price of 80 for this unit.",
+  "errors": { "lines.0.unit_price": ["The price after discount cannot be below the minimum selling price of 80 for this unit."] }
+}
+```
 
 **422 — insufficient stock**:
 ```json
@@ -99,6 +140,28 @@ once the notifications endpoint ships).
 a Sales Rep naming another rep as `sales_rep_id`).
 
 **403** — user lacks `sales.add`, e.g. `Customer Service`.
+
+## `PUT /api/v1/sales-orders/{id}` 🆕 NEW
+
+Requires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** — once an
+order is picking/invoiced/delivered/cancelled its stock, invoice and journal
+entry were created from the old values: **422**
+`{"message": "Only draft sales orders can be changed or deleted."}`.
+
+Partial update with the create fields. Header fields update in place; `lines`,
+if sent, **replace every line** and the order is re-priced and re-validated
+exactly as on create (credit limit, per-line-warehouse FEFO availability,
+minimum selling price, gift rules). If `lines` is omitted but the customer,
+warehouse, `pay_type` or `invoice_discount` change, totals and availability are
+re-checked against the existing lines. Audit-logged. **200** — the order. Another
+tenant's order is **404**.
+
+## `DELETE /api/v1/sales-orders/{id}` 🆕 NEW
+
+Requires `sales.delete` (+ ownership if Sales Rep). **Draft orders only** (same
+**422**) — a draft has no stock, invoice or journal side effects, so the order
+and its lines (cascade) simply go. Anything further along: set the status to
+`cancelled`. **204**; audit-logged as `DELETE`.
 
 ---
 
@@ -179,8 +242,8 @@ invoice-lines table) and `collections_count`.
 ```
 `status`: `outstanding` (paid = 0) → `partial` (0 < paid < total) → `paid`
 (paid ≥ total). There's no `overdue` job yet — that's a scheduled command,
-still to come. Invoices are never deleted, only voided (voiding isn't
-built yet either).
+still to come. Invoices are never deleted, only voided — see
+`POST /invoices/{id}/void` below (`void` is a status).
 
 ### `GET /api/v1/invoices/{id}/lines`, `/collections`
 
@@ -189,7 +252,47 @@ collections recorded against it, each as its own list. Same access as the
 invoice show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
 
 There's no `POST /invoices` — they only come from the status-transition
-endpoint above.
+endpoint above (or [import](#post-apiv1invoicesimport--new)).
+
+### `POST /api/v1/invoices/{id}/void` 🆕 NEW
+
+Invoices are never hard-deleted; this is their "delete". Requires `sales.delete`
+(+ ownership if Sales Rep).
+
+- sets `status: void` and `balance: 0`;
+- posts the **reversing journal entry**: Dr Sales Revenue (4100) + Dr VAT
+  Payable (2300) / Cr Accounts Receivable (1200);
+- gives the receivable back off the customer's `balance` (for credit orders and
+  imported invoices; floored at 0).
+
+**422** if the invoice is already void, or if any money was collected against it
+(`paid > 0` / collections exist — deal with those first). **200** — the invoice.
+Another tenant's invoice is **404**.
+
+### `POST /api/v1/invoices/import` 🆕 NEW
+
+Requires `sales.add`. Brings in historical / opening invoices. Multipart `file` —
+see [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
+**Invoices have no natural key, so re-importing the same file creates
+duplicates** (`update_existing` has no effect here).
+
+Columns: `Customer`* (exact customer name, must exist), `Issued Date`*,
+`Due Date`, `Subtotal`*, `Tax Amount`, `Paid`. Per row:
+
+- the invoice is created with `total = subtotal + tax`, `balance = total − paid`
+  and status `paid` / `partial` / `overdue` (due date passed and unpaid) /
+  `outstanding`;
+- it posts the same journal entry a live invoice does — Dr Receivable (1200) /
+  Cr Sales Revenue (4100) + VAT Payable (2300) — and, if `Paid > 0`, a receipt
+  Dr Cash (1110) / Cr Receivable (1200), so the books stay consistent;
+- the customer's `balance` rises by what is still owed.
+
+A Sales Rep can only import invoices for their own customers. `paid` may not
+exceed the total.
+
+### `GET /api/v1/invoices/import-template` 🆕 NEW
+
+Requires `sales.add`. Downloads `invoices-import-template.xlsx`.
 
 ---
 

@@ -5,6 +5,30 @@ browsable site at **`/docs`** on a running instance of this app (`ApiDocsControl
 `resources/views/api-docs/show.blade.php`) — same content, syntax-highlighted and
 navigable, if that's easier to share with the frontend dev than raw markdown files.
 
+> ## 🏷️ Change flags
+>
+> Anything added or altered in the latest update is marked so you can find it:
+>
+> | Flag | Meaning |
+> |---|---|
+> | 🆕 **NEW** | a brand-new endpoint, section or module |
+> | 🔄 **CHANGED** | an existing endpoint that now accepts or returns more (existing requests keep working) |
+>
+> The same flags are on the matching requests in the Postman collection
+> (`🆕` / `🔄` in the request name). Summary of this update:
+>
+> - 🆕 **Roles & permissions API** — create roles, pick permissions (incl. edit/delete per module), assign users → [admin.md](./admin.md#roles--permissions)
+> - 🆕 **Edit & delete endpoints** across the API, gated by `{module}.edit` / `{module}.delete` → [Editing and deleting](#editing-and-deleting-records--new)
+> - 🆕 **Spreadsheet import** for customers, products, suppliers, warehouses and invoices → [Importing](#importing-from-a-spreadsheet--new)
+> - 🆕 **Recap** (stock write-off posting to the chart of accounts) → [recap.md](./recap.md)
+> - 🆕 **Manufacturing** (BOMs, production orders) → [manufacturing.md](./manufacturing.md)
+> - 🆕 **Units / packaging ladder** (packet → package → carton) → [inventory.md](./inventory.md#units--product-packaging--new)
+> - 🆕 **Free gifts** on purchase receipts and gift lines on sales orders
+> - 🆕 **Minimum selling price** per product; 🔄 **product cost is Administrator-only**
+> - 🔄 **Sales orders from several warehouses** (per-line warehouse) + 🆕 `GET /products/{id}/availability`
+> - 🆕 **Product life cycle** timeline → [analytics.md](./analytics.md#get-apiv1productsidlifecycle--new)
+> - 🆕 Chart of accounts create/edit/delete; 🆕 invoice **void**
+
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 
 Auth: Bearer token (Laravel Sanctum). Send `Authorization: Bearer <token>` on every
@@ -33,6 +57,90 @@ Unauthenticated requests return `401`:
 ```json
 { "message": "Unauthenticated." }
 ```
+
+## Editing and deleting records 🆕 NEW
+
+Every master-data resource now has `PUT /{resource}/{id}` (permission
+`{module}.edit`) and `DELETE /{resource}/{id}` (permission `{module}.delete`).
+An admin decides who may edit or delete by giving a role those permissions
+([Roles & permissions](./admin.md#roles--permissions)) — by default only
+`Administrator` holds any `*.delete`.
+
+| Resource | Edit | Delete |
+|---|---|---|
+| Users | `PUT /users/{id}` | 🆕 `DELETE /users/{id}` (`admin.delete`) |
+| Roles | 🆕 `PUT /roles/{id}` | 🆕 `DELETE /roles/{id}` |
+| Customers, leads, visits, complaints, campaigns | 🆕 `PUT` (customers existed) | 🆕 `DELETE` (`crm.delete`) |
+| Warehouses, products, categories | existed | 🆕 `DELETE` (`inventory.delete`) |
+| Units | 🆕 `PUT /units/{id}` | 🆕 `DELETE` |
+| Suppliers | existed | 🆕 `DELETE` (`purchasing.delete`) |
+| Purchase orders | existed | existed (unreceived only) |
+| Sales orders | 🆕 `PUT /sales-orders/{id}` (draft only) | 🆕 `DELETE` (draft only, `sales.delete`) |
+| Invoices | — | 🆕 `POST /invoices/{id}/void` (invoices are never hard-deleted) |
+| Expense categories | existed | 🆕 `DELETE` (`expenses.delete`) |
+| Chart of accounts | 🆕 `PUT` | 🆕 `DELETE` (`accounting.delete`) |
+| Recaps, BOMs, production orders | 🆕 (draft only) | 🆕 (draft only / unused only) |
+
+Common behaviour:
+
+- **204 No Content** on delete; the deletion (and every edit's before/after) is
+  written to the audit log.
+- **404** for another tenant's record — checked *before* permissions, so even an
+  Administrator cannot touch another tenant's data.
+- **409 Conflict** when other records still reference the row:
+  `{"message": "This Customer is referenced by other records and cannot be deleted."}`
+  (or a specific message, e.g. `This role is assigned to users...`). Retire the
+  record (`active: false` / `status: inactive`) instead.
+- **422** when a business rule forbids the change (e.g. editing a non-draft
+  document).
+- **Deliberately not editable / deletable:** posted financial and stock
+  documents — journal entries, collections, deliveries, returns, transfers,
+  goods receipts and invoices. They are corrected by posting a reversal (e.g.
+  `POST /invoices/{id}/void`), never by rewriting history.
+
+## Importing from a spreadsheet 🆕 NEW
+
+Bulk-load data from an Excel/CSV file:
+
+| Resource | Import | Template | Needs | Matched by |
+|---|---|---|---|---|
+| Customers | `POST /customers/import` | `GET /customers/import-template` | `crm.add` | name |
+| Products | `POST /products/import` | `GET /products/import-template` | `inventory.add` | SKU |
+| Suppliers | `POST /suppliers/import` | `GET /suppliers/import-template` | `purchasing.add` | name |
+| Warehouses | `POST /warehouses/import` | `GET /warehouses/import-template` | `inventory.add` | name |
+| Invoices | `POST /invoices/import` | `GET /invoices/import-template` | `sales.add` | — (no natural key) |
+
+- **Request:** `multipart/form-data` with `file` (`.xlsx`, `.xls` or `.csv`, max
+  5 MB, max 5000 rows) and optional `update_existing` (boolean). The first row
+  must be the headings from the template (case-insensitive, spaces or
+  underscores); blank rows are ignored; unknown columns are ignored.
+- **Template:** `GET .../import-template` downloads an `.xlsx` with the exact
+  headings and one example row.
+- **Existing records** (matched by the key above) are **skipped** by default;
+  with `update_existing=1` they are updated with the non-blank cells (a blank
+  cell never wipes an existing value).
+- **All-or-nothing.** Everything is validated and written in one transaction. If
+  any row is invalid, **nothing is imported** and the response lists every bad
+  row:
+
+```json
+{
+  "message": "The file has 2 invalid row(s). Nothing was imported.",
+  "created": 0, "updated": 0, "skipped": 0,
+  "errors": [
+    { "row": 3, "errors": { "type": ["The selected type is invalid."], "email": ["The email field must be a valid email address."] } },
+    { "row": 5, "errors": { "category": ["No product category named or coded \"Mystery\"."] } }
+  ]
+}
+```
+
+  `row` is the spreadsheet row number (row 1 = headings). Status **422**; a
+  missing required column or an unreadable / empty file is also 422 (with
+  `errors: []`).
+- **Success** — **200**:
+  `{ "message": "...", "created": 12, "updated": 0, "skipped": 3, "errors": [] }`.
+  One `IMPORT` entry is written to the audit log.
+- Dates may be real Excel dates or `YYYY-MM-DD` text.
 
 ## Exporting a list as CSV or Excel
 
@@ -171,8 +279,10 @@ The counts are on both the list and the show response of the parent.
 | CRM (Customers / Leads / Visits / Complaints / Campaigns) | Done | [crm.md](./crm.md) |
 | Accounting (Chart of Accounts / Journal Entries / Balance Sheet / Income Statement) | Done | [accounting.md](./accounting.md) |
 | Expenses (Expense Categories / Expenses / Receipts / Approval) | Done | [expenses.md](./expenses.md) |
+| 🆕 Recap (stock write-offs posting to the chart of accounts) | New | [recap.md](./recap.md) |
+| 🆕 Manufacturing (BOMs / Production Orders) | New | [manufacturing.md](./manufacturing.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
-| Admin (users, audit log, notifications, discarded actions, governorates/cities) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
+| Admin (users, 🆕 roles & permissions, audit log, notifications, discarded actions, governorates/cities) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
 
 This file is updated as each module ships.
 
@@ -182,7 +292,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all 121 endpoints below, organized to match this doc's module split, with
+all the endpoints below (219 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —
@@ -192,12 +302,36 @@ don't hand-edit the JSON.
 
 ## Roles & permissions
 
+> 🆕 Roles are no longer fixed: an admin can create roles, choose their
+> permissions and connect users to them — see [admin.md](./admin.md#roles--permissions).
+> 🆕 Two new permission modules exist: `recap.*` and `manufacturing.*` (each
+> with the same eight capabilities). Re-run `RolePermissionSeeder` to create them.
+
 10 roles are seeded (`Administrator`, `Owner`, `Sales Manager`, `Sales Rep`,
 `Warehouse Manager`, `Warehouse Employee`, `Accountant`, `Customer Service`,
 `Purchasing`, `Auditor`). Permissions are named `{module}.{capability}`, e.g.
 `sales.approve`, `inventory.export`. The `permissions` array returned on login
 and `GET /auth/me` is the frontend's source of truth for what to show/hide —
 don't hardcode role-based UI logic, check permission strings instead.
+
+## Upgrading an existing database 🆕 NEW
+
+After pulling this update, an existing install needs (in order):
+
+```bash
+php artisan migrate                                    # units, product_units, min price, gift batches, PO/SO line columns, recap + manufacturing tables
+php artisan db:seed --class="Modules\\Core\\Database\\Seeders\\RolePermissionSeeder"   # recap.* and manufacturing.* permissions
+php artisan db:seed --class="Modules\\Accounting\\Database\\Seeders\\AccountSeeder"     # accounts 6300 and 6400
+php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\UnitSeeder"        # Packet / Package / Carton
+php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\ProductUnitSeeder" # every product gets a Packet -> Carton ladder
+```
+
+All five seeders are idempotent. Which roles got the new permissions:
+`Warehouse Manager` → `recap.*` and `manufacturing.*` (view/add/edit/approve/print/export),
+`Warehouse Employee` → `manufacturing.view/add/edit`, `Accountant` → `recap.view`;
+`Owner`/`Auditor` get the new modules through their module-wide grants;
+`Administrator` gets everything. Nobody but `Administrator` gets any `*.delete`
+until an admin grants it.
 
 ## Seed accounts (local/dev only)
 

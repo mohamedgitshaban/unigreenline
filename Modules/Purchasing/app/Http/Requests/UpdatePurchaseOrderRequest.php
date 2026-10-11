@@ -35,8 +35,13 @@ class UpdatePurchaseOrderRequest extends FormRequest
 
             'lines' => ['sometimes', 'array', 'min:1'],
             'lines.*.product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
-            'lines.*.qty_cartons' => ['required', 'integer', 'min:1'],
-            'lines.*.cost_per_carton' => ['required', 'numeric', 'min:0'],
+            // Order either in cartons (qty_cartons + cost_per_carton) or in any of the product's
+            // packaging units (unit_id + qty + cost_per_unit); the latter must come to whole cartons.
+            'lines.*.qty_cartons' => ['required_without:lines.*.unit_id', 'integer', 'min:1'],
+            'lines.*.cost_per_carton' => ['required_without:lines.*.unit_id', 'numeric', 'min:0'],
+            'lines.*.unit_id' => ['nullable', 'string', Rule::exists('units', 'id')->where('tenant_id', $tenantId)],
+            'lines.*.qty' => ['required_with:lines.*.unit_id', 'integer', 'min:1'],
+            'lines.*.cost_per_unit' => ['required_with:lines.*.unit_id', 'numeric', 'min:0'],
         ];
     }
 }

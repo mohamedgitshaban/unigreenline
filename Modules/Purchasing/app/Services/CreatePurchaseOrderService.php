@@ -48,6 +48,9 @@ class CreatePurchaseOrderService
             foreach ($computedLines as $line) {
                 $po->lines()->create([
                     'product_id' => $line['product_id'],
+                    'unit_id' => $line['unit_id'] ?? null,
+                    'unit_qty' => $line['unit_qty'] ?? null,
+                    'cost_per_unit' => $line['cost_per_unit'] ?? null,
                     'qty_cartons' => $line['qty_cartons'],
                     'cost_per_carton' => $line['cost_per_carton'],
                     'total' => $line['total'],

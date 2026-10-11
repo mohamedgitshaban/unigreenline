@@ -74,6 +74,53 @@ rollup) — same row shape as batches elsewhere.
 `?start_date=&end_date=&warehouse_id=&per_page=` — date filters apply to
 `rcv_date` (when each batch was received), not `exp_date`.
 
+## `GET /api/v1/products/{id}/lifecycle` 🆕 NEW
+
+Requires `analytics.view` **or** `inventory.view`. A product's whole journey as
+one date-ordered timeline — purchase, transfers, manufacturing, sale, returns,
+write-offs — plus where the stock is now. `?from=&to=` (optional dates,
+`to` ≥ `from`) narrow the window. Another tenant's product is **404**.
+
+```json
+{
+  "data": {
+    "product": { "id": "01m...", "name": "Ivermectin 1%", "sku": "PRD-00002", "carton_qty": 30 },
+    "summary": {
+      "purchased_cartons": 50, "sold_cartons": 5, "transferred_cartons": 20,
+      "written_off_cartons": 0, "produced_cartons": 0, "on_hand_cartons": 15
+    },
+    "stock": [
+      { "batch_id": "01m...", "batch_no": "B-1", "warehouse": { "id": "01m...", "name": "Branch" },
+        "qty_cartons": 15, "exp_date": "2027-01-01", "is_free_gift": false, "cost_per_carton": "20.00" }
+    ],
+    "events": [
+      { "date": "2026-01-01", "type": "purchase_ordered", "title": "Purchase order raised with Acme",
+        "reference_id": "01m...(PO)", "supplier": "Acme", "warehouse": "Main", "quantity": 50, "unit": "Carton",
+        "amount": "1000.00", "cost_per_carton": "20.00", "status": "received" },
+      { "date": "2026-01-05", "type": "purchase_received", "title": "Received into Main", "...": "" },
+      { "date": "2026-01-10", "type": "transfer", "title": "Transferred Main → Branch",
+        "reference_id": "01m...", "from_warehouse": "Main", "to_warehouse": "Branch", "quantity": 20, "unit": "Carton" },
+      { "date": "2026-01-20", "type": "sale", "title": "Sold to Nile Clinic", "reference_id": "01m...(sales order)",
+        "invoice_ids": ["01m..."], "customer": "Nile Clinic", "warehouse": "Branch",
+        "quantity": 5, "quantity_cartons": 5, "unit": "Carton", "free_qty": 0, "amount": "150.00", "status": "delivered" }
+    ]
+  }
+}
+```
+
+Event `type` is one of `purchase_ordered`, `purchase_received`, `transfer`,
+`production_consumed`, `production_output`, `sale` (not for cancelled orders),
+`sales_return`, `purchase_return`, `write_off` (approved recaps only). Events on
+the same date are ordered purchase → transfer → manufacturing → sale → return →
+write-off. `reference_id` is the source document (PO, transfer, production
+order, sales order, return, recap) for linking. `quantity` is in `unit`;
+`quantity_cartons` (sales) is the carton equivalent used in the summary, and
+`sold_cartons` only counts orders that are invoiced or delivered.
+
+**Cost is administrator-only**: for non-Administrators the cost fields
+(`amount`/`cost_per_carton` on purchase, manufacturing and write-off events, and
+`cost_per_carton` in `stock`) are omitted; sale amounts (prices) stay.
+
 ---
 
 ## Scheduled jobs
@@ -89,6 +136,12 @@ Flips `outstanding`/`partial` invoices whose `due_date` has passed to
 data). For each one: updates the invoice, creates a broadcast (`user_id:
 null`) notification (`type: "invoice_overdue"`), and records an audit log
 entry. Paid invoices and ones not yet due are left alone.
+
+### `php artisan recap:generate-expired` 🆕 NEW
+
+Daily. Drafts a write-off recap per warehouse for every batch past its expiry
+date (batches already on a draft are skipped). Drafts only — nothing is deducted
+or posted until someone approves; see [recap.md](./recap.md).
 
 ### `php artisan inventory:generate-expiry-alerts`
 

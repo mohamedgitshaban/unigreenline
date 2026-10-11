@@ -1,5 +1,7 @@
 # CRM
 
+> 🆕 **Delete** (`crm.delete`), **edit** for leads/visits/complaints/campaigns and **customer import** were added later and are flagged below. By default only `Administrator` holds `crm.delete`; an admin can grant it to any role (see [Admin > Roles](./admin.md#roles--permissions)).
+
 `Customer Service` has `crm.view/add/edit` (sees/manages every customer, no
 ownership scoping). `Sales Rep` also has `crm.view/add/edit/print`, per
 spec §2 grouping "orders/customers" as one scope — **but** scoped to their
@@ -45,17 +47,51 @@ naming a different rep is `422`.
 
 Requires `crm.edit` (+ ownership if Sales Rep). All fields optional.
 
+### `DELETE /api/v1/customers/{id}` 🆕 NEW
+
+Requires `crm.delete` (+ ownership if Sales Rep). **204**, audit-logged as
+`DELETE`; the customer's visits and complaints are removed with it. **409**
+`This Customer is referenced by other records and cannot be deleted.` while the
+customer has sales orders, invoices or collections — set `status: inactive`
+instead. Another tenant's customer is **404**.
+
+### `POST /api/v1/customers/import` 🆕 NEW
+
+Requires `crm.add`. Bulk-creates customers from a spreadsheet — see
+[Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
+Multipart: `file` (.xlsx/.csv) and optional `update_existing` (`1` = update
+customers matched by **name**, otherwise they are skipped).
+
+Columns (headings are case-insensitive): `Name`*, `Type`*, `Classification`,
+`Phone`, `Email`, `Governorate`, `Province`, `City`, `Area`, `Address`,
+`Credit Limit`, `Pay Terms`, `Status`, `Sales Rep Email` (must be an existing
+user; a Sales Rep can only import customers under their own name — a blank
+value assigns them to the importer).
+
+### `GET /api/v1/customers/import-template` 🆕 NEW
+
+Requires `crm.add`. Downloads `customers-import-template.xlsx` — the headings
+above plus one example row.
+
 ---
 
 ## `GET/POST /api/v1/leads`
 
-Requires `crm.view`/`crm.add`. No update/delete endpoint (not in the spec's
-table). Same `type` enum as customers; `status`: `new` (default),
+Requires `crm.view`/`crm.add`. Same `type` enum as customers; `status`: `new` (default),
 `qualified`, `proposal`, `won`, `lost`.
 
 ### `GET /api/v1/leads/{id}`
 
 Requires `crm.view`. Includes `assigned_to`. **404** — the lead belongs to another account.
+
+### `PUT /api/v1/leads/{id}` 🆕 NEW
+
+Requires `crm.edit`. Partial update with the create rules. Audit-logged with the
+changed fields.
+
+### `DELETE /api/v1/leads/{id}` 🆕 NEW
+
+Requires `crm.delete`. **204**.
 
 ---
 
@@ -68,6 +104,15 @@ defaulted to themselves if omitted. `outcome`: `positive`, `neutral`,
 ### `GET /api/v1/visits/{id}`
 
 Requires `crm.view`. Includes the nested `customer` and `rep`. **404** — the visit belongs to another account.
+
+### `PUT /api/v1/visits/{id}` 🆕 NEW
+
+Requires `crm.edit`. Partial update with the create rules (`next_visit` must not
+precede `visit_date`).
+
+### `DELETE /api/v1/visits/{id}` 🆕 NEW
+
+Requires `crm.delete`. **204**.
 
 ---
 
@@ -82,6 +127,16 @@ defaults to `investigating`.
 
 Requires `crm.view`. Includes the nested `customer`, `product` and
 `assigned_to`. **404** — the complaint belongs to another account.
+
+### `PUT /api/v1/complaints/{id}` 🆕 NEW
+
+Requires `crm.edit`. Partial update of the complaint's details (type, priority,
+description, product, batch, assignee...). Resolving remains its own action,
+`PUT /complaints/{id}/resolve`, below.
+
+### `DELETE /api/v1/complaints/{id}` 🆕 NEW
+
+Requires `crm.delete`. **204**.
 
 ### `PUT /api/v1/complaints/{id}/resolve`
 
@@ -104,6 +159,15 @@ Requires `crm.view`/`crm.add`. `status` defaults to `active`.
 ### `GET /api/v1/campaigns/{id}`
 
 Requires `crm.view`. **404** — the campaign belongs to another account.
+
+### `PUT /api/v1/campaigns/{id}` 🆕 NEW
+
+Requires `crm.edit`. Partial update (`end_date` must not precede `start_date`).
+Ending a campaign remains its own action, `PUT /campaigns/{id}/end`, below.
+
+### `DELETE /api/v1/campaigns/{id}` 🆕 NEW
+
+Requires `crm.delete`. **204**.
 
 ### `PUT /api/v1/campaigns/{id}/end`
 

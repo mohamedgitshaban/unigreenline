@@ -12,7 +12,7 @@ use Modules\Inventory\Database\Factories\InventoryBatchFactory;
 
 #[Fillable([
     'tenant_id', 'product_id', 'warehouse_id', 'batch_no', 'mfg_date', 'exp_date',
-    'rcv_date', 'qty_cartons', 'qty_packs', 'cost_per_carton',
+    'rcv_date', 'qty_cartons', 'qty_packs', 'cost_per_carton', 'is_free_gift', 'source_po_id',
 ])]
 class InventoryBatch extends Model
 {
@@ -27,6 +27,7 @@ class InventoryBatch extends Model
             'qty_cartons' => 'integer',
             'qty_packs' => 'integer',
             'cost_per_carton' => 'decimal:2',
+            'is_free_gift' => 'boolean',
         ];
     }
 

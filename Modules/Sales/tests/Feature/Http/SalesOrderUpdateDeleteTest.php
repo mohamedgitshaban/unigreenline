@@ -4,6 +4,7 @@ namespace Modules\Sales\Tests\Feature\Http;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
+use Modules\Accounting\Models\Account;
 use Modules\Core\Database\Seeders\RolePermissionSeeder;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
@@ -116,6 +117,71 @@ class SalesOrderUpdateDeleteTest extends TestCase
 
         $this->putJson("/api/v1/sales-orders/{$foreign->id}", ['notes' => 'x'])->assertNotFound();
         $this->deleteJson("/api/v1/sales-orders/{$foreign->id}")->assertNotFound();
+    }
+
+    public function test_lines_can_draw_from_different_warehouses_and_stock_leaves_each_one(): void
+    {
+        $this->actingAsRole('Sales Manager');
+        foreach (['1200' => 'Asset', '4100' => 'Revenue', '2300' => 'Liability'] as $code => $type) {
+            Account::factory()->recycle($this->tenant)->create(['code' => $code, 'type' => $type]);
+        }
+        $second = Warehouse::factory()->recycle($this->tenant)->create();
+        $secondBatch = InventoryBatch::factory()->recycle([$this->tenant, $this->product, $second])->withQtyCartons(5)->create();
+        $firstBatch = InventoryBatch::query()->where('warehouse_id', $this->warehouse->id)->firstOrFail();
+
+        // 8 cartons: only 5 exist in the second warehouse, so it must be 3 + 5 across two lines.
+        $id = $this->postJson('/api/v1/sales-orders', [
+            'customer_id' => $this->customer->id,
+            'warehouse_id' => $this->warehouse->id,
+            'pay_type' => 'cash',
+            'lines' => [
+                ['product_id' => $this->product->id, 'qty' => 3, 'unit' => 'Carton', 'unit_price' => 100],
+                ['product_id' => $this->product->id, 'warehouse_id' => $second->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 100],
+            ],
+        ])
+            ->assertCreated()
+            ->json('data.id');
+
+        $this->assertDatabaseHas('sales_order_lines', ['so_id' => $id, 'warehouse_id' => $second->id, 'qty' => 5]);
+
+        $this->putJson("/api/v1/sales-orders/{$id}/status", ['status' => 'invoiced'])->assertOk();
+
+        $this->assertSame(17, $firstBatch->fresh()->qty_cartons);
+        $this->assertSame(0, $secondBatch->fresh()->qty_cartons);
+    }
+
+    public function test_a_line_asking_more_than_its_own_warehouse_holds_is_refused(): void
+    {
+        $this->actingAsRole('Sales Manager');
+        $second = Warehouse::factory()->recycle($this->tenant)->create();
+        InventoryBatch::factory()->recycle([$this->tenant, $this->product, $second])->withQtyCartons(2)->create();
+
+        $this->postJson('/api/v1/sales-orders', [
+            'customer_id' => $this->customer->id,
+            'warehouse_id' => $this->warehouse->id,
+            'pay_type' => 'cash',
+            'lines' => [['product_id' => $this->product->id, 'warehouse_id' => $second->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 100]],
+        ])->assertUnprocessable()->assertJsonPath('shortfalls.0.warehouse_id', $second->id);
+    }
+
+    public function test_lists_every_warehouse_holding_stock_of_a_product(): void
+    {
+        $this->actingAsRole('Sales Rep');
+        $second = Warehouse::factory()->recycle($this->tenant)->create();
+        $empty = Warehouse::factory()->recycle($this->tenant)->create();
+        InventoryBatch::factory()->recycle([$this->tenant, $this->product, $second])->withQtyCartons(50)->create();
+        InventoryBatch::factory()->recycle([$this->tenant, $this->product, $empty])->withQtyCartons(0)->create();
+
+        $this->getJson("/api/v1/products/{$this->product->id}/availability")
+            ->assertOk()
+            ->assertJsonPath('data.total_available_cartons', 70)
+            ->assertJsonCount(2, 'data.warehouses')
+            ->assertJsonPath('data.warehouses.0.id', $second->id)
+            ->assertJsonPath('data.warehouses.0.available_cartons', 50)
+            ->assertJsonPath('data.warehouses.1.id', $this->warehouse->id);
+
+        $this->actingAsRole('Customer Service');
+        $this->getJson("/api/v1/products/{$this->product->id}/availability")->assertForbidden();
     }
 
     /**

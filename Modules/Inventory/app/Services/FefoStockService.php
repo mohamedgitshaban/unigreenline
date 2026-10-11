@@ -20,7 +20,10 @@ class FefoStockService
     /**
      * Returns shortfalls grouped by product+warehouse; empty means every line is satisfiable.
      *
-     * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int}>  $lines
+     * A line with `gift => true` draws only from free-gift batches; every other
+     * line draws only from regular stock, so gifts stay reserved for gift lines.
+     *
+     * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int, gift?: bool}>  $lines
      * @return array<int, array{product_id: string, warehouse_id: string, needed: int, available: int}>
      */
     public function checkAvailability(array $lines): array
@@ -28,7 +31,7 @@ class FefoStockService
         $shortfalls = [];
 
         foreach ($this->groupByProductWarehouse($lines) as $group) {
-            $available = $this->availableCartons($group['product_id'], $group['warehouse_id']);
+            $available = $this->availableCartons($group['product_id'], $group['warehouse_id'], $group['gift']);
 
             if ($available < $group['needed']) {
                 $shortfalls[] = [
@@ -69,6 +72,7 @@ class FefoStockService
                 $batches = InventoryBatch::query()
                     ->where('product_id', $line['product_id'])
                     ->where('warehouse_id', $line['warehouse_id'])
+                    ->where('is_free_gift', $line['gift'] ?? false)
                     ->where('qty_cartons', '>', 0)
                     ->orderBy('exp_date')
                     ->orderBy('rcv_date')
@@ -116,11 +120,12 @@ class FefoStockService
         });
     }
 
-    private function availableCartons(string $productId, string $warehouseId): int
+    private function availableCartons(string $productId, string $warehouseId, bool $gift = false): int
     {
         return (int) InventoryBatch::query()
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
+            ->where('is_free_gift', $gift)
             ->where('qty_cartons', '>', 0)
             ->sum('qty_cartons');
     }
@@ -132,15 +137,16 @@ class FefoStockService
      * one of them would already consume.
      *
      * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int}>  $lines
-     * @return Collection<string, array{product_id: string, warehouse_id: string, needed: int}>
+     * @return Collection<string, array{product_id: string, warehouse_id: string, gift: bool, needed: int}>
      */
     private function groupByProductWarehouse(array $lines): Collection
     {
         return collect($lines)
-            ->groupBy(fn (array $line) => $line['product_id'].'|'.$line['warehouse_id'])
+            ->groupBy(fn (array $line) => $line['product_id'].'|'.$line['warehouse_id'].'|'.(int) ($line['gift'] ?? false))
             ->map(fn (Collection $group) => [
                 'product_id' => $group->first()['product_id'],
                 'warehouse_id' => $group->first()['warehouse_id'],
+                'gift' => (bool) ($group->first()['gift'] ?? false),
                 'needed' => $group->sum('cartons_needed'),
             ]);
     }

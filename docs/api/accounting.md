@@ -31,6 +31,44 @@ there are usually few enough accounts that one page covers it).
 
 A single account, same shape as a list row. **404** — the account belongs to another account.
 
+## `POST /api/v1/chart-of-accounts` 🆕 NEW
+
+Requires `accounting.add`. Adds an account to the chart.
+
+```json
+{ "code": "6500", "name": "Fuel", "type": "Expense", "parent_id": "01m...", "active": true }
+```
+
+`code` (unique per tenant, max 20 chars), `name` and `type`
+(`Asset`/`Liability`/`Equity`/`Revenue`/`Expense`) are required. `parent_id`
+(optional, same tenant) sets `level` = parent level + 1; without it the account
+is level 1. **201** — the account. **422** on a duplicate code.
+
+## `PUT /api/v1/chart-of-accounts/{id}` 🆕 NEW
+
+Requires `accounting.edit`. Partial update of `name`, `active`, `parent_id`
+(cannot be itself), `code`, `type`. **`code` and `type` are frozen (422) for the
+system accounts below and for any account that already has journal lines** —
+postings and statements key on them. `balance` is never editable (only postings
+move it). Audit-logged.
+
+## `DELETE /api/v1/chart-of-accounts/{id}` 🆕 NEW
+
+Requires `accounting.delete`. **204**. **409** for a system account, an account
+with child accounts, or an account with journal lines. Another tenant's account
+is **404**.
+
+**System accounts** (auto-posting looks these up by code; never deleted or
+re-coded/re-typed): `1110` Cash, `1120` Bank, `1200` Accounts Receivable, `1300`
+Inventory, `2100` Accounts Payable, `2300` VAT Payable, `4100` Sales Revenue,
+🆕 `6300` Inventory Write-off Expense (used by [Recap](./recap.md)) and 🆕 `6400`
+Manufacturing Overhead Absorbed (used by [Manufacturing](./manufacturing.md)).
+Run `AccountSeeder` to create `6300` and `6400` on an existing database.
+
+> Journal entries stay read-only on purpose: a posted entry is never edited or
+> deleted. Corrections are made by posting a reversing entry — which is what
+> voiding an invoice, rejecting/undoing a document, etc. do.
+
 ## `GET /api/v1/journal-entries`
 
 Paginated, includes `lines_count`. Optional `?start_date=&end_date=` filter

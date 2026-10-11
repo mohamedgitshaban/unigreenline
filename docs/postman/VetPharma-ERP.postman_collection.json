@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "VetPharma ERP API",
-        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 126 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 219 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (Recap, Manufacturing, Units, Roles & Permissions, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit). The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `RolePermissionSeeder`, `AccountSeeder`, `UnitSeeder`, `ProductUnitSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "auth": {
@@ -209,6 +209,156 @@
             "key": "deletable_expense_id",
             "value": "",
             "type": "string"
+        },
+        {
+            "key": "unit_id_packet",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "unit_id_package",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "unit_id_carton",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_unit_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "unit_product_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_product_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_warehouse_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_category_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_supplier_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_customer_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_lead_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_visit_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_complaint_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_campaign_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_expense_category_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "new_account_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "gift_sales_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "voidable_sales_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "voidable_invoice_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "recap_batch_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "recap_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "rejectable_recap_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_recap_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "finished_product_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "bom_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_bom_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "production_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "cancellable_production_order_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "deletable_user_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "role_id",
+            "value": "",
+            "type": "string"
         }
     ],
     "item": [
@@ -384,6 +534,303 @@
         {
             "name": "Inventory",
             "item": [
+                {
+                    "name": "🆕 Units",
+                    "item": [
+                        {
+                            "name": "🆕 List units",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/units?page=1&per_page=50&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "50",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.view`, `purchasing.view` or `sales.view`. The packaging unit names (Packet, Package, Carton by default — seeded by UnitSeeder). Supports `search` on name."
+                            }
+                        },
+                        {
+                            "name": "🆕 Create unit (Packet)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. Adds a unit name an admin can then use in any product packaging ladder. `name` is unique per tenant. The Postman names are prefixed so they do not clash with the seeded Packet/Package/Carton.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Packet\",\n    \"active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('unit_id_packet', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Create unit (Package)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. See Create unit (Packet).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Package\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('unit_id_package', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Create unit (Carton)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. See Create unit (Packet).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Carton\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('unit_id_carton', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Get unit",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/units/{{unit_id_packet}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units",
+                                        "{{unit_id_packet}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires the same permissions as List units. 404 for another tenant."
+                            }
+                        },
+                        {
+                            "name": "🆕 Update unit",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/units/{{unit_id_packet}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units",
+                                        "{{unit_id_packet}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.edit`. Rename it or set `active: false` to stop offering it.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Create unit (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/units",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nA throwaway unit for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Unit\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_unit_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete unit",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/units/{{deletable_unit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "units",
+                                        "{{deletable_unit_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.delete`. 204. **409** if any product is packaged in the unit — set `active: false` instead."
+                            }
+                        }
+                    ],
+                    "description": "**🆕 — NEW**\n\nAdmin-managed packaging unit names. What each unit holds is set per product (Products > Create product with packaging units)."
+                },
                 {
                     "name": "Warehouses",
                     "item": [
@@ -613,6 +1060,122 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "🆕 Import warehouses",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/import",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "import"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. Bulk-creates warehouses from a spreadsheet. Matched by name. `manager_email` must be an existing user.\n\n**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "update_existing",
+                                            "value": "0",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "file",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows)."
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Download warehouses import template",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/import-template",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "import-template"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. An .xlsx with the exact column headings and one example row."
+                            }
+                        },
+                        {
+                            "name": "Create warehouse (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Warehouse\",\n    \"city\": \"Cairo\",\n    \"governorate\": \"Cairo\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_warehouse_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete warehouse",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{deletable_warehouse_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{deletable_warehouse_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.delete` + the warehouse visible to the caller. 204. **409** while it holds batches, has transfers or purchase/sales orders. Audit-logged as DELETE."
+                            }
                         }
                     ]
                 },
@@ -758,6 +1321,70 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "Create category (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/categories",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Category\",\n    \"active\": true\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_category_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete category",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/categories/{{deletable_category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories",
+                                        "{{deletable_category_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.delete`. 204. **409** while any product uses the category — set `active: false` instead."
+                            }
                         }
                     ]
                 },
@@ -878,7 +1505,7 @@
                             }
                         },
                         {
-                            "name": "Create product",
+                            "name": "🔄 Create product",
                             "request": {
                                 "method": "POST",
                                 "header": [
@@ -896,10 +1523,10 @@
                                         "products"
                                     ]
                                 },
-                                "description": "Requires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
+                                "description": "**🔄 — CHANGED: takes `min_selling_price` (per smallest unit, never above `pack_selling_price`; sales-order lines may not be priced below it) and an optional `units` packaging ladder (see Units). Cost fields (`pack_cost_price`, `cost_price`) are only returned to Administrators.**\n\nRequires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"supplier_id\": null,\n    \"name\": \"Oxytetracycline 20% Injectable (Postman Demo)\",\n    \"sku\": \"POSTMAN-DEMO-0001\",\n    \"brand\": \"EgyVet\",\n    \"pack_unit\": \"Vial 100ml\",\n    \"carton_qty\": 20,\n    \"pack_cost_price\": 45,\n    \"pack_selling_price\": 65,\n    \"discount_pct\": 0,\n    \"tax_pct\": 14,\n    \"min_stock_cartons\": 10,\n    \"reorder_level\": 20\n}",
+                                    "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"supplier_id\": null,\n    \"name\": \"Oxytetracycline 20% Injectable (Postman Demo)\",\n    \"sku\": \"POSTMAN-DEMO-0001\",\n    \"brand\": \"EgyVet\",\n    \"pack_unit\": \"Vial 100ml\",\n    \"carton_qty\": 20,\n    \"pack_cost_price\": 45,\n    \"pack_selling_price\": 65,\n    \"min_selling_price\": 1,\n    \"discount_pct\": 0,\n    \"tax_pct\": 14,\n    \"min_stock_cartons\": 10,\n    \"reorder_level\": 20\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -924,7 +1551,7 @@
                             ]
                         },
                         {
-                            "name": "Update product",
+                            "name": "🔄 Update product",
                             "request": {
                                 "method": "PUT",
                                 "header": [
@@ -943,16 +1570,197 @@
                                         "{{product_id}}"
                                     ]
                                 },
-                                "description": "Requires `inventory.edit`. All fields optional.",
+                                "description": "**🔄 — CHANGED: accepts `min_selling_price` and `units` (replaces the whole packaging ladder; `carton_qty` is re-derived from it).**\n\nRequires `inventory.edit`. All fields optional.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"pack_selling_price\": 70\n}",
+                                    "raw": "{\n    \"pack_selling_price\": 70,\n    \"min_selling_price\": 2\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 }
+                            }
+                        },
+                        {
+                            "name": "🆕 Product availability by warehouse",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/{{product_id}}/availability",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "{{product_id}}",
+                                        "availability"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.view` or `sales.view`. Every active warehouse holding unexpired stock of the product — `available_cartons`, `available_base_units`, `batches_count`, `nearest_expiry` — largest first, plus totals. Use it to let a seller pick the warehouse for each sales-order line."
+                            }
+                        },
+                        {
+                            "name": "🆕 Create product with packaging units",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/products",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. Packaging ladder smallest unit first; each larger unit says how many of the previous one it holds — here Packet, Package (10 packets), Carton (3 packages) = **30 packets per carton**, so `carton_qty` is derived (do not send it) and stock is stored by the carton. Uses the units from Units > Create unit.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"name\": \"Packaged Product X (Postman Demo)\",\n    \"sku\": \"POSTMAN-UNITS-0001\",\n    \"pack_cost_price\": 5,\n    \"pack_selling_price\": 10,\n    \"min_selling_price\": 8,\n    \"units\": [\n        {\n            \"unit_id\": \"{{unit_id_packet}}\"\n        },\n        {\n            \"unit_id\": \"{{unit_id_package}}\",\n            \"contains\": 10\n        },\n        {\n            \"unit_id\": \"{{unit_id_carton}}\",\n            \"contains\": 3\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('unit_product_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Import products",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/import",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "import"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. Bulk-creates products from a spreadsheet. Matched by SKU. Category (name or code) and Supplier (name) must already exist; optional `Min Selling Price` column.\n\n**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "update_existing",
+                                            "value": "0",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "file",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows)."
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Download products import template",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/import-template",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "import-template"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.add`. An .xlsx with the exact column headings and one example row."
+                            }
+                        },
+                        {
+                            "name": "Create product (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/products",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"name\": \"Postman Delete Me Product\",\n    \"sku\": \"POSTMAN-DEL-0001\",\n    \"pack_unit\": \"Vial\",\n    \"carton_qty\": 10,\n    \"pack_cost_price\": 1,\n    \"pack_selling_price\": 2\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_product_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete product",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/{{deletable_product_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "{{deletable_product_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.delete`. 204. **409** if the product still has batches, order lines or transfers — set `active: false` instead."
                             }
                         }
                     ]
@@ -1343,6 +2151,122 @@
                             ]
                         },
                         {
+                            "name": "🆕 Import customers",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/import",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "import"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.add`. Bulk-creates customers from a spreadsheet. Matched by name. `Sales Rep Email` must be an existing user; a Sales Rep can only import under their own name.\n\n**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "update_existing",
+                                            "value": "0",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "file",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows)."
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Download customers import template",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/import-template",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "import-template"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.add`. An .xlsx with the exact column headings and one example row."
+                            }
+                        },
+                        {
+                            "name": "Create customer (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/customers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Customer\",\n    \"type\": \"Clinic\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_customer_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete customer",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{deletable_customer_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{deletable_customer_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.delete` (+ ownership if Sales Rep). 204. **409** while the customer has sales orders or invoices; its visits and complaints are removed with it. Audit-logged as DELETE."
+                            }
+                        },
+                        {
                             "name": "Update customer",
                             "request": {
                                 "method": "PUT",
@@ -1470,6 +2394,102 @@
                             ]
                         },
                         {
+                            "name": "🆕 Update lead",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/leads/{{lead_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads",
+                                        "{{lead_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.edit`. Partial update. Audit-logged with the changed fields.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"qualified\",\n    \"value\": 15000\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create lead (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/leads",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Lead\",\n    \"type\": \"Farm\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_lead_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete lead",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/leads/{{deletable_lead_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads",
+                                        "{{deletable_lead_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.delete`. 204."
+                            }
+                        },
+                        {
                             "name": "Get lead",
                             "request": {
                                 "method": "GET",
@@ -1583,6 +2603,102 @@
                             ]
                         },
                         {
+                            "name": "🆕 Update visit",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/visits/{{visit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits",
+                                        "{{visit_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.edit`. Partial update.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"outcome\": \"neutral\",\n    \"notes\": \"Updated from Postman\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create visit (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/visits",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"visit_date\": \"2026-09-21\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_visit_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete visit",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/visits/{{deletable_visit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits",
+                                        "{{deletable_visit_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.delete`. 204."
+                            }
+                        },
+                        {
                             "name": "Get visit",
                             "request": {
                                 "method": "GET",
@@ -1694,6 +2810,102 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "🆕 Update complaint",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints/{{complaint_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints",
+                                        "{{complaint_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.edit`. Partial update of the complaint details (resolving stays a separate action — Resolve complaint).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"priority\": \"high\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create complaint (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"description\": \"Throwaway complaint\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_complaint_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete complaint",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints/{{deletable_complaint_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints",
+                                        "{{deletable_complaint_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.delete`. 204."
+                            }
                         },
                         {
                             "name": "Get complaint",
@@ -1840,6 +3052,102 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "🆕 Update campaign",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns/{{campaign_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns",
+                                        "{{campaign_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.edit`. Partial update (`end_date` must not precede `start_date`). Ending a campaign stays a separate action — End campaign.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"discount\": 12,\n    \"description\": \"Updated from Postman\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Create campaign (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Campaign\",\n    \"start_date\": \"2026-10-01\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_campaign_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete campaign",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns/{{deletable_campaign_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns",
+                                        "{{deletable_campaign_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `crm.delete`. 204."
+                            }
                         },
                         {
                             "name": "Get campaign",
@@ -2091,6 +3399,122 @@
                                 },
                                 "description": "Requires `purchasing.view` or `accounting.view`. File download; 404 if the supplier has no contract, or belongs to another tenant."
                             }
+                        },
+                        {
+                            "name": "🆕 Import suppliers",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/import",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "import"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `purchasing.add`. Bulk-creates suppliers from a spreadsheet. Matched by name. Contract files cannot be imported — attach them afterwards via Upload supplier contract.\n\n**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "update_existing",
+                                            "value": "0",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "file",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows)."
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Download suppliers import template",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/import-template",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "import-template"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `purchasing.add`. An .xlsx with the exact column headings and one example row."
+                            }
+                        },
+                        {
+                            "name": "Create supplier (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Supplier\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_supplier_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete supplier",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/{{deletable_supplier_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "{{deletable_supplier_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `purchasing.delete`. 204. **409** while the supplier has purchase orders or expenses; its contract file is not removed by this call. Audit-logged as DELETE."
+                            }
                         }
                     ]
                 },
@@ -2306,7 +3730,7 @@
                             ]
                         },
                         {
-                            "name": "Receive purchase order",
+                            "name": "🔄 Receive purchase order",
                             "request": {
                                 "method": "POST",
                                 "header": [
@@ -2326,10 +3750,10 @@
                                         "receive"
                                     ]
                                 },
-                                "description": "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by List purchase order lines above — for a PO with more than one line, replace it with the specific line id you're receiving.\n\n`invoice_data` (optional) records the supplier's own invoice: `invoice_no` is required when it's sent; `invoice_date`, `amount` and `file_path` (from Upload supplier invoice) are optional. It comes back as `supplier_invoice` on the PO.",
+                                "description": "**🔄 — CHANGED: optional `free_gifts` — bonus stock the supplier delivered on top of the order. Each entry (`product_id`, optional `unit_id`, `qty`, `batch_no`, `exp_date`, optional `mfg_date`) is added to stock at zero cost as a free-gift batch (`is_free_gift: true`, `source_po_id` = this PO); it does not change the amount owed. A gift batch number may not collide with paid stock. Only gift lines on a sales order can sell it.**\n\nRequires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by List purchase order lines above — for a PO with more than one line, replace it with the specific line id you're receiving.\n\n`invoice_data` (optional) records the supplier's own invoice: `invoice_no` is required when it's sent; `invoice_date`, `amount` and `file_path` (from Upload supplier invoice) are optional. It comes back as `supplier_invoice` on the PO.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"invoice_data\": {\n        \"invoice_no\": \"SUP-INV-4471\",\n        \"invoice_date\": \"2026-10-05\",\n        \"amount\": \"2280.00\",\n        \"file_path\": \"{{purchase_order_invoice_path}}\"\n    },\n    \"receipts\": [\n        {\n            \"line_id\": \"{{purchase_order_line_id}}\",\n            \"batch_no\": \"PO-BATCH-1\",\n            \"exp_date\": \"2028-01-01\",\n            \"mfg_date\": null,\n            \"rcv_date\": null\n        }\n    ]\n}",
+                                    "raw": "{\n    \"invoice_data\": {\n        \"invoice_no\": \"SUP-INV-4471\",\n        \"invoice_date\": \"2026-10-05\",\n        \"amount\": \"2280.00\",\n        \"file_path\": \"{{purchase_order_invoice_path}}\"\n    },\n    \"receipts\": [\n        {\n            \"line_id\": \"{{purchase_order_line_id}}\",\n            \"batch_no\": \"PO-BATCH-1\",\n            \"exp_date\": \"2028-01-01\",\n            \"mfg_date\": null,\n            \"rcv_date\": null\n        }\n    ],\n    \"free_gifts\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty\": 2,\n            \"batch_no\": \"PO-GIFT-1\",\n            \"exp_date\": \"2028-01-01\"\n        }\n    ]\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -2355,6 +3779,37 @@
                                     ]
                                 },
                                 "description": "Requires `purchasing.view`. File download; 404 if the PO has no supplier invoice file, or belongs to another tenant."
+                            }
+                        },
+                        {
+                            "name": "🔄 Create purchase order (ordered in packages)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders"
+                                    ]
+                                },
+                                "description": "**🔄 — CHANGED: lines may use `unit_id` + `qty` + `cost_per_unit` instead of `qty_cartons` + `cost_per_carton`.**\n\nRequires `purchasing.add`. A line can be ordered in any packaging unit of the product instead of cartons: `unit_id` + `qty` + `cost_per_unit`. Here 6 packages x 10 packets = 60 packets = **2 cartons** at 150 per carton (total 300 = 6 x 50). The quantity must come to a whole number of cartons (else 422 on `lines.N.qty`). Uses the product from Products > Create product with packaging units.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"supplier_id\": \"{{supplier_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"order_date\": \"2026-09-19\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{unit_product_id}}\",\n            \"unit_id\": \"{{unit_id_package}}\",\n            \"qty\": 6,\n            \"cost_per_unit\": 50\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             }
                         },
                         {
@@ -2774,6 +4229,102 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "🔄 Create sales order (per-line warehouse + free gift)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders"
+                                    ]
+                                },
+                                "description": "**🔄 — CHANGED: lines accept `warehouse_id`, `unit_id` and `is_gift`; `unit` and `unit_price` are optional when `unit_id` / `is_gift` are used; minimum selling price is enforced.**\n\nRequires `sales.add`. Shows the new line options: `warehouse_id` per line (draw each line from a different warehouse — get the choices from Inventory > Product availability by warehouse), `is_gift: true` (sold at 0, no `unit_price` needed, draws only from free-gift stock received via Receive purchase order > free_gifts), and `unit_id` (order in any packaging unit of the product instead of `unit`). A non-gift line priced below the product's `min_selling_price` (per smallest unit, after discount) is a 422 on `lines.N.unit_price`. Saves the id into `{{gift_sales_order_id}}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"pay_type\": \"cash\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"warehouse_id\": \"{{warehouse_id}}\",\n            \"qty\": 1,\n            \"unit\": \"Carton\",\n            \"unit_price\": 65\n        },\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"warehouse_id\": \"{{warehouse_id}}\",\n            \"qty\": 1,\n            \"unit\": \"Carton\",\n            \"is_gift\": true\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('gift_sales_order_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Update sales order",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{gift_sales_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{gift_sales_order_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** (else 422 \"Only draft sales orders can be changed or deleted.\"). Header fields update in place; `lines`, if sent, **replace every line** and the order is re-priced and re-validated (credit limit, per-warehouse FEFO availability, minimum price). Audit-logged.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"notes\": \"Updated from Postman\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Delete sales order",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{gift_sales_order_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{gift_sales_order_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.delete` (Administrator by default). **Draft orders only** — a draft has no stock, invoice or journal side effects. 204; lines cascade. Anything further along: cancel it instead."
+                            }
                         }
                     ]
                 },
@@ -2922,6 +4473,190 @@
                                     ]
                                 },
                                 "description": "Same access as Get invoice. Payments recorded against this invoice. Paginated (10 per page by default) — follow `links.next`."
+                            }
+                        },
+                        {
+                            "name": "🆕 Import invoices",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/import",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "import"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.add`. Bulk-creates invoices from a spreadsheet. Matched by (none — invoices have no natural key, so re-importing creates duplicates). Each row posts the same journal entries a live invoice would (Dr Receivable / Cr Revenue + VAT) and raises the customer balance by what is still owed.\n\n**Multipart upload**: attach a .xlsx/.csv to the `file` field (headings = the template columns; get the template from the matching `import-template` request). All-or-nothing — one bad row rejects the whole file with a per-row error report (`errors[].row`, 1 = the heading row). Existing records (matched by the natural key) are skipped unless `update_existing=1`. In an unattended collection run (no file attached) this returns 422, which is expected.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "update_existing",
+                                            "value": "0",
+                                            "type": "text"
+                                        },
+                                        {
+                                            "key": "file",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Spreadsheet (.xlsx or .csv, max 5 MB, max 5000 rows)."
+                                        }
+                                    ]
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Download invoices import template",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/import-template",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "import-template"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.add`. An .xlsx with the exact column headings and one example row."
+                            }
+                        },
+                        {
+                            "name": "Create sales order (to void its invoice)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders"
+                                    ]
+                                },
+                                "description": "A throwaway cash order whose invoice the Void request below voids (the main invoice has collections against it, so it cannot be voided).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"pay_type\": \"cash\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty\": 1,\n            \"unit\": \"Carton\",\n            \"unit_price\": 65\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('voidable_sales_order_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Invoice that order",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{voidable_sales_order_id}}/status",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{voidable_sales_order_id}}",
+                                        "status"
+                                    ]
+                                },
+                                "description": "Moves it to `invoiced`, which creates the invoice.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"status\": \"invoiced\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Find that order invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{voidable_sales_order_id}}/invoices",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{voidable_sales_order_id}}",
+                                        "invoices"
+                                    ]
+                                },
+                                "description": "Saves the invoice id into `{{voidable_invoice_id}}`."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('voidable_invoice_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Void invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{voidable_invoice_id}}/void",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{voidable_invoice_id}}",
+                                        "void"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.delete`. Invoices are never hard-deleted — this is their \"delete\". Marks it `void`, posts the reversing journal entry (Dr Sales Revenue + VAT Payable / Cr Receivable) and gives the balance back to the customer. 422 if already void or if any collection was recorded against it. Returns the invoice."
                             }
                         }
                     ]
@@ -3415,6 +5150,102 @@
                     }
                 },
                 {
+                    "name": "🆕 Create account",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/chart-of-accounts",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "chart-of-accounts"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `accounting.add`. `code` unique per tenant; `type` is Asset/Liability/Equity/Revenue/Expense; `parent_id` (optional, same tenant) sets `level` to parent level + 1. Saves the id into `{{new_account_id}}`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"code\": \"6999\",\n    \"name\": \"Postman Demo Account\",\n    \"type\": \"Expense\",\n    \"parent_id\": null,\n    \"active\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('new_account_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Update account",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/chart-of-accounts/{{new_account_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "chart-of-accounts",
+                                "{{new_account_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `accounting.edit`. Rename, re-parent or deactivate. `code` and `type` are frozen (422) for system accounts (1110, 1120, 1200, 1300, 2100, 2300, 4100, 6300, 6400) and for any account that already has journal lines.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"name\": \"Postman Demo Account (renamed)\",\n    \"active\": true\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "🆕 Delete account",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/chart-of-accounts/{{new_account_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "chart-of-accounts",
+                                "{{new_account_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `accounting.delete`. 204. **409** for system accounts, accounts with child accounts, or accounts with journal lines."
+                    }
+                },
+                {
                     "name": "Journal entries",
                     "request": {
                         "method": "GET",
@@ -3704,7 +5535,7 @@
                                         "{{expense_category_id}}"
                                     ]
                                 },
-                                "description": "Requires `expenses.edit`. Partial update. There is no delete — set `active: false` to retire a category; inactive categories can't take new expenses.",
+                                "description": "Requires `expenses.edit`. Partial update. `DELETE` (needs `expenses.delete`) only works while no expense uses the category — otherwise set `active: false` to retire it; inactive categories can't take new expenses.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n    \"description\": \"Updated from Postman\"\n}",
@@ -3714,6 +5545,70 @@
                                         }
                                     }
                                 }
+                            }
+                        },
+                        {
+                            "name": "Create expense category (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/expense-categories",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "expense-categories"
+                                    ]
+                                },
+                                "description": "A throwaway record for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Delete Me Expense Category\",\n    \"account_id\": \"{{expense_account_id}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_expense_category_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete expense category",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/expense-categories/{{deletable_expense_category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "expense-categories",
+                                        "{{deletable_expense_category_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `expenses.delete`. 204. **409** while any expense uses the category — set `active: false` instead."
                             }
                         }
                     ]
@@ -4102,8 +5997,968 @@
             "description": "Draft → approved (posts to the journal) or rejected. Accountant and Purchasing record expenses; only Accountant or Administrator approve/reject. Run after Accounting — Create expense category needs `{{expense_account_id}}` from Chart of accounts."
         },
         {
+            "name": "🆕 Recap",
+            "item": [
+                {
+                    "name": "Find a batch to write off",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/{{product_id}}/batches?page=1&per_page=10&sort_by=exp_date&sort_dir=asc&filter%5Bwarehouse_id%5D=%7B%7Bwarehouse_id%7D%7D&filter%5Bqty_cartons%5D%5Bgt%5D=0",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "{{product_id}}",
+                                "batches"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "10",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "exp_date",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "asc",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "filter[warehouse_id]",
+                                    "value": "{{warehouse_id}}",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "filter[qty_cartons][gt]",
+                                    "value": "0",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Existing endpoint, used here to capture a batch id into `{{recap_batch_id}}` for the recaps below."
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data[0]?.id;",
+                                    "    if (value) { pm.collectionVariables.set('recap_batch_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Create recap",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.add` + the warehouse visible to the caller. Drafts a stock write-off (`reason`: expired, damaged, lost, recall, other). Each line names a `batch_id` (of that warehouse, no repeats) and `qty_cartons`. A draft changes no stock and posts nothing; it snapshots the batch cost so `total_value` can be reviewed. Saves the id into `{{recap_id}}`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"reason\": \"damaged\",\n    \"recap_date\": \"2026-10-11\",\n    \"notes\": \"Damaged in transit\",\n    \"lines\": [\n        {\n            \"batch_id\": \"{{recap_batch_id}}\",\n            \"qty_cartons\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('recap_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 List recaps",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/recaps?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.view`. `search` matches id, notes, warehouse name. Export needs `recap.export` or `accounting.export`."
+                    }
+                },
+                {
+                    "name": "🆕 Get recap",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/{{recap_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "{{recap_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.view`. Includes the lines (batch, product, qty, cost, value). 404 for another tenant."
+                    }
+                },
+                {
+                    "name": "🆕 Update recap",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/{{recap_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "{{recap_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.edit`. **Draft only** (else 422). `lines`, if sent, replace every line; changing `warehouse_id` requires re-sending `lines`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"notes\": \"Damaged in transit — updated\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "🆕 Approve recap",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/{{recap_id}}/approve",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "{{recap_id}}",
+                                "approve"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.approve`. **This is the write-off:** locks each batch and removes the cartons (422 if a batch no longer holds enough), re-costs the lines, refreshes the warehouse stock value and posts **Dr 6300 Inventory Write-off Expense / Cr 1300 Inventory** for the total — so the loss hits the income statement and the inventory asset drops. Needs accounts 6300 and 1300 (run AccountSeeder)."
+                    }
+                },
+                {
+                    "name": "Create recap (to reject)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps"
+                            ]
+                        },
+                        "description": "A throwaway draft for the Reject request below.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"reason\": \"other\",\n    \"lines\": [\n        {\n            \"batch_id\": \"{{recap_batch_id}}\",\n            \"qty_cartons\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('rejectable_recap_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Reject recap",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/{{rejectable_recap_id}}/reject",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "{{rejectable_recap_id}}",
+                                "reject"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.approve`. Draft → rejected; stock and ledger untouched. Optional `reason`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"reason\": \"Counted wrong\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "Create recap (to delete)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps"
+                            ]
+                        },
+                        "description": "A throwaway draft for the Delete request below.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"reason\": \"lost\",\n    \"lines\": [\n        {\n            \"batch_id\": \"{{recap_batch_id}}\",\n            \"qty_cartons\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('deletable_recap_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Delete recap",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/{{deletable_recap_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "{{deletable_recap_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.delete` (Administrator by default). **Draft only** — an approved recap already moved stock and posted a journal entry (422). 204; lines cascade."
+                    }
+                },
+                {
+                    "name": "🆕 List expired batches",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/expired-batches?warehouse_id=%7B%7Bwarehouse_id%7D%7D",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "expired-batches"
+                            ],
+                            "query": [
+                                {
+                                    "key": "warehouse_id",
+                                    "value": "{{warehouse_id}}",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.view`. Batches past their expiry date that still hold stock, with the value each would write off — what the generator below would pick up."
+                    }
+                },
+                {
+                    "name": "🆕 Draft recaps from expired stock",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/recaps/from-expired",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "recaps",
+                                "from-expired"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `recap.add`. Creates one **draft** recap per warehouse covering all expired batches (optionally `warehouse_id`); batches already on a draft are skipped, so it is safe to repeat. 201 with the new drafts, or 200 with an empty list when nothing new expired. The same thing runs daily from the scheduler (`php artisan recap:generate-expired`). Drafts still need approving.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"warehouse_id\": null\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                }
+            ],
+            "description": "**🆕 — NEW**\n\nStock write-offs (expired / damaged / lost / recall). Draft → approved (removes stock and posts Dr 6300 / Cr 1300) or rejected. See docs/api/recap.md."
+        },
+        {
+            "name": "🆕 Manufacturing",
+            "item": [
+                {
+                    "name": "Create finished product",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/products",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products"
+                            ]
+                        },
+                        "description": "Existing endpoint — the finished good the BOM below makes. Saves the id into `{{finished_product_id}}`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"category_id\": \"{{category_id}}\",\n    \"name\": \"Postman Finished Good\",\n    \"sku\": \"POSTMAN-FG-0001\",\n    \"pack_unit\": \"Bottle\",\n    \"carton_qty\": 10,\n    \"pack_cost_price\": 10,\n    \"pack_selling_price\": 20\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('finished_product_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Create BOM",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/boms",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.add`. A recipe: one run consumes the listed component cartons and yields `output_qty_cartons` of the finished product, plus a per-run `conversion_cost` (labour/overhead). Components must be distinct and not the finished product. Saves the id into `{{bom_id}}`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"product_id\": \"{{finished_product_id}}\",\n    \"name\": \"Postman BOM\",\n    \"output_qty_cartons\": 5,\n    \"conversion_cost\": 10,\n    \"notes\": null,\n    \"active\": true,\n    \"lines\": [\n        {\n            \"component_product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('bom_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 List BOMs",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/boms?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.view`. `search` matches name, notes, product name/SKU."
+                    }
+                },
+                {
+                    "name": "🆕 Get BOM",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/boms/{{bom_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms",
+                                "{{bom_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.view`. Includes the finished product and component lines."
+                    }
+                },
+                {
+                    "name": "🆕 Update BOM",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/boms/{{bom_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms",
+                                "{{bom_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.edit`. Partial; `lines`, if sent, replace every line. Does not touch production orders already raised.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"notes\": \"Updated from Postman\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "🆕 Create production order",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.add` + warehouse visible. `runs` repetitions of the BOM in a warehouse; `output_qty_cartons` and the default `conversion_cost` (BOM cost x runs) are derived. `batch_no` defaults to a generated MO-... number; `exp_date` is required. A draft touches no stock. Saves the id into `{{production_order_id}}`.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"bom_id\": \"{{bom_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"runs\": 1,\n    \"batch_no\": \"POSTMAN-MO-1\",\n    \"production_date\": \"2026-10-11\",\n    \"exp_date\": \"2028-06-30\",\n    \"notes\": null\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('production_order_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 List production orders",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders?page=1&per_page=15&sort_by=id&sort_dir=desc&export=csv",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "15",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.view`. Export needs `manufacturing.export` or `accounting.export`."
+                    }
+                },
+                {
+                    "name": "🆕 Get production order",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders/{{production_order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders",
+                                "{{production_order_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.view`. After completion includes `consumptions` (which batches were used, at what cost)."
+                    }
+                },
+                {
+                    "name": "🆕 Update production order",
+                    "request": {
+                        "method": "PUT",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders/{{production_order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders",
+                                "{{production_order_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.edit`. **Draft only** (else 422). Changing `runs` or `bom_id` re-derives the output and (unless sent) the conversion cost.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"notes\": \"Updated from Postman\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    }
+                },
+                {
+                    "name": "🆕 Complete production order",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders/{{production_order_id}}/complete",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders",
+                                "{{production_order_id}}",
+                                "complete"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.approve`. In one transaction: consumes every component x runs from the warehouse **FEFO** (422 with `shortfalls` and nothing written if any is short), costs the output (material + conversion cost, per carton), creates the finished-goods batch, and posts Dr 1300 (finished goods) / Cr 1300 (materials used) / Cr 6400 Manufacturing Overhead Absorbed (conversion cost). 422 if the batch number already exists in the warehouse."
+                    }
+                },
+                {
+                    "name": "Create production order (to cancel)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders"
+                            ]
+                        },
+                        "description": "A throwaway draft for the Cancel request below.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"bom_id\": \"{{bom_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"batch_no\": \"POSTMAN-MO-CANCEL\",\n    \"exp_date\": \"2028-06-30\"\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('cancellable_production_order_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Cancel production order",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders/{{cancellable_production_order_id}}/cancel",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders",
+                                "{{cancellable_production_order_id}}",
+                                "cancel"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.edit`. Draft → cancelled. 422 for anything not a draft."
+                    }
+                },
+                {
+                    "name": "🆕 Delete production order",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/production-orders/{{cancellable_production_order_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "production-orders",
+                                "{{cancellable_production_order_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.delete`. Drafts and cancelled orders only — a completed order cannot be deleted (422). 204."
+                    }
+                },
+                {
+                    "name": "Create BOM (to delete)",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/boms",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms"
+                            ]
+                        },
+                        "description": "A throwaway BOM with no production orders, for the Delete request below.",
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"product_id\": \"{{finished_product_id}}\",\n    \"name\": \"Postman BOM Delete Me\",\n    \"lines\": [\n        {\n            \"component_product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 1\n        }\n    ]\n}",
+                            "options": {
+                                "raw": {
+                                    "language": "json"
+                                }
+                            }
+                        }
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data?.id;",
+                                    "    if (value) { pm.collectionVariables.set('deletable_bom_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "🆕 Delete BOM",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/boms/{{deletable_bom_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "boms",
+                                "{{deletable_bom_id}}"
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `manufacturing.delete`. 204; lines cascade. **409** when production orders were raised from it — set `active: false` instead."
+                    }
+                }
+            ],
+            "description": "**🆕 — NEW**\n\nBills of materials and production orders. Completing an order consumes components FEFO, creates the finished batch and posts the cost. See docs/api/manufacturing.md."
+        },
+        {
             "name": "Analytics",
             "item": [
+                {
+                    "name": "🆕 Product life cycle",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/products/{{product_id}}/lifecycle?from=2026-01-01&to=2026-12-31",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "products",
+                                "{{product_id}}",
+                                "lifecycle"
+                            ],
+                            "query": [
+                                {
+                                    "key": "from",
+                                    "value": "2026-01-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "to",
+                                    "value": "2026-12-31",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `analytics.view` or `inventory.view`. One date-ordered timeline for a product: purchase order raised, received into stock, transfers between warehouses, manufacturing use/output, sales (with invoice ids), returns and write-offs, plus a `summary` (purchased / sold / transferred / written-off / produced / on-hand cartons) and the current `stock` by batch. Each event carries its source document id. `from`/`to` (optional) narrow the window. Cost amounts are returned to Administrators only."
+                    }
+                },
                 {
                     "name": "Dashboard",
                     "request": {
@@ -4430,8 +7285,313 @@
                                     }
                                 }
                             }
+                        },
+                        {
+                            "name": "Create user (to delete)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/users",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users"
+                                    ]
+                                },
+                                "description": "A throwaway user for the Delete request below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Delete Me\",\n    \"email\": \"delete.me@vetpharma.com\",\n    \"password\": \"a-secure-password\",\n    \"role\": \"Warehouse Employee\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('deletable_user_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Delete user",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/users/{{deletable_user_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users",
+                                        "{{deletable_user_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.delete`. 204; the user's API tokens are revoked. You cannot delete your own account (422). **409** if the user owns records that must keep an owner (e.g. sales orders as the sales rep)."
+                            }
                         }
                     ]
+                },
+                {
+                    "name": "🆕 Roles & Permissions",
+                    "item": [
+                        {
+                            "name": "🆕 List permissions",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/permissions",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "permissions"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.view`. Every assignable permission grouped by module (`sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`, `recap`, `manufacturing`, `analytics`, `admin`) — drives the checkbox grid on a role form. Capabilities: view, add, edit, delete, approve, print, export, audit."
+                            }
+                        },
+                        {
+                            "name": "🆕 List roles",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/roles?page=1&per_page=15&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.view`. Each role with its `permissions` and `users_count`. Roles are global, not per tenant."
+                            }
+                        },
+                        {
+                            "name": "🆕 Create role",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/roles",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.add`. An admin builds a role by choosing permissions — e.g. give a role `sales.edit` and `sales.delete` to let those users edit and delete sales records. `name` unique; every permission must exist (422 otherwise). Saves the id into `{{role_id}}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"name\": \"Postman Shift Lead\",\n    \"permissions\": [\n        \"sales.view\",\n        \"sales.edit\",\n        \"sales.delete\",\n        \"crm.view\"\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('role_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Get role",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/roles/{{role_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles",
+                                        "{{role_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.view`."
+                            }
+                        },
+                        {
+                            "name": "🆕 Update role",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/roles/{{role_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles",
+                                        "{{role_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.edit`. Rename and/or replace the full permission set (`permissions` is a sync, not a merge). The **Administrator** role is protected (403). Takes effect on the role users next request.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"permissions\": [\n        \"sales.view\",\n        \"sales.edit\",\n        \"sales.delete\",\n        \"inventory.view\"\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Assign users to role",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/roles/{{role_id}}/users",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles",
+                                        "{{role_id}}",
+                                        "users"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.edit`. Puts the listed same-tenant users on this role, **replacing** whichever role they had. (A user can also be given a role through Create/Update user.) Targets the demo user, never your own login.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"user_ids\": [\n        \"{{demo_user_id}}\"\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Put demo user back on a seeded role",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/users/{{demo_user_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "users",
+                                        "{{demo_user_id}}"
+                                    ]
+                                },
+                                "description": "Moves the demo user off the custom role so the role can be deleted below.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"role\": \"Warehouse Employee\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 Delete role",
+                            "request": {
+                                "method": "DELETE",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/roles/{{role_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "roles",
+                                        "{{role_id}}"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `admin.delete`. 204. **409** while any user still has the role; the Administrator role cannot be deleted (403)."
+                            }
+                        }
+                    ],
+                    "description": "**🆕 — NEW**\n\nAdmin-managed roles: create a role, pick its permissions (including delete/edit per module), connect users to it."
                 },
                 {
                     "name": "Audit Log",

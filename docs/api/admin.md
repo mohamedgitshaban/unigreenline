@@ -1,6 +1,6 @@
 # Admin
 
-Covers user management, the audit log viewer, notifications, discarded
+Covers user management, roles & permissions, the audit log viewer, notifications, discarded
 actions, and the governorate/city reference lists. All endpoints require authentication; most additionally require an
 `admin.*` permission — **only `Administrator`, `Owner`, and `Auditor` hold
 any `admin.*` permission** (spec §2's own role table never grants it to an
@@ -58,6 +58,105 @@ password). Sending `warehouse_ids` replaces the full set, not a merge.
 ```json
 { "role": "Sales Manager", "status": "suspended" }
 ```
+
+### `DELETE /api/v1/users/{id}` 🆕 NEW
+
+Requires `admin.delete`. **204**; the user's API tokens are revoked and the
+deletion is audit-logged. Another tenant's user is **404**.
+
+- You cannot delete your own account — **422**.
+- **409** `{"message": "This User is referenced by other records and cannot be deleted."}`
+  if the user owns records that must keep an owner (e.g. sales orders where they
+  are the sales rep). Set `status: inactive`/`suspended` instead.
+
+---
+
+## Roles & Permissions 🆕 NEW
+
+> 🆕 **NEW.** An admin can create roles, choose each role's permissions —
+> including `*.edit` and `*.delete` for every module — and connect users to
+> them. The 10 seeded roles are editable the same way (except `Administrator`).
+
+Roles are **global** (not per tenant). Permissions are named
+`{module}.{capability}`:
+
+- modules: `sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`,
+  `recap`, `manufacturing`, `analytics`, `admin`
+- capabilities: `view`, `add`, `edit`, `delete`, `approve`, `print`, `export`, `audit`
+
+Access: `admin.view` to read, `admin.add` to create, `admin.edit` to update or
+assign users, `admin.delete` to delete — by default only `Administrator` holds
+the write ones. Changes apply on the affected users' next request.
+
+How "edit" and "delete" are enforced everywhere: every update endpoint checks
+`{module}.edit` and every delete endpoint `{module}.delete`, so giving a role
+those permissions is all it takes to let its users edit or delete that module's
+records. Business rules still apply on top (e.g. only draft sales orders can be
+deleted, invoices are voided rather than deleted).
+
+### Role object
+
+```json
+{
+  "id": 11, "name": "Shift Lead",
+  "permissions": ["crm.view", "sales.delete", "sales.edit", "sales.view"],
+  "users_count": 3,
+  "created_at": "2026-10-11T09:00:00.000000Z", "updated_at": "2026-10-11T09:00:00.000000Z"
+}
+```
+
+### `GET /api/v1/permissions` 🆕 NEW
+
+Requires `admin.view`. Every assignable permission grouped by module — drives
+the checkbox grid on a role form:
+
+```json
+{ "data": { "sales": ["sales.add", "sales.approve", "sales.audit", "sales.delete", "..."], "inventory": ["..."] } }
+```
+
+### `GET /api/v1/roles` 🆕 NEW
+
+Requires `admin.view`. Paginated; `search` matches the name. Each role has its
+`permissions` and `users_count`.
+
+### `GET /api/v1/roles/{id}` 🆕 NEW
+
+Requires `admin.view`.
+
+### `POST /api/v1/roles` 🆕 NEW
+
+Requires `admin.add`.
+
+```json
+{ "name": "Shift Lead", "permissions": ["sales.view", "sales.edit", "sales.delete", "crm.view"] }
+```
+
+`name` is required and unique; every entry in `permissions` must exist (**422**
+on `permissions.N` otherwise). **201** — the role.
+
+### `PUT /api/v1/roles/{id}` 🆕 NEW
+
+Requires `admin.edit`. Rename and/or replace the permission set — `permissions`
+is a **sync**, not a merge (send the full list). The `Administrator` role is
+protected: **403** `The Administrator role cannot be modified.`
+
+### `DELETE /api/v1/roles/{id}` 🆕 NEW
+
+Requires `admin.delete`. **204**. **409** while any user still has the role
+(reassign them first); the `Administrator` role cannot be deleted (**403**).
+
+### `PUT /api/v1/roles/{id}/users` 🆕 NEW
+
+Requires `admin.edit`. Connects existing users to the role:
+
+```json
+{ "user_ids": ["01m...", "01m..."] }
+```
+
+Users must be in the caller's tenant. Each listed user is moved **onto this role,
+replacing whichever role they had** (a user has one role). Returns the role with
+its new `users_count`. (A user can also be given a role through
+`POST/PUT /users` with `role`.)
 
 ---
 

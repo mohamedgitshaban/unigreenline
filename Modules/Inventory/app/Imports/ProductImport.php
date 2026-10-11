@@ -19,7 +19,7 @@ class ProductImport extends ImportDefinition
     {
         return [
             'SKU', 'Name', 'Category', 'Supplier', 'Brand', 'Pack Unit', 'Carton Qty', 'Pack Cost Price',
-            'Pack Selling Price', 'Discount Pct', 'Tax Pct', 'Min Stock Cartons', 'Reorder Level', 'Active',
+            'Pack Selling Price', 'Min Selling Price', 'Discount Pct', 'Tax Pct', 'Min Stock Cartons', 'Reorder Level', 'Active',
         ];
     }
 
@@ -30,7 +30,7 @@ class ProductImport extends ImportDefinition
 
     public function exampleRow(): array
     {
-        return ['AMX-100', 'Amoxicillin 100ml', 'Antibiotics', 'Acme Pharma', 'Acme', 'Bottle', 24, 40, 55, 0, 14, 10, 20, 'yes'];
+        return ['AMX-100', 'Amoxicillin 100ml', 'Antibiotics', 'Acme Pharma', 'Acme', 'Bottle', 24, 40, 55, 50, 0, 14, 10, 20, 'yes'];
     }
 
     public function rules(): array
@@ -45,6 +45,7 @@ class ProductImport extends ImportDefinition
             'carton_qty' => ['required', 'integer', 'min:1'],
             'pack_cost_price' => ['required', 'numeric', 'min:0'],
             'pack_selling_price' => ['required', 'numeric', 'min:0'],
+            'min_selling_price' => ['nullable', 'numeric', 'min:0', 'lte:pack_selling_price'],
             'discount_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'tax_pct' => ['nullable', 'numeric', 'min:0', 'max:100'],
             'min_stock_cartons' => ['nullable', 'integer', 'min:0'],
@@ -85,6 +86,7 @@ class ProductImport extends ImportDefinition
                 'carton_qty' => $row['carton_qty'],
                 'pack_cost_price' => $row['pack_cost_price'],
                 'pack_selling_price' => $row['pack_selling_price'],
+                'min_selling_price' => $row['min_selling_price'] ?? null,
                 'discount_pct' => $row['discount_pct'] ?? null,
                 'tax_pct' => $row['tax_pct'] ?? null,
                 'min_stock_cartons' => $row['min_stock_cartons'] ?? null,

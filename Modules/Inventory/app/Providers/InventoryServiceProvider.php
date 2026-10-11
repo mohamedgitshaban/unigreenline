@@ -8,10 +8,12 @@ use Modules\Inventory\Console\Commands\GenerateExpiryAlerts;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\ProductCategory;
 use Modules\Inventory\Models\Transfer;
+use Modules\Inventory\Models\Unit;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Policies\ProductCategoryPolicy;
 use Modules\Inventory\Policies\ProductPolicy;
 use Modules\Inventory\Policies\TransferPolicy;
+use Modules\Inventory\Policies\UnitPolicy;
 use Modules\Inventory\Policies\WarehousePolicy;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
@@ -60,6 +62,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
 
         Gate::policy(Warehouse::class, WarehousePolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(Unit::class, UnitPolicy::class);
         Gate::policy(ProductCategory::class, ProductCategoryPolicy::class);
         Gate::policy(Transfer::class, TransferPolicy::class);
     }

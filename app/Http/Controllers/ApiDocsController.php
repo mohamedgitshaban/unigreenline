@@ -27,6 +27,8 @@ class ApiDocsController extends Controller
         'crm' => 'crm',
         'accounting' => 'accounting',
         'expenses' => 'expenses',
+        'recap' => 'recap',
+        'manufacturing' => 'manufacturing',
         'analytics' => 'analytics',
         'admin' => 'admin',
     ];

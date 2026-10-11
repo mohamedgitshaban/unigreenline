@@ -3,12 +3,14 @@
 namespace Modules\Sales\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Notification;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Models\Customer;
 use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Services\FefoStockService;
+use Modules\Inventory\Services\UnitConverter;
 use Modules\Sales\Exceptions\CreditLimitExceededException;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Support\CartonCalculator;
@@ -29,6 +31,7 @@ class CreateSalesOrderService
     public function __construct(
         private readonly FefoStockService $fefoStock,
         private readonly AuditLogService $auditLog,
+        private readonly UnitConverter $units,
     ) {}
 
     /**
@@ -70,12 +73,16 @@ class CreateSalesOrderService
             foreach ($computedLines as $line) {
                 $order->lines()->create([
                     'product_id' => $line['product_id'],
+                    'warehouse_id' => $line['warehouse_id'],
                     'batch_no' => $line['batch_no'],
                     'qty' => $line['qty'],
                     'unit' => $line['unit'],
+                    'unit_id' => $line['unit_id'],
+                    'base_qty' => $line['base_qty'],
                     'unit_price' => $line['unit_price'],
                     'discount_pct' => $line['discount_pct'],
                     'free_qty' => $line['free_qty'],
+                    'is_gift' => $line['is_gift'],
                     'subtotal' => $line['subtotal'],
                 ]);
             }
@@ -122,11 +129,12 @@ class CreateSalesOrderService
      */
     public function price(array $lines, float $invoiceDiscount = 0): array
     {
-        $products = Product::query()->whereIn('id', array_column($lines, 'product_id'))->get()->keyBy('id');
+        $products = Product::query()->with('units')->whereIn('id', array_column($lines, 'product_id'))->get()->keyBy('id');
 
         $computedLines = array_map(
-            fn (array $line) => $this->computeLine($line, $products[$line['product_id']]),
-            $lines
+            fn (array $line, int $index) => $this->computeLine($line, $products[$line['product_id']], $index),
+            $lines,
+            array_keys($lines),
         );
 
         $subtotal = round(array_sum(array_column($computedLines, 'subtotal')), 2);
@@ -156,8 +164,9 @@ class CreateSalesOrderService
         $shortfalls = $this->fefoStock->checkAvailability(array_map(
             fn (array $line) => [
                 'product_id' => $line['product_id'],
-                'warehouse_id' => $warehouseId,
+                'warehouse_id' => $line['warehouse_id'] ?? $warehouseId,
                 'cartons_needed' => $line['cartons_needed'],
+                'gift' => $line['gift'] ?? $line['is_gift'] ?? false,
             ],
             $computedLines
         ));
@@ -168,27 +177,61 @@ class CreateSalesOrderService
     }
 
     /**
-     * @return array{product_id: string, batch_no: ?string, qty: int, unit: string, unit_price: float, discount_pct: float, free_qty: int, subtotal: float, tax: float, cartons_needed: int}
+     * Prices one line. A line is ordered either as a plain `Carton`/`Pack`
+     * (`unit`) or in one of the product's packaging units (`unit_id`). Gift
+     * lines are sold at 0; every other line's price, after its discount, must
+     * not fall below the product's minimum selling price for that unit.
+     *
+     * @param  array<string, mixed>  $line
+     * @return array<string, mixed>
      */
-    private function computeLine(array $line, Product $product): array
+    private function computeLine(array $line, Product $product, int $index): array
     {
+        $isGift = (bool) ($line['is_gift'] ?? false);
         $discountPct = $line['discount_pct'] ?? 0;
         $freeQty = $line['free_qty'] ?? 0;
-        $subtotal = round($line['qty'] * $line['unit_price'] * (1 - $discountPct / 100), 2);
+        $unitId = $line['unit_id'] ?? null;
+        $explicitBase = $this->units->baseQty($product, $unitId, "lines.{$index}.unit_id");
+
+        if ($explicitBase !== null) {
+            $unit = $explicitBase === $product->carton_qty ? 'Carton' : 'Pack';
+            $baseQty = $explicitBase;
+        } else {
+            $unit = $line['unit'];
+            $baseQty = $unit === 'Carton' ? $product->carton_qty : 1;
+        }
+
+        $unitPrice = $isGift ? 0 : (float) $line['unit_price'];
+
+        if (! $isGift && $product->min_selling_price !== null) {
+            $floor = round((float) $product->min_selling_price * $baseQty, 2);
+
+            if (round($unitPrice * (1 - $discountPct / 100), 2) < $floor) {
+                throw ValidationException::withMessages([
+                    "lines.{$index}.unit_price" => "The price after discount cannot be below the minimum selling price of {$floor} for this unit.",
+                ]);
+            }
+        }
+
+        $subtotal = round($line['qty'] * $unitPrice * (1 - $discountPct / 100), 2);
         $tax = round($subtotal * (float) $product->tax_pct / 100, 2);
 
         $cartonsNeeded = CartonCalculator::cartonsNeeded(
-            $line['qty'], $freeQty, $line['unit'], $product->carton_qty
+            $line['qty'], $freeQty, $unit, $product->carton_qty, $explicitBase
         );
 
         return [
             'product_id' => $line['product_id'],
+            'warehouse_id' => $line['warehouse_id'] ?? null,
             'batch_no' => $line['batch_no'] ?? null,
             'qty' => $line['qty'],
-            'unit' => $line['unit'],
-            'unit_price' => $line['unit_price'],
+            'unit' => $unit,
+            'unit_id' => $unitId,
+            'base_qty' => $explicitBase,
+            'unit_price' => $unitPrice,
             'discount_pct' => $discountPct,
             'free_qty' => $freeQty,
+            'is_gift' => $isGift,
             'subtotal' => $subtotal,
             'tax' => $tax,
             'cartons_needed' => $cartonsNeeded,

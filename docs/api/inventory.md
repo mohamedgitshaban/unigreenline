@@ -9,6 +9,93 @@ silently filters to what they can see; `GET/PUT /warehouses/{id}` returns
 `403` for a warehouse they're not assigned to. `Administrator` bypasses every
 check.
 
+> 🆕 / 🔄 flags: **🆕 NEW** = a new endpoint or section, **🔄 CHANGED** = an
+> existing endpoint that now accepts or returns more. Added in this update:
+> packaging **units**, **minimum selling price**, **cost visible to
+> Administrators only**, **free-gift stock**, product **availability by
+> warehouse**, **import**, and **delete** for warehouses, products and categories.
+
+---
+
+## Units & product packaging 🆕 NEW
+
+Every product is stored by the **carton** and knows its packaging ladder: the
+units it is sold or bought in and how they nest. Example — product X where a
+*package* holds 10 *packets* and a *carton* holds 3 *packages*:
+
+| Unit | Holds | Base units (packets) |
+|---|---|---|
+| Packet | — (smallest) | 1 |
+| Package | 10 Packets | 10 |
+| Carton | 3 Packages | **30** (= the product's `carton_qty`) |
+
+30 packets of stock = **1 carton**. Anywhere a quantity is entered in a unit
+(purchase-order lines, sales-order lines, free gifts), the server converts it
+through this ladder; stock is always held in whole cartons. Unit **names** are
+admin-managed (below); what they mean is set **per product** with `units`.
+
+`UnitSeeder` adds Packet, Package and Carton for every tenant, and
+`ProductUnitSeeder` gives every existing product a Packet → Carton ladder using
+its current `carton_qty` — so every product already knows it is stored by the
+carton. Both are idempotent.
+
+### `GET /api/v1/units` 🆕 NEW
+
+Requires `inventory.view`, `purchasing.view` or `sales.view`. Paginated (50 per
+page); `search` matches `name`.
+
+```json
+{ "data": [ { "id": "01m...", "name": "Packet", "active": true } ] }
+```
+
+### `GET /api/v1/units/{id}` 🆕 NEW
+
+Same permissions. **404** for another tenant's unit.
+
+### `POST /api/v1/units` 🆕 NEW
+
+Requires `inventory.add`. `{ "name": "Pallet", "active": true }` — `name` unique
+per tenant (**422** otherwise). **201**.
+
+### `PUT /api/v1/units/{id}` 🆕 NEW
+
+Requires `inventory.edit`. Rename or set `active: false`.
+
+### `DELETE /api/v1/units/{id}` 🆕 NEW
+
+Requires `inventory.delete`. **204**. **409** while any product is packaged in
+the unit — deactivate it instead.
+
+### The `units` field on products 🔄 CHANGED
+
+`POST/PUT /products` accept a `units` array, **smallest unit first**; every
+larger unit says how many of the previous one it holds:
+
+```json
+"units": [
+  { "unit_id": "01m...packet" },
+  { "unit_id": "01m...package", "contains": 10 },
+  { "unit_id": "01m...carton",  "contains": 3 }
+]
+```
+
+- the first entry must have no `contains`; every other entry needs `contains` ≥ 2
+  (**422** on `units.N.contains`); unit ids must be distinct and in your tenant;
+  1–6 levels;
+- `carton_qty` is **derived** (here 10 × 3 = 30) — with `units` you no longer send
+  `carton_qty`/`pack_unit` (`pack_unit` defaults to the smallest unit's name);
+- on update, `units` **replaces the whole ladder** and re-derives `carton_qty`.
+
+Product responses include (on show / index / store / update):
+
+```json
+"units": [
+  { "unit_id": "01m...", "name": "Packet",  "contains": null, "base_qty": 1 },
+  { "unit_id": "01m...", "name": "Package", "contains": 10,   "base_qty": 10 },
+  { "unit_id": "01m...", "name": "Carton",  "contains": 3,    "base_qty": 30 }
+]
+```
+
 ---
 
 ## `GET /api/v1/warehouses`
@@ -88,11 +175,34 @@ Only `name`, `city`, `governorate` are required.
 
 Requires `inventory.edit` + visibility. All fields optional (partial update).
 
+## `DELETE /api/v1/warehouses/{id}` 🆕 NEW
+
+Requires `inventory.delete` + visibility. **204**, audit-logged as `DELETE`.
+**409** while the warehouse holds batches or has transfers, purchase orders or
+sales orders against it. Another tenant's warehouse is **404**.
+
+## `POST /api/v1/warehouses/import` 🆕 NEW
+
+Requires `inventory.add`. Multipart `file` (+ optional `update_existing`) — see
+[Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
+Matched by **name**. Columns: `Name`*, `City`*, `Governorate`*, `Address`,
+`Manager Email` (an existing user; their name is copied to `manager_name`),
+`Temperature`, `Capacity`, `Phone`, `Status` (`active`/`inactive`/`maintenance`).
+
+## `GET /api/v1/warehouses/import-template` 🆕 NEW
+
+Requires `inventory.add`. Downloads `warehouses-import-template.xlsx`.
+
 ---
 
 ## `GET /api/v1/products`
 
 Requires `inventory.view`. Not warehouse-scoped (catalog-wide).
+
+> 🔄 **CHANGED — cost is administrator-only.** `pack_cost_price` and
+> `cost_price` are returned **only to Administrators**; every other user gets the
+> selling prices and the new `min_selling_price` instead (same for batch
+> `cost_per_carton`, and nested products in orders and lines).
 
 ## `GET /api/v1/products/{id}`
 
@@ -120,7 +230,8 @@ GET /api/v1/products/{id}/batches?filter[warehouse_id]=01m...&filter[qty_cartons
       "warehouse": { "id": "01m...", "name": "Main Warehouse", "...": "full warehouse object" },
       "batch_no": "PRD-00001-B1",
       "mfg_date": "2026-06-30", "exp_date": "2028-03-30", "rcv_date": "2026-08-31",
-      "qty_cartons": 150, "qty_packs": 0, "cost_per_carton": "900.00"
+      "qty_cartons": 150, "qty_packs": 0, "cost_per_carton": "900.00",
+      "is_free_gift": false, "source_po_id": null
     }
   ],
   "links": {
@@ -133,13 +244,25 @@ GET /api/v1/products/{id}/batches?filter[warehouse_id]=01m...&filter[qty_cartons
 }
 ```
 
+🔄 **CHANGED** — batch fields: `is_free_gift` (🆕 `true` for bonus stock received
+through a purchase order's `free_gifts`; it has `cost_per_carton: 0` and is sold
+only by gift lines on a sales order) and `source_po_id` (🆕 the purchase order it
+came with). `cost_per_carton` is returned to Administrators only.
+
 `links.next` is `null` on the last page. `search` matches `batch_no` and the
 warehouse name; sorting and `filter[...]` work as described in the README.
 **404** — the product belongs to another account.
 
-## `POST /api/v1/products`
+## `POST /api/v1/products` 🔄 CHANGED
 
-Requires `inventory.add`.
+Requires `inventory.add`. 🔄 New: `min_selling_price`, `units` (see
+[Units & product packaging](#units--product-packaging--new)).
+
+**`min_selling_price`** (🔄 CHANGED, optional, per smallest unit like
+`pack_selling_price`): the lowest price a seller may charge. It must not exceed
+`pack_selling_price` (**422**). Sales-order lines are rejected below it — see
+[sales.md](./sales.md). `null` = no floor. Every user sees it; cost stays
+admin-only. The response also carries `min_selling_price_per_carton`.
 
 **Request**
 ```json
@@ -152,15 +275,15 @@ Requires `inventory.add`.
 ```
 `sku` is unique. `category_id` must be a real category.
 
-**201/200 response fields** — `cost_price` and `selling_price` are computed
+**201/200 response fields** — (`pack_cost_price` / `cost_price` appear for Administrators only) `cost_price` and `selling_price` are computed
 server-side (`pack_price × carton_qty`), always present, always in sync:
 ```json
 {
   "id": "01m...", "category_id": "01m...", "supplier_id": null,
   "name": "Oxytetracycline 20% Injectable", "sku": "PRD-00001", "brand": "EgyVet",
   "pack_unit": "Vial 100ml", "carton_qty": 20,
-  "pack_cost_price": "45.00", "pack_selling_price": "65.00",
-  "cost_price": "900.00", "selling_price": "1300.00",
+  "pack_cost_price": "45.00", "pack_selling_price": "65.00", "min_selling_price": "50.00",
+  "cost_price": "900.00", "selling_price": "1300.00", "min_selling_price_per_carton": "1000.00",
   "discount_pct": "0.00", "tax_pct": "14.00",
   "min_stock_cartons": 10, "reorder_level": 20, "active": true
 }
@@ -170,9 +293,53 @@ server-side (`pack_price × carton_qty`), always present, always in sync:
 > supplier record — the Purchasing module hasn't shipped. It'll start being
 > checked once it does; existing values won't need migrating.
 
-## `PUT /api/v1/products/{id}`
+## `PUT /api/v1/products/{id}` 🔄 CHANGED
 
-Requires `inventory.edit`. All fields optional.
+Requires `inventory.edit`. All fields optional. 🔄 Also accepts
+`min_selling_price` and `units` (replaces the whole ladder).
+
+## `DELETE /api/v1/products/{id}` 🆕 NEW
+
+Requires `inventory.delete`. **204**, audit-logged. **409** while the product has
+batches, order lines, transfers or complaints against it — set `active: false`
+instead. Another tenant's product is **404**.
+
+## `GET /api/v1/products/{id}/availability` 🆕 NEW
+
+Requires `inventory.view` **or** `sales.view` (so a Sales Rep can use it while
+ordering). Every active warehouse that holds unexpired stock of the product,
+largest first — the list a seller picks from when each sales-order line can draw
+from a different warehouse.
+
+```json
+{
+  "data": {
+    "product_id": "01m...", "carton_qty": 30,
+    "total_available_cartons": 70, "total_available_base_units": 2100,
+    "warehouses": [
+      { "id": "01m...", "name": "Main Warehouse", "city": "Cairo", "governorate": "Cairo",
+        "available_cartons": 50, "available_base_units": 1500, "batches_count": 3, "nearest_expiry": "2027-03-01" }
+    ]
+  }
+}
+```
+
+Counts include free-gift batches (`is_free_gift`); the sales order decides which
+kind a line draws from. Another tenant's product is **404**.
+
+## `POST /api/v1/products/import` 🆕 NEW
+
+Requires `inventory.add`. Multipart `file` (+ optional `update_existing`) — see
+[Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
+Matched by **SKU**. Columns: `SKU`*, `Name`*, `Category`* (name **or** code, must
+exist), `Supplier` (name, must exist), `Brand`, `Pack Unit`*, `Carton Qty`*,
+`Pack Cost Price`*, `Pack Selling Price`*, `Min Selling Price`, `Discount Pct`,
+`Tax Pct`, `Min Stock Cartons`, `Reorder Level`, `Active` (`yes`/`no`/`1`/`0`).
+Packaging ladders are not imported — set them with `PUT /products/{id}`.
+
+## `GET /api/v1/products/import-template` 🆕 NEW
+
+Requires `inventory.add`. Downloads `products-import-template.xlsx`.
 
 ---
 
@@ -204,6 +371,11 @@ a category's own current name is fine.
 ```
 
 **200** — the updated category. **422** if `name` is taken by another category.
+
+## `DELETE /api/v1/categories/{id}` 🆕 NEW
+
+Requires `inventory.delete`. **204**. **409** while any product uses the
+category — set `active: false` instead.
 
 ---
 
@@ -257,6 +429,13 @@ up (`PUT /sales-orders/{id}/status`). Any endpoint that uses it can return
   ]
 }
 ```
+
+🔄 **CHANGED — free-gift stock.** FEFO now keeps two pools per product and
+warehouse: regular stock and **free-gift** stock (`is_free_gift`). A normal line
+draws only from regular stock; a *gift* line (`is_gift: true` on a sales-order
+line) draws only from gift stock. So gift stock can never be sold at a price by
+accident, and a gift line can never eat paid stock. Transfers keep a batch's
+gift flag.
 
 ---
 

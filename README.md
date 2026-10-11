@@ -1,3 +1,53 @@
+# VetPharma ERP
+
+A modular Laravel API (nwidart modules) for a veterinary-pharmaceutical
+distributor: inventory with FEFO stock, sales, purchasing, CRM, accounting,
+expenses, analytics — and, in the latest update, **recap** (stock write-offs)
+and **manufacturing**.
+
+| Module | What it covers |
+|---|---|
+| Core | auth, users, 🆕 roles & permissions, audit log, notifications |
+| Inventory | warehouses, products, categories, 🆕 packaging units, batches (FEFO), transfers, 🆕 free-gift stock |
+| Sales | sales orders (🔄 multi-warehouse, 🆕 gift lines, 🆕 minimum price), invoices (🆕 void / import), deliveries, collections, returns |
+| Purchasing | suppliers, purchase orders (🔄 lines in any unit), receiving (🔄 free gifts) |
+| CRM | customers, leads, visits, complaints, campaigns |
+| Accounting | 🔄 chart of accounts (now editable), journal entries, statements |
+| Expenses | categories, expenses, approval |
+| 🆕 Recap | stock write-offs for expired / damaged / lost stock, posted to the chart of accounts |
+| 🆕 Manufacturing | bills of materials and production orders |
+| Analytics | dashboard, reports, 🆕 product life cycle |
+
+> **Flags used in the docs and the Postman collection:** 🆕 **NEW** = a new
+> endpoint / module, 🔄 **CHANGED** = an existing endpoint that now accepts or
+> returns more.
+
+### Documentation
+
+- API reference: [`docs/api/README.md`](docs/api/README.md) (overview, conventions, change flags) and one file per module in [`docs/api/`](docs/api) — also served as a site at `/docs`.
+- Postman: [`docs/postman/`](docs/postman) — import the collection and the `Local` environment; regenerate with `php docs/postman/generate.php` (never hand-edit the JSON).
+
+### Setup
+
+```bash
+composer install
+cp .env.example .env && php artisan key:generate
+php artisan migrate --seed
+```
+
+Upgrading an existing database after the latest update: see
+[Upgrading an existing database](docs/api/README.md#upgrading-an-existing-database--new).
+
+### Tests
+
+```bash
+php artisan test --compact
+```
+
+Feature tests run against MySQL (see `phpunit.xml`).
+
+---
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

@@ -19,7 +19,9 @@ class InventoryBatchResource extends JsonResource
             'rcv_date' => $this->rcv_date->toDateString(),
             'qty_cartons' => $this->qty_cartons,
             'qty_packs' => $this->qty_packs,
-            'cost_per_carton' => $this->cost_per_carton,
+            'cost_per_carton' => $this->when($request->user()?->hasRole('Administrator'), fn () => $this->cost_per_carton),
+            'is_free_gift' => (bool) $this->is_free_gift,
+            'source_po_id' => $this->source_po_id,
         ];
     }
 }

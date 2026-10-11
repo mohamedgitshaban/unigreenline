@@ -3,6 +3,7 @@
 namespace Modules\Inventory\Services;
 
 use Illuminate\Support\Facades\DB;
+use Modules\Inventory\Exceptions\GiftBatchConflictException;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Warehouse;
 
@@ -32,6 +33,8 @@ class GoodsReceiptService
      *     exp_date: string,
      *     mfg_date?: string|null,
      *     rcv_date?: string|null,
+     *     is_free_gift?: bool,
+     *     source_po_id?: string|null,
      * }  $data
      */
     public function receive(array $data): InventoryBatch
@@ -44,6 +47,14 @@ class GoodsReceiptService
                 ->where('batch_no', $data['batch_no'])
                 ->lockForUpdate()
                 ->first();
+
+            $isGift = (bool) ($data['is_free_gift'] ?? false);
+
+            // A gift batch and a paid batch must never share a batch number:
+            // topping one up with the other would change what the stock is.
+            if ($batch && $batch->is_free_gift !== $isGift) {
+                throw new GiftBatchConflictException($data['batch_no']);
+            }
 
             if ($batch) {
                 $batch->increment('qty_cartons', $data['qty_cartons']);
@@ -59,6 +70,8 @@ class GoodsReceiptService
                     'qty_cartons' => $data['qty_cartons'],
                     'qty_packs' => 0,
                     'cost_per_carton' => $data['cost_per_carton'],
+                    'is_free_gift' => $isGift,
+                    'source_po_id' => $data['source_po_id'] ?? null,
                 ]);
             }
 

@@ -4,10 +4,13 @@ namespace Modules\Inventory\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Modules\Inventory\Http\Requests\Concerns\ChecksProductPackaging;
 use Modules\Inventory\Models\Product;
 
 class StoreProductRequest extends FormRequest
 {
+    use ChecksProductPackaging;
+
     public function authorize(): bool
     {
         return $this->user()->can('create', Product::class);
@@ -28,15 +31,25 @@ class StoreProductRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'sku' => ['required', 'string', 'max:100', Rule::unique('products')->where('tenant_id', $tenantId)],
             'brand' => ['nullable', 'string', 'max:255'],
-            'pack_unit' => ['required', 'string', 'max:255'],
-            'carton_qty' => ['required', 'integer', 'min:1'],
+            'pack_unit' => ['required_without:units', 'nullable', 'string', 'max:255'],
+            'carton_qty' => ['required_without:units', 'integer', 'min:1'],
             'pack_cost_price' => ['required', 'numeric', 'min:0'],
             'pack_selling_price' => ['required', 'numeric', 'min:0'],
+            'min_selling_price' => ['nullable', 'numeric', 'min:0'],
+            // Smallest unit first; every larger unit says how many of the previous one it holds.
+            'units' => ['sometimes', 'array', 'min:1', 'max:6'],
+            'units.*.unit_id' => ['required', 'string', 'distinct', Rule::exists('units', 'id')->where('tenant_id', $tenantId)],
+            'units.*.contains' => ['nullable', 'integer', 'min:2', 'max:100000'],
             'discount_pct' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'tax_pct' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'min_stock_cartons' => ['sometimes', 'integer', 'min:0'],
             'reorder_level' => ['sometimes', 'integer', 'min:0'],
             'active' => ['sometimes', 'boolean'],
         ];
+    }
+
+    public function after(): array
+    {
+        return [$this->packagingChecks(null)];
     }
 }

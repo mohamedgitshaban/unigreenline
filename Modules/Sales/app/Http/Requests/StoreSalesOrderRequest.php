@@ -30,10 +30,15 @@ class StoreSalesOrderRequest extends FormRequest
 
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
+            'lines.*.warehouse_id' => ['nullable', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
             'lines.*.batch_no' => ['nullable', 'string', 'max:255'],
             'lines.*.qty' => ['required', 'integer', 'min:1'],
-            'lines.*.unit' => ['required', Rule::in(['Carton', 'Pack'])],
-            'lines.*.unit_price' => ['required', 'numeric', 'min:0'],
+            // Either a plain Carton/Pack, or one of the product's packaging units (unit_id).
+            'lines.*.unit' => ['required_without:lines.*.unit_id', 'nullable', Rule::in(['Carton', 'Pack'])],
+            'lines.*.unit_id' => ['nullable', 'string', Rule::exists('units', 'id')->where('tenant_id', $tenantId)],
+            'lines.*.is_gift' => ['sometimes', 'boolean'],
+            // Not needed on gift lines, which are sold at 0.
+            'lines.*.unit_price' => ['nullable', 'numeric', 'min:0'],
             'lines.*.discount_pct' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'lines.*.free_qty' => ['sometimes', 'integer', 'min:0'],
         ];
@@ -48,6 +53,13 @@ class StoreSalesOrderRequest extends FormRequest
                 }
 
                 $this->ensureRepOwnsTheOrder($validator);
+            },
+            function (Validator $validator) {
+                foreach ((array) $this->input('lines', []) as $index => $line) {
+                    if (! filter_var($line['is_gift'] ?? false, FILTER_VALIDATE_BOOLEAN) && ($line['unit_price'] ?? null) === null) {
+                        $validator->errors()->add("lines.{$index}.unit_price", 'A price is required unless the line is a free gift.');
+                    }
+                }
             },
         ];
     }

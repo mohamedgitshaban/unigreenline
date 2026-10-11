@@ -13,6 +13,9 @@ class PurchaseOrderLineResource extends JsonResource
         return [
             'id' => $this->id,
             'product' => ProductResource::make($this->product),
+            'unit_id' => $this->unit_id,
+            'unit_qty' => $this->unit_qty,
+            'cost_per_unit' => $this->cost_per_unit,
             'qty_cartons' => $this->qty_cartons,
             'cost_per_carton' => $this->cost_per_carton,
             'total' => $this->total,

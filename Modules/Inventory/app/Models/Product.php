@@ -11,10 +11,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Tenant;
 use Modules\Inventory\Database\Factories\ProductFactory;
+use Modules\Purchasing\Models\Supplier;
 
 #[Fillable([
     'tenant_id', 'category_id', 'supplier_id', 'name', 'sku', 'brand', 'pack_unit',
-    'carton_qty', 'pack_cost_price', 'pack_selling_price', 'discount_pct', 'tax_pct',
+    'carton_qty', 'pack_cost_price', 'pack_selling_price', 'min_selling_price', 'discount_pct', 'tax_pct',
     'min_stock_cartons', 'reorder_level', 'active',
 ])]
 class Product extends Model
@@ -38,6 +39,7 @@ class Product extends Model
             'carton_qty' => 'integer',
             'pack_cost_price' => 'decimal:2',
             'pack_selling_price' => 'decimal:2',
+            'min_selling_price' => 'decimal:2',
             'discount_pct' => 'decimal:2',
             'tax_pct' => 'decimal:2',
             'min_stock_cartons' => 'integer',
@@ -63,6 +65,14 @@ class Product extends Model
         return Attribute::get(fn () => number_format($this->pack_selling_price * $this->carton_qty, 2, '.', ''));
     }
 
+    /**
+     * The packaging ladder, smallest unit first.
+     */
+    public function units(): HasMany
+    {
+        return $this->hasMany(ProductUnit::class)->orderBy('position');
+    }
+
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
@@ -77,9 +87,10 @@ class Product extends Model
     {
         return $this->hasMany(InventoryBatch::class);
     }
+
     public function supplier(): BelongsTo
     {
-        return $this->belongsTo(\Modules\Purchasing\Models\Supplier::class, 'supplier_id');
+        return $this->belongsTo(Supplier::class, 'supplier_id');
     }
 
     protected static function newFactory(): ProductFactory

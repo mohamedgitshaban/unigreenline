@@ -81,6 +81,8 @@ class TransferStockService
                     'qty_cartons' => $data['qty_cartons'],
                     'qty_packs' => 0,
                     'cost_per_carton' => $costPerCarton,
+                    'is_free_gift' => $sourceBatch->is_free_gift,
+                    'source_po_id' => $sourceBatch->source_po_id,
                 ]);
             }
 
