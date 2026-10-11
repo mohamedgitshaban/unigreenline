@@ -73,7 +73,7 @@ class RoleManagementTest extends TestCase
 
         $this->putJson("/api/v1/roles/{$admin->id}", ['permissions' => []])->assertForbidden();
         $this->deleteJson("/api/v1/roles/{$admin->id}")->assertForbidden();
-        $this->assertSame(80, $admin->fresh()->permissions()->count());
+        $this->assertSame(81, $admin->fresh()->permissions()->count());
     }
 
     public function test_a_role_with_users_cannot_be_deleted_but_an_unused_one_can(): void

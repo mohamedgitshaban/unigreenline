@@ -45,7 +45,7 @@ class PurchaseOrderUpdateTest extends TestCase
 
     public function test_lines_replace_existing_lines_and_totals_are_recalculated(): void
     {
-        $this->actingAsRole('Purchasing');
+        $this->actingAsRole('Administrator');
         $po = $this->purchaseOrder(['subtotal' => 1000, 'tax_amount' => 0, 'total' => 1000]);
         $oldLine = PurchaseOrderLine::factory()->for($po, 'purchaseOrder')->create();
         $product = Product::factory()->recycle($this->tenant)->create(['tax_pct' => 14]);

@@ -28,6 +28,8 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🔄 **Sales orders from several warehouses** (per-line warehouse) + 🆕 `GET /products/{id}/availability`
 > - 🆕 **Product life cycle** timeline → [analytics.md](./analytics.md#get-apiv1productsidlifecycle--new)
 > - 🆕 Chart of accounts create/edit/delete; 🆕 invoice **void**
+> - 🆕 **Purchase orders pending pricing** — buyers no longer enter costs; an admin prices the order → [purchasing.md](./purchasing.md#pending-pricing-who-sets-the-cost--new)
+> - 🆕 **Create + deliver in one call** — `POST /sales-orders/deliver` → [sales.md](./sales.md#post-apiv1sales-ordersdeliver--new)
 
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 
@@ -292,7 +294,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all the endpoints below (219 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
+all the endpoints below (224 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —
@@ -330,7 +332,7 @@ All five seeders are idempotent. Which roles got the new permissions:
 `Warehouse Manager` → `recap.*` and `manufacturing.*` (view/add/edit/approve/print/export),
 `Warehouse Employee` → `manufacturing.view/add/edit`, `Accountant` → `recap.view`;
 `Owner`/`Auditor` get the new modules through their module-wide grants;
-`Administrator` gets everything. Nobody but `Administrator` gets any `*.delete`
+`Administrator` gets everything (including the new `purchasing.pricing`, the right to price purchase orders). Nobody but `Administrator` gets any `*.delete`
 until an admin grants it.
 
 ## Seed accounts (local/dev only)

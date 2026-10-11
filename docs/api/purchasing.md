@@ -122,9 +122,70 @@ Requires `purchasing.view`. The PO's lines (each with its `product`) as
 their own list. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. A line's `id` is the `line_id` that receive
 expects.
 
+## Pending pricing: who sets the cost 🆕 NEW
+
+> 🆕 **NEW flow.** A buyer no longer types `cost_per_carton`. They raise the order
+> with quantities only; it waits in the status **`pending_pricing`** until an
+> **administrator** sets the cost of each line.
+
+```
+buyer creates (no costs) ──► pending_pricing ──► admin prices ──► draft ──► sent/pending ──► received
+```
+
+- **Who may price:** the new permission **`purchasing.pricing`** — held by
+  `Administrator` only. An admin can grant it to any role through
+  [Roles](./admin.md#roles--permissions); it is not part of the usual
+  view/add/edit/... grid. (Re-run `RolePermissionSeeder` to create it.)
+- **Creating:** `lines[].cost_per_carton` / `cost_per_unit` are now **optional**
+  and may only be sent by a user with `purchasing.pricing` — anyone else sending
+  a cost gets **422** on `lines.N.cost_per_carton`. An order with any unpriced
+  line is created with `status: "pending_pricing"`, `subtotal`/`tax_amount`/`total`
+  `0.00` and line costs `0.00`. A pricer who sends a cost for every line gets a
+  normal `draft`, exactly as before.
+- **Waiting orders can't move on:** a `pending_pricing` order cannot be received
+  (**422** `This purchase order is pending pricing — an administrator must set the
+  line costs first.`), and its `status` can't be changed through `PUT` except to
+  `cancelled`. Everything else (notes, expected date, the lines' quantities) can
+  still be edited by the buyer; replacing the lines of a priced order drops the
+  costs again and sends it back to `pending_pricing`.
+- `pending_pricing` is a normal filter value: `GET /purchase-orders?filter[status]=pending_pricing`.
+
+### `GET /api/v1/purchase-orders/pending-pricing` 🆕 NEW
+
+Requires `purchasing.pricing` (**403** otherwise). The admin's queue: the
+tenant's orders still in `pending_pricing`, newest first, same shape as
+`GET /purchase-orders` (with `lines_count`). Supports `search`
+(id, notes, supplier, warehouse), `sort_by` and pagination.
+
+### `PUT /api/v1/purchase-orders/{id}/pricing` 🆕 NEW
+
+Requires `purchasing.pricing`. Sets the cost of **every** line in one call:
+
+```json
+{
+  "lines": [
+    { "line_id": "01m...", "cost_per_carton": 90 },
+    { "line_id": "01m...", "cost_per_unit": 5 }
+  ]
+}
+```
+
+- every line of the order must appear exactly once (**422** on `lines`);
+- each entry has **exactly one** of `cost_per_carton` or `cost_per_unit`;
+  `cost_per_unit` is only valid for a line that was ordered in a packaging unit
+  (its total is `unit_qty × cost_per_unit`), otherwise send `cost_per_carton`;
+- subtotal, tax (`product.tax_pct`) and total are recomputed the same way as on
+  create;
+- a `pending_pricing` order is released to `draft`; an order that was already
+  priced and not yet received can be **re-priced** the same way (status unchanged);
+- **422** for a received order (`This purchase order has already been received.`)
+  or a cancelled one; **404** for another tenant's order.
+
+**200** — the purchase order. Audit-logged with the before/after status and total.
+
 ## `POST /api/v1/purchase-orders` 🔄 CHANGED
 
-Requires `purchasing.add`. 🔄 A line can now be ordered **in any packaging unit**
+Requires `purchasing.add`. 🔄 Costs are now optional — see [Pending pricing](#pending-pricing-who-sets-the-cost--new). A line can now be ordered **in any packaging unit**
 of its product, not only cartons (see
 [Units & product packaging](./inventory.md#units--product-packaging--new)).
 
@@ -139,8 +200,8 @@ of its product, not only cartons (see
 }
 ```
 
-**🔄 CHANGED — lines in a unit.** Instead of `qty_cartons` + `cost_per_carton`,
-send `unit_id` + `qty` + `cost_per_unit`:
+**🔄 CHANGED — lines in a unit.** Instead of `qty_cartons` (+ `cost_per_carton`),
+send `unit_id` + `qty` (+ `cost_per_unit`):
 
 ```json
 { "product_id": "01m...", "unit_id": "01m...package", "qty": 6, "cost_per_unit": 50 }

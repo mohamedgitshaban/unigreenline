@@ -141,6 +141,54 @@ a Sales Rep naming another rep as `sales_rep_id`).
 
 **403** — user lacks `sales.add`, e.g. `Customer Service`.
 
+## `POST /api/v1/sales-orders/deliver` 🆕 NEW
+
+**Create the order and deliver it in one call** — for a counter / van sale where
+the goods leave with the customer, so there is no separate "create" then
+"deliver" round trip. It is exactly `POST /sales-orders` followed by
+`PUT /sales-orders/{id}/status` → `delivered`, done atomically.
+
+Requires **`sales.add` and `sales.edit`** (**403** otherwise, e.g. Customer
+Service). A Sales Rep creates it under their own name.
+
+**Request** — everything `POST /sales-orders` takes (same lines, per-line
+`warehouse_id`, `is_gift`, `unit_id`, minimum-price and credit rules), plus an
+optional `delivery` block:
+
+```json
+{
+  "customer_id": "01m...", "warehouse_id": "01m...", "pay_type": "cash",
+  "lines": [ { "product_id": "01m...", "qty": 4, "unit": "Carton", "unit_price": 100 } ],
+  "delivery": {
+    "driver": "Hassan", "delivery_date": "2026-10-12",
+    "notes": "Left at the gate",
+    "invoice_data": "delivery-invoices/01m.../a1b2c3.jpg"
+  }
+}
+```
+
+`delivery.invoice_data` is the signed / delivered invoice copy, a path from
+`POST /deliveries/invoices` (**422** `delivery.invoice_data` otherwise). Every
+`delivery` field is optional; `delivery_date` defaults to today.
+
+**What happens, in one transaction**
+
+1. stock is checked and the order created (credit limit, FEFO per line warehouse,
+   minimum price — the usual 422s apply);
+2. the order moves to `delivered`: stock is deducted FEFO, the invoice and its
+   journal entry (Dr Receivable / Cr Revenue + VAT) are created, a credit
+   order raises the customer balance, and the delivery is created already
+   `delivered`;
+3. the `delivery` details are written onto that delivery (audit-logged).
+
+If any step fails — insufficient stock, credit limit, price below the minimum, a
+bad file path — **nothing is saved**: no order, no stock movement, no invoice.
+
+**201** — the order exactly as `PUT /sales-orders/{id}/status` returns it for
+`delivered`: `status: "delivered"`, `invoices_count: 1` and the `delivery`
+object (`status: "delivered"`, `driver`, `delivery_date`, ...). Use
+`GET /sales-orders/{id}/invoices` for the invoice id.
+
 ## `PUT /api/v1/sales-orders/{id}` 🆕 NEW
 
 Requires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** — once an

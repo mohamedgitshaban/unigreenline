@@ -27,7 +27,7 @@ class RolePermissionSeederTest extends TestCase
 
         $administrator = Role::findByName('Administrator');
 
-        $this->assertSame(80, $administrator->permissions()->count());
+        $this->assertSame(81, $administrator->permissions()->count());
     }
 
     /**

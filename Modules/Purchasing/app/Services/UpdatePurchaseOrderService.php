@@ -6,6 +6,7 @@ use DateTimeInterface;
 use Illuminate\Support\Facades\DB;
 use Modules\Core\Services\AuditLogService;
 use Modules\Purchasing\Exceptions\PurchaseOrderAlreadyReceivedException;
+use Modules\Purchasing\Exceptions\PurchaseOrderNotPricedException;
 use Modules\Purchasing\Models\PurchaseOrder;
 
 /**
@@ -49,6 +50,19 @@ class UpdatePurchaseOrderService
 
             if ($totals !== null) {
                 $data += ['subtotal' => $totals['subtotal'], 'tax_amount' => $totals['tax_amount'], 'total' => $totals['total']];
+
+                // Replacing the lines re-opens pricing unless every new line carries a cost
+                // (only an administrator can supply one), and a priced replacement releases it.
+                if (! $totals['priced']) {
+                    $data['status'] = $locked->status === 'cancelled' ? 'cancelled' : 'pending_pricing';
+                } elseif ($locked->status === 'pending_pricing') {
+                    $data['status'] = $data['status'] ?? 'draft';
+                }
+            }
+
+            // Pricing cannot be skipped by flipping the status.
+            if ($locked->status === 'pending_pricing' && isset($data['status']) && ! in_array($data['status'], ['pending_pricing', 'cancelled'], true) && ($totals === null || ! $totals['priced'])) {
+                throw new PurchaseOrderNotPricedException;
             }
 
             $prevValues = $this->auditValues($locked, array_keys($data));

@@ -56,7 +56,7 @@ class PurchaseUnitsAndGiftsTest extends TestCase
 
     public function test_a_line_ordered_in_packages_is_converted_to_whole_cartons(): void
     {
-        $this->actingAsRole('Purchasing');
+        $this->actingAsRole('Administrator');
 
         // 6 packages × 10 packets = 60 packets = 2 cartons; 6 × 50 = 300 total → 150 per carton.
         $this->postJson('/api/v1/purchase-orders', $this->orderPayload([
@@ -73,7 +73,7 @@ class PurchaseUnitsAndGiftsTest extends TestCase
 
     public function test_a_quantity_that_is_not_a_whole_number_of_cartons_is_rejected(): void
     {
-        $this->actingAsRole('Purchasing');
+        $this->actingAsRole('Administrator');
 
         $this->postJson('/api/v1/purchase-orders', $this->orderPayload([
             ['product_id' => $this->product->id, 'unit_id' => $this->packet->id, 'qty' => 45, 'cost_per_unit' => 5],
@@ -91,7 +91,7 @@ class PurchaseUnitsAndGiftsTest extends TestCase
 
     public function test_cartons_still_work_as_before(): void
     {
-        $this->actingAsRole('Purchasing');
+        $this->actingAsRole('Administrator');
 
         $this->postJson('/api/v1/purchase-orders', $this->orderPayload([
             ['product_id' => $this->product->id, 'qty_cartons' => 3, 'cost_per_carton' => 100],

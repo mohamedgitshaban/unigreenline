@@ -19,10 +19,12 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('purchase-orders', [PurchaseOrderController::class, 'index']);
     Route::post('purchase-orders', [PurchaseOrderController::class, 'store']);
     Route::post('purchase-orders/invoices', [PurchaseOrderController::class, 'uploadInvoice']);
+    Route::get('purchase-orders/pending-pricing', [PurchaseOrderController::class, 'pendingPricing']);
     Route::get('purchase-orders/{id}/invoice', [PurchaseOrderController::class, 'downloadInvoice']);
     Route::get('purchase-orders/{id}', [PurchaseOrderController::class, 'show']);
     Route::get('purchase-orders/{id}/lines', [PurchaseOrderController::class, 'lines']);
     Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update']);
+    Route::put('purchase-orders/{purchaseOrder}/pricing', [PurchaseOrderController::class, 'price']);
     Route::delete('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'destroy']);
     Route::post('purchase-orders/{purchaseOrder}/receive', [PurchaseOrderController::class, 'receive']);
 

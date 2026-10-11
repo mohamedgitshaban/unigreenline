@@ -29,13 +29,13 @@ class CreatePurchaseOrderService
         $taxAmount = $totals['tax_amount'];
         $total = $totals['total'];
 
-        return DB::transaction(function () use ($data, $computedLines, $subtotal, $taxAmount, $total) {
+        return DB::transaction(function () use ($data, $computedLines, $subtotal, $taxAmount, $total, $totals) {
             $po = PurchaseOrder::create([
                 'tenant_id' => $data['tenant_id'],
                 'supplier_id' => $data['supplier_id'],
                 'warehouse_id' => $data['warehouse_id'],
                 'created_by' => $data['created_by'],
-                'status' => 'draft',
+                'status' => $totals['priced'] ? 'draft' : 'pending_pricing',
                 'stock_added' => false,
                 'order_date' => $data['order_date'] ?? now()->toDateString(),
                 'expected_date' => $data['expected_date'] ?? null,

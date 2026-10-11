@@ -10,6 +10,7 @@ use Modules\Inventory\Services\GoodsReceiptService;
 use Modules\Inventory\Services\UnitConverter;
 use Modules\Purchasing\Exceptions\IncompleteReceiptException;
 use Modules\Purchasing\Exceptions\PurchaseOrderAlreadyReceivedException;
+use Modules\Purchasing\Exceptions\PurchaseOrderNotPricedException;
 use Modules\Purchasing\Models\PurchaseOrder;
 
 /**
@@ -38,6 +39,10 @@ class ReceivePurchaseOrderService
     {
         if ($po->stock_added) {
             throw new PurchaseOrderAlreadyReceivedException;
+        }
+
+        if ($po->status === 'pending_pricing') {
+            throw new PurchaseOrderNotPricedException;
         }
 
         $lines = $po->lines()->get()->keyBy('id');

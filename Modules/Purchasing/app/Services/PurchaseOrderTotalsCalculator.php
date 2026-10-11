@@ -19,7 +19,7 @@ class PurchaseOrderTotalsCalculator
      * case it's converted to whole cartons — the line total stays qty × cost_per_unit.
      *
      * @param  array<int, array<string, mixed>>  $lines
-     * @return array{lines: array<int, array{product_id: string, qty_cartons: int, cost_per_carton: float, total: float, tax: float}>, subtotal: float, tax_amount: float, total: float}
+     * @return array{lines: array<int, array{product_id: string, qty_cartons: int, cost_per_carton: float, total: float, tax: float}>, priced: bool, subtotal: float, tax_amount: float, total: float}
      */
     public function calculate(array $lines): array
     {
@@ -27,6 +27,7 @@ class PurchaseOrderTotalsCalculator
 
         $computedLines = array_map(function (array $line, int $index) use ($products) {
             $line = $this->normalize($line, $products[$line['product_id']], $index);
+            $line['cost_per_carton'] ??= 0;
             $total = $line['total'] ?? round($line['qty_cartons'] * $line['cost_per_carton'], 2);
             $tax = round($total * (float) $products[$line['product_id']]->tax_pct / 100, 2);
 
@@ -38,10 +39,22 @@ class PurchaseOrderTotalsCalculator
 
         return [
             'lines' => $computedLines,
+            // False when any line came without a cost — the order then waits for an administrator to price it.
+            'priced' => ! in_array(false, array_map(fn (array $line) => $this->hasCost($line), $lines), true),
             'subtotal' => $subtotal,
             'tax_amount' => $taxAmount,
             'total' => round($subtotal + $taxAmount, 2),
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $line  A raw (un-normalized) request line.
+     */
+    private function hasCost(array $line): bool
+    {
+        return ($line['unit_id'] ?? null) !== null
+            ? ($line['cost_per_unit'] ?? null) !== null
+            : ($line['cost_per_carton'] ?? null) !== null;
     }
 
     /**
@@ -55,13 +68,13 @@ class PurchaseOrderTotalsCalculator
         }
 
         $cartons = $this->units->toCartons($product, (int) $line['qty'], $line['unit_id'], "lines.{$index}.qty");
-        $total = round($line['qty'] * $line['cost_per_unit'], 2);
+        $total = round($line['qty'] * ($line['cost_per_unit'] ?? 0), 2);
 
         return [
             'product_id' => $line['product_id'],
             'unit_id' => $line['unit_id'],
             'unit_qty' => (int) $line['qty'],
-            'cost_per_unit' => $line['cost_per_unit'],
+            'cost_per_unit' => $line['cost_per_unit'] ?? null,
             'qty_cartons' => $cartons,
             'cost_per_carton' => round($total / $cartons, 2),
             'total' => $total,

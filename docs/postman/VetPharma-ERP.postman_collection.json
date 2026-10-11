@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "VetPharma ERP API",
-        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 219 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (Recap, Manufacturing, Units, Roles & Permissions, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit). The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `RolePermissionSeeder`, `AccountSeeder`, `UnitSeeder`, `ProductUnitSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 224 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (Recap, Manufacturing, Units, Roles & Permissions, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit). The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `RolePermissionSeeder`, `AccountSeeder`, `UnitSeeder`, `ProductUnitSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "auth": {
@@ -207,6 +207,16 @@
         },
         {
             "key": "deletable_expense_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "pending_po_line_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "pending_pricing_po_id",
             "value": "",
             "type": "string"
         },
@@ -3782,6 +3792,159 @@
                             }
                         },
                         {
+                            "name": "🔄 Create purchase order (no cost — goes to pending pricing)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders"
+                                    ]
+                                },
+                                "description": "**🔄 — CHANGED: line costs are now optional; an order with any unpriced line starts as `pending_pricing`, and only users with `purchasing.pricing` (Administrator by default) may send costs.**\n\nRequires `purchasing.add`. **Costs are optional and only an administrator may send them.** A buyer sends quantities only (`qty_cartons`, or `unit_id` + `qty`); the order is created with `status: pending_pricing` and zero totals, and cannot be sent or received until an administrator prices it (next requests). A non-admin who sends `cost_per_carton` / `cost_per_unit` gets 422. An Administrator who omits costs gets the same pending order; one who sends them for every line gets a normal `draft`. Saves the id into `{{pending_pricing_po_id}}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"supplier_id\": \"{{supplier_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"notes\": \"Waiting for pricing\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty_cartons\": 5\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('pending_pricing_po_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 List purchase orders pending pricing",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/pending-pricing?page=1&per_page=15&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "pending-pricing"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `purchasing.pricing` (Administrator by default; 403 otherwise). The admin work queue: every purchase order of the tenant still in `pending_pricing`, newest first. Supports `search` and `sort_by`."
+                            }
+                        },
+                        {
+                            "name": "List lines of the pending purchase order",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{pending_pricing_po_id}}/lines",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{pending_pricing_po_id}}",
+                                        "lines"
+                                    ]
+                                },
+                                "description": "Existing endpoint — saves the first line id into `{{pending_po_line_id}}` for the pricing request below."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('pending_po_line_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "🆕 Price purchase order",
+                            "request": {
+                                "method": "PUT",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{pending_pricing_po_id}}/pricing",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{pending_pricing_po_id}}",
+                                        "pricing"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `purchasing.pricing` (Administrator by default). Sets the cost of **every** line — each entry needs its `line_id` and exactly one of `cost_per_carton` or `cost_per_unit` (the latter only for lines ordered in a packaging unit). Recomputes subtotal / tax / total and releases the order `pending_pricing` → `draft`, so it can be sent and received. An unreceived, non-cancelled order that is already priced can be re-priced the same way. 422 if a line is missing, repeated, or priced twice; 422 for a received or cancelled order; 404 for another tenant.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"lines\": [\n        {\n            \"line_id\": \"{{pending_po_line_id}}\",\n            \"cost_per_carton\": 40\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
                             "name": "🔄 Create purchase order (ordered in packages)",
                             "request": {
                                 "method": "POST",
@@ -4229,6 +4392,38 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "🆕 Create sales order and deliver it (one call)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/deliver",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "deliver"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales.add` **and** `sales.edit`. Creates the order and delivers it in the same request — for a counter / van sale where the goods leave with the customer. Takes everything Create sales order takes (same stock, credit-limit, minimum-price, gift and per-line-warehouse rules) plus an optional `delivery` block (`driver`, `delivery_date`, `notes`, `invoice_data` = a file path from Sales > Deliveries > Upload delivery invoice). Atomic: stock is deducted (FEFO), the invoice and its journal entry are created, and the delivery is created already `delivered`; if anything fails nothing is saved. 201 with the order (`status: delivered`, `invoices_count`, `delivery`).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"pay_type\": \"cash\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty\": 1,\n            \"unit\": \"Carton\",\n            \"unit_price\": 65\n        }\n    ],\n    \"delivery\": {\n        \"driver\": \"Postman Driver\",\n        \"delivery_date\": \"2026-10-12\",\n        \"notes\": \"Delivered on the spot\"\n    }\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
                         },
                         {
                             "name": "🔄 Create sales order (per-line warehouse + free gift)",

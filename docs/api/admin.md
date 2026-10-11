@@ -83,6 +83,7 @@ Roles are **global** (not per tenant). Permissions are named
 - modules: `sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`,
   `recap`, `manufacturing`, `analytics`, `admin`
 - capabilities: `view`, `add`, `edit`, `delete`, `approve`, `print`, `export`, `audit`
+- 🆕 one special permission outside that grid: **`purchasing.pricing`** — the right to set what a purchase order costs ([Pending pricing](./purchasing.md#pending-pricing-who-sets-the-cost--new)). Only `Administrator` has it until an admin grants it to a role.
 
 Access: `admin.view` to read, `admin.add` to create, `admin.edit` to update or
 assign users, `admin.delete` to delete — by default only `Administrator` holds

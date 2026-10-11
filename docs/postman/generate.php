@@ -448,6 +448,10 @@ $sales = folder('Sales', [
             'description' => 'The invoice created by the status update above, saved into `{{invoice_id}}`.',
             'tests' => saveId('invoice_id', 'data.0.id'),
         ]),
+        nw(req('POST', 'Create sales order and deliver it (one call)', '/sales-orders/deliver', [
+            'description' => 'Requires `sales.add` **and** `sales.edit`. Creates the order and delivers it in the same request — for a counter / van sale where the goods leave with the customer. Takes everything Create sales order takes (same stock, credit-limit, minimum-price, gift and per-line-warehouse rules) plus an optional `delivery` block (`driver`, `delivery_date`, `notes`, `invoice_data` = a file path from Sales > Deliveries > Upload delivery invoice). Atomic: stock is deducted (FEFO), the invoice and its journal entry are created, and the delivery is created already `delivered`; if anything fails nothing is saved. 201 with the order (`status: delivered`, `invoices_count`, `delivery`).',
+            'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65]], 'delivery' => ['driver' => 'Postman Driver', 'delivery_date' => '2026-10-12', 'notes' => 'Delivered on the spot']],
+        ])),
         chg(req('POST', 'Create sales order (per-line warehouse + free gift)', '/sales-orders', [
             'description' => "Requires `sales.add`. Shows the new line options: `warehouse_id` per line (draw each line from a different warehouse — get the choices from Inventory > Product availability by warehouse), `is_gift: true` (sold at 0, no `unit_price` needed, draws only from free-gift stock received via Receive purchase order > free_gifts), and `unit_id` (order in any packaging unit of the product instead of `unit`). A non-gift line priced below the product's `min_selling_price` (per smallest unit, after discount) is a 422 on `lines.N.unit_price`. Saves the id into `{{gift_sales_order_id}}`.",
             'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65], ['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'is_gift' => true]]],
@@ -626,6 +630,23 @@ $purchasing = folder('Purchasing', [
         req('GET', 'Download supplier invoice', '/purchase-orders/{{purchase_order_id}}/invoice', [
             'description' => 'Requires `purchasing.view`. File download; 404 if the PO has no supplier invoice file, or belongs to another tenant.',
         ]),
+        chg(req('POST', 'Create purchase order (no cost — goes to pending pricing)', '/purchase-orders', [
+            'description' => 'Requires `purchasing.add`. **Costs are optional and only an administrator may send them.** A buyer sends quantities only (`qty_cartons`, or `unit_id` + `qty`); the order is created with `status: pending_pricing` and zero totals, and cannot be sent or received until an administrator prices it (next requests). A non-admin who sends `cost_per_carton` / `cost_per_unit` gets 422. An Administrator who omits costs gets the same pending order; one who sends them for every line gets a normal `draft`. Saves the id into `{{pending_pricing_po_id}}`.',
+            'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'notes' => 'Waiting for pricing', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 5]]],
+            'tests' => saveId('pending_pricing_po_id'),
+        ]), 'line costs are now optional; an order with any unpriced line starts as `pending_pricing`, and only users with `purchasing.pricing` (Administrator by default) may send costs.'),
+        nw(req('GET', 'List purchase orders pending pricing', '/purchase-orders/pending-pricing', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `purchasing.pricing` (Administrator by default; 403 otherwise). The admin work queue: every purchase order of the tenant still in `pending_pricing`, newest first. Supports `search` and `sort_by`.',
+        ])),
+        req('GET', 'List lines of the pending purchase order', '/purchase-orders/{{pending_pricing_po_id}}/lines', [
+            'description' => 'Existing endpoint — saves the first line id into `{{pending_po_line_id}}` for the pricing request below.',
+            'tests' => saveId('pending_po_line_id', 'data.0.id'),
+        ]),
+        nw(req('PUT', 'Price purchase order', '/purchase-orders/{{pending_pricing_po_id}}/pricing', [
+            'description' => 'Requires `purchasing.pricing` (Administrator by default). Sets the cost of **every** line — each entry needs its `line_id` and exactly one of `cost_per_carton` or `cost_per_unit` (the latter only for lines ordered in a packaging unit). Recomputes subtotal / tax / total and releases the order `pending_pricing` → `draft`, so it can be sent and received. An unreceived, non-cancelled order that is already priced can be re-priced the same way. 422 if a line is missing, repeated, or priced twice; 422 for a received or cancelled order; 404 for another tenant.',
+            'body' => ['lines' => [['line_id' => '{{pending_po_line_id}}', 'cost_per_carton' => 40]]],
+        ])),
         chg(req('POST', 'Create purchase order (ordered in packages)', '/purchase-orders', [
             'description' => 'Requires `purchasing.add`. A line can be ordered in any packaging unit of the product instead of cartons: `unit_id` + `qty` + `cost_per_unit`. Here 6 packages x 10 packets = 60 packets = **2 cartons** at 150 per carton (total 300 = 6 x 50). The quantity must come to a whole number of cartons (else 422 on `lines.N.qty`). Uses the product from Products > Create product with packaging units.',
             'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{unit_product_id}}', 'unit_id' => '{{unit_id_package}}', 'qty' => 6, 'cost_per_unit' => 50]]],
@@ -1222,6 +1243,8 @@ $collection = [
             'expense_id' => '',
             'rejectable_expense_id' => '',
             'deletable_expense_id' => '',
+            'pending_po_line_id' => '',
+            'pending_pricing_po_id' => '',
             'unit_id_packet' => '',
             'unit_id_package' => '',
             'unit_id_carton' => '',

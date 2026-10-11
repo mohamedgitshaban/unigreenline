@@ -25,7 +25,9 @@ class RolePermissionSeeder extends Seeder
      * @var array<string, array{modules: string[]|'*', capabilities: string[], extra?: string[], except?: string[]}>
      */
     private const ROLES = [
-        'Administrator' => ['modules' => '*', 'capabilities' => self::CAPABILITIES],
+        // purchasing.pricing sits outside the module x capability grid: it is the right to set
+        // what a purchase order costs, and by default only Administrator has it.
+        'Administrator' => ['modules' => '*', 'capabilities' => self::CAPABILITIES, 'extra' => ['purchasing.pricing']],
         // Expense approval sits with Accountant/Administrator only, so Owner's
         // module-wide approve stops short of expenses.
         'Owner' => ['modules' => '*', 'capabilities' => ['view', 'approve', 'print', 'export', 'audit'], 'except' => ['expenses.approve']],
@@ -52,6 +54,8 @@ class RolePermissionSeeder extends Seeder
                 Permission::findOrCreate("{$module}.{$capability}", 'web');
             }
         }
+
+        Permission::findOrCreate('purchasing.pricing', 'web');
 
         foreach (self::ROLES as $roleName => $definition) {
             $role = Role::findOrCreate($roleName, 'web');

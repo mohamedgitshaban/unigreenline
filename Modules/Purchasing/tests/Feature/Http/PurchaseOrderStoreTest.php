@@ -16,7 +16,7 @@ class PurchaseOrderStoreTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_purchasing_role_creates_a_purchase_order(): void
+    public function test_purchasing_role_creates_a_purchase_order_that_waits_for_pricing(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
@@ -32,12 +32,13 @@ class PurchaseOrderStoreTest extends TestCase
             'supplier_id' => $supplier->id,
             'warehouse_id' => $warehouse->id,
             'lines' => [
-                ['product_id' => $product->id, 'qty_cartons' => 10, 'cost_per_carton' => 90],
+                ['product_id' => $product->id, 'qty_cartons' => 10],
             ],
         ]);
 
         $response->assertCreated();
-        $response->assertJsonPath('data.status', 'draft');
+        $response->assertJsonPath('data.status', 'pending_pricing');
+        $response->assertJsonPath('data.total', '0.00');
         $response->assertJsonPath('data.created_by.id', $user->id);
         $response->assertJsonPath('data.lines_count', 1);
 

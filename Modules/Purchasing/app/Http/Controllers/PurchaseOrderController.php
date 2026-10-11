@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Purchasing\Http\Requests\PricePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\UpdatePurchaseOrderRequest;
@@ -17,6 +18,7 @@ use Modules\Purchasing\Http\Resources\PurchaseOrderResource;
 use Modules\Purchasing\Models\PurchaseOrder;
 use Modules\Purchasing\Services\CreatePurchaseOrderService;
 use Modules\Purchasing\Services\DeletePurchaseOrderService;
+use Modules\Purchasing\Services\PricePurchaseOrderService;
 use Modules\Purchasing\Services\ReceivePurchaseOrderService;
 use Modules\Purchasing\Services\UpdatePurchaseOrderService;
 
@@ -42,6 +44,7 @@ class PurchaseOrderController extends Controller
         private readonly ReceivePurchaseOrderService $receivePurchaseOrder,
         private readonly DeletePurchaseOrderService $deletePurchaseOrder,
         private readonly UpdatePurchaseOrderService $updatePurchaseOrder,
+        private readonly PricePurchaseOrderService $pricePurchaseOrder,
     ) {}
 
     public function index(Request $request)
@@ -195,5 +198,39 @@ class PurchaseOrderController extends Controller
             ->with(self::RELATIONS)
             ->withCount('lines')
             ->findOrFail($id);
+    }
+
+    /**
+     * The administrator's work queue: orders waiting for their line costs.
+     */
+    public function pendingPricing(Request $request)
+    {
+        $this->authorize('price', PurchaseOrder::class);
+
+        $query = PurchaseOrder::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->where('status', 'pending_pricing')
+            ->with(self::RELATIONS)
+            ->withCount('lines');
+
+        $this->applyFilters($request, $query, ['id', 'notes', 'supplier.name', 'warehouse.name']);
+
+        $this->applySorting($request, $query);
+
+        return PurchaseOrderResource::collection($query->paginate($request->integer('per_page', 15))->withQueryString());
+    }
+
+    /**
+     * Sets the cost of every line and releases the order from pending pricing.
+     */
+    public function price(PricePurchaseOrderRequest $request, PurchaseOrder $purchaseOrder)
+    {
+        $order = $this->pricePurchaseOrder->price($purchaseOrder, $request->validated('lines'), [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return new PurchaseOrderResource($this->findForTenant($request, $order->id));
     }
 }

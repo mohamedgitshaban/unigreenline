@@ -8,12 +8,14 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Models\Customer;
+use Modules\Sales\Http\Requests\StoreAndDeliverSalesOrderRequest;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
 use Modules\Sales\Http\Requests\UpdateSalesOrderRequest;
 use Modules\Sales\Http\Requests\UpdateSalesOrderStatusRequest;
 use Modules\Sales\Http\Resources\SalesOrderLineResource;
 use Modules\Sales\Http\Resources\SalesOrderResource;
 use Modules\Sales\Models\SalesOrder;
+use Modules\Sales\Services\CreateAndDeliverSalesOrderService;
 use Modules\Sales\Services\CreateSalesOrderService;
 use Modules\Sales\Services\DeleteSalesOrderService;
 use Modules\Sales\Services\UpdateSalesOrderService;
@@ -209,5 +211,23 @@ class SalesOrderController extends Controller
             'actor_name' => $request->user()->name,
             'ip_address' => $request->ip(),
         ];
+    }
+
+    /**
+     * Create the order and deliver it in the same call: order, stock
+     * deduction, invoice, journal entry and a delivered delivery, atomically.
+     */
+    public function storeAndDeliver(StoreAndDeliverSalesOrderRequest $request, CreateAndDeliverSalesOrderService $createAndDeliver)
+    {
+        $data = $request->validated();
+        $data['tenant_id'] = $request->user()->tenant_id;
+        $data['sales_rep_id'] ??= $request->user()->id;
+        $data['actor_id'] = $request->user()->id;
+        $data['actor_name'] = $request->user()->name;
+        $data['ip_address'] = $request->ip();
+
+        $order = $createAndDeliver->handle($data, $this->actor($request));
+
+        return (new SalesOrderResource($this->findForTenant($request, $order->id, withDelivery: true)))->response()->setStatusCode(201);
     }
 }

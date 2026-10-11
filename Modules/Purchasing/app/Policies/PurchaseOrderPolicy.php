@@ -30,6 +30,15 @@ class PurchaseOrderPolicy
     }
 
     /**
+     * Setting what a purchase order costs. Held by Administrator only, unless an
+     * admin grants `purchasing.pricing` to a role.
+     */
+    public function price(User $user): bool
+    {
+        return $user->can('purchasing.pricing');
+    }
+
+    /**
      * Tenant scoping is enforced in UpdatePurchaseOrderRequest, not here.
      */
     public function update(User $user): bool

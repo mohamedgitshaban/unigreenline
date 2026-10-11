@@ -11,6 +11,7 @@ use Modules\Sales\Http\Controllers\SalesOrderController;
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('sales-orders', [SalesOrderController::class, 'index']);
     Route::post('sales-orders', [SalesOrderController::class, 'store']);
+    Route::post('sales-orders/deliver', [SalesOrderController::class, 'storeAndDeliver']);
     Route::get('sales-orders/{id}', [SalesOrderController::class, 'show']);
     Route::get('sales-orders/{id}/lines', [SalesOrderController::class, 'lines']);
     Route::get('sales-orders/{id}/invoices', [InvoiceController::class, 'forSalesOrder']);
