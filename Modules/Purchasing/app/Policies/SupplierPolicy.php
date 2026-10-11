@@ -17,6 +17,14 @@ class SupplierPolicy
         return $user->can('purchasing.view') || $user->can('accounting.view');
     }
 
+    /**
+     * Tenant scoping is enforced in the controller, not here.
+     */
+    public function view(User $user): bool
+    {
+        return $user->can('purchasing.view') || $user->can('accounting.view');
+    }
+
     public function create(User $user): bool
     {
         return $user->can('purchasing.add');
@@ -25,5 +33,10 @@ class SupplierPolicy
     public function update(User $user, Supplier $supplier): bool
     {
         return $user->can('purchasing.edit') && $supplier->tenant_id === $user->tenant_id;
+    }
+
+    public function delete(User $user): bool
+    {
+        return $user->can('purchasing.delete');
     }
 }

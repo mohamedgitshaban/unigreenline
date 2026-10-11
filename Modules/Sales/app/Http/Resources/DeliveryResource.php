@@ -20,6 +20,8 @@ class DeliveryResource extends JsonResource
             'status' => $this->status,
             'delivered_at' => $this->delivered_at?->toIso8601String(),
             'notes' => $this->notes,
+            'invoice_data' => $this->invoice_data,
+            'invoice_url' => $this->invoice_data !== null ? url("/api/v1/deliveries/{$this->id}/invoice") : null,
         ];
     }
 }

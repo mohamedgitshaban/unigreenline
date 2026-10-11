@@ -3,21 +3,32 @@
 namespace Modules\CRM\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Http\Requests\StoreCustomerRequest;
 use Modules\CRM\Http\Requests\UpdateCustomerRequest;
 use Modules\CRM\Http\Resources\CustomerResource;
+use Modules\CRM\Imports\CustomerImport;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\SalesOrder;
 
 class CustomerController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+
+    private const RELATIONS = [
+        'salesRep',
+        'salesRep.roles.permissions',
+        'salesRep.permissions',
+    ];
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -32,11 +43,7 @@ class CustomerController extends Controller
                 fn ($query) => $query->where('sales_rep_id', $request->user()->id)
             );
 
-        $query->with([
-            'salesRep',
-            'salesRep.roles.permissions',
-            'salesRep.permissions',
-        ]);
+        $this->withRelationsAndCounts($query, $request->user());
 
         $this->applyFilters($request, $query, ['name', 'phone', 'email', 'governorate', 'province', 'city', 'area', 'address']);
 
@@ -56,13 +63,11 @@ class CustomerController extends Controller
         return CustomerResource::collection($customers);
     }
 
-    public function show(Customer $customer)
+    public function show(Request $request, string $id)
     {
-        $this->authorize('view', $customer);
+        $customer = $this->findForTenant($request, $id);
 
-        $customer->load('visits');
-        $customer->setAttribute('orders', SalesOrder::query()->where('customer_id', $customer->id)->get());
-        $customer->setAttribute('invoices', Invoice::query()->where('customer_id', $customer->id)->get());
+        $this->authorize('view', $customer);
 
         return new CustomerResource($customer);
     }
@@ -89,7 +94,7 @@ class CustomerController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return (new CustomerResource($customer))->response()->setStatusCode(201);
+        return (new CustomerResource($this->findForTenant($request, $customer->id)))->response()->setStatusCode(201);
     }
 
     public function update(UpdateCustomerRequest $request, Customer $customer)
@@ -112,6 +117,60 @@ class CustomerController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return new CustomerResource($customer);
+        return new CustomerResource($this->findForTenant($request, $customer->id));
+    }
+
+    private function findForTenant(Request $request, string $id): Customer
+    {
+        $query = Customer::query()->where('tenant_id', $request->user()->tenant_id);
+
+        return $this->withRelationsAndCounts($query, $request->user())->findOrFail($id);
+    }
+
+    /**
+     * orders/invoices aren't relations on Customer (see CustomerResource),
+     * so their counts are subqueries. A Sales Rep's counts match what
+     * GET /customers/{id}/orders and /invoices return to them.
+     *
+     * @param  Builder<Customer>  $query
+     * @return Builder<Customer>
+     */
+    private function withRelationsAndCounts(Builder $query, User $user): Builder
+    {
+        $ordersCount = SalesOrder::query()
+            ->selectRaw('count(*)')
+            ->whereColumn('sales_orders.customer_id', 'customers.id')
+            ->visibleTo($user);
+
+        $invoicesCount = Invoice::query()
+            ->selectRaw('count(*)')
+            ->whereColumn('invoices.customer_id', 'customers.id')
+            ->when(
+                $user->hasRole('Sales Rep'),
+                fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $user->id))
+            );
+
+        return $query->with(self::RELATIONS)
+            ->withCount('visits')
+            ->addSelect(['orders_count' => $ordersCount, 'invoices_count' => $invoicesCount]);
+    }
+
+    public function destroy(Request $request, Customer $customer)
+    {
+        return $this->destroyRecord($request, $customer, 'crm', 'Customer');
+    }
+
+    public function import(Request $request)
+    {
+        $this->authorize('create', Customer::class);
+
+        return $this->runImport($request, new CustomerImport($request->user()));
+    }
+
+    public function importTemplate(Request $request)
+    {
+        $this->authorize('create', Customer::class);
+
+        return $this->templateResponse(new CustomerImport($request->user()), 'customers');
     }
 }

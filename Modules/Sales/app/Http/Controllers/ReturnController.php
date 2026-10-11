@@ -16,6 +16,38 @@ class ReturnController extends Controller
 {
     use Exportable, Filterable, Sortable;
 
+    private const RELATIONS = [
+        'invoice',
+        'invoice.salesOrder',
+        'invoice.salesOrder.customer',
+        'invoice.salesOrder.customer.salesRep',
+        'invoice.salesOrder.customer.salesRep.roles.permissions',
+        'invoice.salesOrder.customer.salesRep.permissions',
+        'invoice.salesOrder.warehouse',
+        'invoice.salesOrder.warehouse.manager',
+        'invoice.salesOrder.warehouse.manager.roles.permissions',
+        'invoice.salesOrder.warehouse.manager.permissions',
+        'invoice.salesOrder.salesRep',
+        'invoice.salesOrder.salesRep.roles.permissions',
+        'invoice.salesOrder.salesRep.permissions',
+        'invoice.customer',
+        'invoice.customer.salesRep',
+        'invoice.customer.salesRep.roles.permissions',
+        'invoice.customer.salesRep.permissions',
+        'customer',
+        'customer.salesRep',
+        'customer.salesRep.roles.permissions',
+        'customer.salesRep.permissions',
+        'supplier',
+        'product',
+        'product.category',
+        'product.supplier',
+        'warehouse',
+        'warehouse.manager',
+        'warehouse.manager.roles.permissions',
+        'warehouse.manager.permissions',
+    ];
+
     public function __construct(private readonly ProcessReturnService $processReturn) {}
 
     public function index(Request $request)
@@ -25,37 +57,7 @@ class ReturnController extends Controller
         $query = ReturnRecord::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'invoice',
-            'invoice.salesOrder',
-            'invoice.salesOrder.customer',
-            'invoice.salesOrder.customer.salesRep',
-            'invoice.salesOrder.customer.salesRep.roles.permissions',
-            'invoice.salesOrder.customer.salesRep.permissions',
-            'invoice.salesOrder.warehouse',
-            'invoice.salesOrder.warehouse.manager',
-            'invoice.salesOrder.warehouse.manager.roles.permissions',
-            'invoice.salesOrder.warehouse.manager.permissions',
-            'invoice.salesOrder.salesRep',
-            'invoice.salesOrder.salesRep.roles.permissions',
-            'invoice.salesOrder.salesRep.permissions',
-            'invoice.customer',
-            'invoice.customer.salesRep',
-            'invoice.customer.salesRep.roles.permissions',
-            'invoice.customer.salesRep.permissions',
-            'customer',
-            'customer.salesRep',
-            'customer.salesRep.roles.permissions',
-            'customer.salesRep.permissions',
-            'supplier',
-            'product',
-            'product.category',
-            'product.supplier',
-            'warehouse',
-            'warehouse.manager',
-            'warehouse.manager.roles.permissions',
-            'warehouse.manager.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['id', 'batch_no', 'reason', 'product.name', 'customer.name', 'supplier.name']);
 
@@ -73,6 +75,18 @@ class ReturnController extends Controller
         $returns = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return ReturnRecordResource::collection($returns);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        $returnRecord = ReturnRecord::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
+
+        $this->authorize('view', $returnRecord);
+
+        return new ReturnRecordResource($returnRecord);
     }
 
     public function store(StoreReturnRequest $request)

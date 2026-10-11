@@ -3,6 +3,8 @@
 namespace Modules\Purchasing\Tests\Feature\Http;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Modules\Accounting\Models\Account;
 use Modules\Core\Database\Seeders\RolePermissionSeeder;
@@ -37,6 +39,57 @@ class PurchaseOrderReceiveTest extends TestCase
         $response->assertOk();
         $response->assertJsonPath('data.status', 'received');
         $this->assertDatabaseHas('inventory_batches', ['batch_no' => 'BATCH-001', 'product_id' => $product->id]);
+    }
+
+    public function test_receiving_records_the_supplier_invoice_and_its_file(): void
+    {
+        Storage::fake();
+        [$tenant, $po, $line] = $this->arrange();
+        $user = User::factory()->recycle($tenant)->create();
+        $user->assignRole('Purchasing');
+        Sanctum::actingAs($user);
+        Account::factory()->recycle($tenant)->create(['code' => '1300', 'type' => 'Asset']);
+        Account::factory()->recycle($tenant)->create(['code' => '2100', 'type' => 'Liability']);
+
+        $filePath = $this->postJson('/api/v1/purchase-orders/invoices', [
+            'invoice' => UploadedFile::fake()->create('inv.pdf', 50, 'application/pdf'),
+        ])->assertCreated()->json('data.file_path');
+
+        $response = $this->postJson("/api/v1/purchase-orders/{$po->id}/receive", [
+            'invoice_data' => ['invoice_no' => 'SUP-INV-4471', 'invoice_date' => '2026-10-05', 'amount' => '1000.00', 'file_path' => $filePath],
+            'receipts' => [
+                ['line_id' => $line->id, 'batch_no' => 'BATCH-001', 'exp_date' => '2027-12-31'],
+            ],
+        ]);
+
+        $response->assertOk();
+        $response->assertJsonPath('data.supplier_invoice.invoice_no', 'SUP-INV-4471');
+        $response->assertJsonPath('data.supplier_invoice.invoice_date', '2026-10-05');
+        $response->assertJsonPath('data.supplier_invoice.amount', '1000.00');
+        $response->assertJsonPath('data.supplier_invoice.file_path', $filePath);
+
+        $this->get("/api/v1/purchase-orders/{$po->id}/invoice")
+            ->assertOk()
+            ->assertDownload("supplier-invoice-{$po->id}.pdf");
+    }
+
+    public function test_invoice_data_without_an_invoice_number_is_rejected(): void
+    {
+        [$tenant, $po, $line] = $this->arrange();
+        $user = User::factory()->recycle($tenant)->create();
+        $user->assignRole('Purchasing');
+        Sanctum::actingAs($user);
+
+        $response = $this->postJson("/api/v1/purchase-orders/{$po->id}/receive", [
+            'invoice_data' => ['invoice_date' => '2026-10-05', 'file_path' => 'purchase-order-invoices/nope.pdf'],
+            'receipts' => [
+                ['line_id' => $line->id, 'batch_no' => 'BATCH-001', 'exp_date' => '2027-12-31'],
+            ],
+        ]);
+
+        $response->assertUnprocessable();
+        $response->assertJsonValidationErrors(['invoice_data.invoice_no', 'invoice_data.file_path']);
+        $this->assertFalse($po->fresh()->stock_added);
     }
 
     public function test_missing_expiry_date_is_rejected(): void

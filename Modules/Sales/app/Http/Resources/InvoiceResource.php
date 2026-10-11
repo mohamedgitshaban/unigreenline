@@ -24,14 +24,9 @@ class InvoiceResource extends JsonResource
             'status' => $this->status,
             // Invoices have no line items of their own — they mirror the
             // originating sales order's lines (spec has no invoice_lines table).
-            // Only when the controller eager-loaded `salesOrder.lines` — the nested
-            // sales_order above lazy-loads salesOrder, so whenLoaded('salesOrder')
-            // alone would no longer be a signal that lines were asked for.
-            'lines' => SalesOrderLineResource::collection($this->when(
-                (bool) $this->salesOrder?->relationLoaded('lines'),
-                fn () => $this->salesOrder->lines
-            )),
-            'collections' => CollectionResource::collection($this->whenLoaded('collections')),
+            // Paginated at GET /invoices/{id}/lines and /invoices/{id}/collections.
+            'lines_count' => $this->whenCounted('lines'),
+            'collections_count' => $this->whenCounted('collections'),
         ];
     }
 }

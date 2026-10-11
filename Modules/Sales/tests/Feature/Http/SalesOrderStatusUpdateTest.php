@@ -64,17 +64,22 @@ class SalesOrderStatusUpdateTest extends TestCase
 
         $response->assertOk();
         $this->assertDatabaseHas('invoices', ['so_id' => $order->id]);
-        $response->assertJsonPath('data.invoices.0.sales_order.id', $order->id);
+        $response->assertJsonPath('data.invoices_count', 1);
+
+        $this->getJson("/api/v1/sales-orders/{$order->id}/invoices")
+            ->assertOk()
+            ->assertJsonPath('data.0.sales_order.id', $order->id);
     }
 
     /**
      * Regression: SalesOrderResource used to omit `invoices`/`delivery`
-     * entirely despite the service eager-loading both and the docs
-     * documenting them — found via an end-to-end Postman collection run
-     * that couldn't chain into Invoices/Deliveries/Collections at all
-     * because there was nowhere to read the created ids from.
+     * entirely — found via an end-to-end Postman collection run that
+     * couldn't chain into Invoices/Deliveries/Collections at all because
+     * there was nowhere to read the created ids from. The delivery is
+     * still embedded; invoices are counted and paged at
+     * GET /sales-orders/{id}/invoices.
      */
-    public function test_transition_to_delivered_returns_both_the_invoice_and_delivery_reference(): void
+    public function test_transition_to_delivered_returns_the_invoice_count_and_delivery_reference(): void
     {
         [$tenant, $rep, $order] = $this->arrange();
         $this->seedAccounts($tenant);
@@ -83,7 +88,7 @@ class SalesOrderStatusUpdateTest extends TestCase
         $response = $this->putJson("/api/v1/sales-orders/{$order->id}/status", ['status' => 'delivered']);
 
         $response->assertOk();
-        $response->assertJsonPath('data.invoices.0.sales_order.id', $order->id);
+        $response->assertJsonPath('data.invoices_count', 1);
         $response->assertJsonPath('data.delivery.sales_order.id', $order->id);
         $response->assertJsonPath('data.delivery.status', 'delivered');
     }

@@ -16,6 +16,23 @@ class TransferController extends Controller
 {
     use Exportable, Filterable, Sortable;
 
+    private const RELATIONS = [
+        'product',
+        'product.category',
+        'product.supplier',
+        'fromWarehouse',
+        'fromWarehouse.manager',
+        'fromWarehouse.manager.roles.permissions',
+        'fromWarehouse.manager.permissions',
+        'toWarehouse',
+        'toWarehouse.manager',
+        'toWarehouse.manager.roles.permissions',
+        'toWarehouse.manager.permissions',
+        'createdBy',
+        'createdBy.roles.permissions',
+        'createdBy.permissions',
+    ];
+
     public function __construct(private readonly TransferStockService $transferStock) {}
 
     public function index(Request $request)
@@ -25,22 +42,7 @@ class TransferController extends Controller
         $query = Transfer::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'product',
-            'product.category',
-            'product.supplier',
-            'fromWarehouse',
-            'fromWarehouse.manager',
-            'fromWarehouse.manager.roles.permissions',
-            'fromWarehouse.manager.permissions',
-            'toWarehouse',
-            'toWarehouse.manager',
-            'toWarehouse.manager.roles.permissions',
-            'toWarehouse.manager.permissions',
-            'createdBy',
-            'createdBy.roles.permissions',
-            'createdBy.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['id', 'batch_no', 'notes', 'product.name', 'fromWarehouse.name', 'toWarehouse.name']);
 
@@ -60,13 +62,16 @@ class TransferController extends Controller
         return TransferResource::collection($transfers);
     }
 
-    public function show(Request $request, Transfer $transfer)
+    public function show(Request $request, string $id)
     {
-        abort_unless($transfer->tenant_id === $request->user()->tenant_id, 404);
+        $transfer = Transfer::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
 
         $this->authorize('view', $transfer);
 
-        return new TransferResource($transfer->load(['product', 'fromWarehouse', 'toWarehouse', 'createdBy']));
+        return new TransferResource($transfer);
     }
 
     public function store(StoreTransferRequest $request)

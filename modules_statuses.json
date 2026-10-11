@@ -6,5 +6,7 @@
     "CRM": true,
     "Accounting": true,
     "Analytics": true,
-    "Expenses": true
+    "Expenses": true,
+    "Recap": true,
+    "Manufacturing": true
 }

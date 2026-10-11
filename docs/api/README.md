@@ -130,6 +130,36 @@ Endpoint-specific filters that already existed still work: `role`/`status`
 on users, `module`/`entity_type` on the audit log, `start_date`/`end_date` on
 journal entries.
 
+## Nested lists (`/{parent}/{id}/{children}`)
+
+A show response never embeds a list of child records. It returns a
+**`{children}_count`** instead, and the children are paged by their own
+endpoint:
+
+```
+GET /api/v1/products/{id}            → { ..., "batches_count": 120 }
+GET /api/v1/products/{id}/batches    → page 1 (10 per page by default)
+GET /api/v1/products/{id}/batches?page=2&per_page=25
+```
+
+Each nested list is a normal list: same `data` / `links` / `meta` envelope,
+**10 per page by default**, and `search`, `filter[...]`, `sort_by` work as
+described above. It needs the same permission as showing the parent (a
+Sales Rep gets `403` for another rep's order or customer), and a parent
+from another account is `404`.
+
+| Parent | Count field(s) | Nested list(s) |
+|---|---|---|
+| Product | `batches_count` | `GET /products/{id}/batches` |
+| Warehouse | `batches_count` | `GET /warehouses/{id}/batches` |
+| Customer | `orders_count`, `invoices_count`, `visits_count` | `GET /customers/{id}/orders`, `/invoices`, `/visits` |
+| Sales order | `lines_count`, `invoices_count` | `GET /sales-orders/{id}/lines`, `/invoices` |
+| Invoice | `lines_count`, `collections_count` | `GET /invoices/{id}/lines`, `/collections` |
+| Purchase order | `lines_count` | `GET /purchase-orders/{id}/lines` |
+| Journal entry | `lines_count` | `GET /journal-entries/{id}/lines` |
+
+The counts are on both the list and the show response of the parent.
+
 ## Endpoint groups (by build step)
 
 | Group | Status | Doc |
@@ -152,7 +182,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all 92 endpoints below, organized to match this doc's module split, with
+all 121 endpoints below, organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —

@@ -17,6 +17,14 @@ class ReturnRecordPolicy
         return $user->can('sales.view') || $user->can('purchasing.view');
     }
 
+    /**
+     * Tenant scoping is enforced in the controller, not here.
+     */
+    public function view(User $user): bool
+    {
+        return $user->can('sales.view') || $user->can('purchasing.view');
+    }
+
     public function create(User $user): bool
     {
         return $user->can('sales.add') || $user->can('purchasing.add');

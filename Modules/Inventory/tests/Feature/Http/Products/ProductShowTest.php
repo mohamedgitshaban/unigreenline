@@ -17,7 +17,7 @@ class ProductShowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_returns_nested_category_and_batches_with_their_warehouse(): void
+    public function test_returns_nested_category_and_a_batch_count(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
@@ -34,6 +34,7 @@ class ProductShowTest extends TestCase
         $this->getJson("/api/v1/products/{$product->id}")
             ->assertOk()
             ->assertJsonPath('data.category.name', 'Antibiotics')
-            ->assertJsonPath('data.batches.0.warehouse.name', 'Cairo Main');
+            ->assertJsonPath('data.batches_count', 1)
+            ->assertJsonMissingPath('data.batches');
     }
 }

@@ -16,6 +16,7 @@ use Modules\Purchasing\Database\Factories\PurchaseOrderFactory;
 #[Fillable([
     'tenant_id', 'supplier_id', 'warehouse_id', 'created_by', 'status', 'stock_added',
     'order_date', 'expected_date', 'received_date', 'subtotal', 'tax_amount', 'total', 'notes',
+    'supplier_invoice_no', 'supplier_invoice_date', 'supplier_invoice_amount', 'supplier_invoice_path',
 ])]
 class PurchaseOrder extends Model
 {
@@ -31,7 +32,14 @@ class PurchaseOrder extends Model
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'total' => 'decimal:2',
+            'supplier_invoice_date' => 'date',
+            'supplier_invoice_amount' => 'decimal:2',
         ];
+    }
+
+    public static function invoiceDirectory(string $tenantId): string
+    {
+        return "purchase-order-invoices/{$tenantId}";
     }
 
     public function tenant(): BelongsTo

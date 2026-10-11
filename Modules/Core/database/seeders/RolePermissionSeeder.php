@@ -14,7 +14,7 @@ use Spatie\Permission\Models\Role;
  */
 class RolePermissionSeeder extends Seeder
 {
-    private const MODULES = ['sales', 'inventory', 'purchasing', 'crm', 'accounting', 'expenses', 'analytics', 'admin'];
+    private const MODULES = ['sales', 'inventory', 'purchasing', 'crm', 'accounting', 'expenses', 'recap', 'manufacturing', 'analytics', 'admin'];
 
     private const CAPABILITIES = ['view', 'add', 'edit', 'delete', 'approve', 'print', 'export', 'audit'];
 
@@ -34,11 +34,11 @@ class RolePermissionSeeder extends Seeder
         // Rep — crm.* is included here (not just sales.*) so a rep can
         // manage their own customers, not only their own orders.
         'Sales Rep' => ['modules' => ['sales', 'crm'], 'capabilities' => ['view', 'add', 'edit', 'print']],
-        'Warehouse Manager' => ['modules' => ['inventory'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export']],
-        'Warehouse Employee' => ['modules' => ['inventory'], 'capabilities' => ['view', 'add', 'edit']],
+        'Warehouse Manager' => ['modules' => ['inventory', 'manufacturing', 'recap'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export']],
+        'Warehouse Employee' => ['modules' => ['inventory', 'manufacturing'], 'capabilities' => ['view', 'add', 'edit']],
         // Approving an expense posts it to the journal, so the accountant
         // approves/rejects expenses — but still not accounting.approve.
-        'Accountant' => ['modules' => ['accounting', 'expenses'], 'capabilities' => ['view', 'add', 'edit', 'print', 'export'], 'extra' => ['expenses.approve']],
+        'Accountant' => ['modules' => ['accounting', 'expenses'], 'capabilities' => ['view', 'add', 'edit', 'print', 'export'], 'extra' => ['expenses.approve', 'recap.view']],
         'Customer Service' => ['modules' => ['crm'], 'capabilities' => ['view', 'add', 'edit']],
         // Purchasing records expenses but can't approve them.
         'Purchasing' => ['modules' => ['purchasing'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print'], 'extra' => ['expenses.view', 'expenses.add', 'expenses.edit']],

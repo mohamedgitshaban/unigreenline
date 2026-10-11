@@ -6,15 +6,30 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\ResolveComplaintRequest;
 use Modules\CRM\Http\Requests\StoreComplaintRequest;
+use Modules\CRM\Http\Requests\UpdateComplaintRequest;
 use Modules\CRM\Http\Resources\ComplaintResource;
 use Modules\CRM\Models\Complaint;
 
 class ComplaintController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ManagesRecords, Sortable;
+
+    private const RELATIONS = [
+        'customer',
+        'customer.salesRep',
+        'customer.salesRep.roles.permissions',
+        'customer.salesRep.permissions',
+        'product',
+        'product.category',
+        'product.supplier',
+        'assignedTo',
+        'assignedTo.roles.permissions',
+        'assignedTo.permissions',
+    ];
 
     public function index(Request $request)
     {
@@ -23,18 +38,7 @@ class ComplaintController extends Controller
         $query = Complaint::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'customer',
-            'customer.salesRep',
-            'customer.salesRep.roles.permissions',
-            'customer.salesRep.permissions',
-            'product',
-            'product.category',
-            'product.supplier',
-            'assignedTo',
-            'assignedTo.roles.permissions',
-            'assignedTo.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['id', 'batch_no', 'type', 'description', 'customer.name', 'product.name']);
 
@@ -52,6 +56,18 @@ class ComplaintController extends Controller
         $complaints = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return ComplaintResource::collection($complaints);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        $complaint = Complaint::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
+
+        $this->authorize('view', $complaint);
+
+        return new ComplaintResource($complaint);
     }
 
     public function store(StoreComplaintRequest $request)
@@ -74,5 +90,17 @@ class ComplaintController extends Controller
         ]);
 
         return new ComplaintResource($complaint);
+    }
+
+    public function update(UpdateComplaintRequest $request, Complaint $complaint)
+    {
+        $this->updateRecord($request, $complaint, $request->validated(), 'crm', 'Complaint');
+
+        return new ComplaintResource($complaint->load(self::RELATIONS));
+    }
+
+    public function destroy(Request $request, Complaint $complaint)
+    {
+        return $this->destroyRecord($request, $complaint, 'crm', 'Complaint');
     }
 }

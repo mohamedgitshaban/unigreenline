@@ -28,8 +28,9 @@ class ReceivePurchaseOrderService
     /**
      * @param  array<int, array{line_id: string, batch_no: string, exp_date: string, mfg_date?: ?string, rcv_date?: ?string}>  $receipts
      * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
+     * @param  array{invoice_no?: string, invoice_date?: ?string, amount?: ?string, file_path?: ?string}|null  $invoiceData  The supplier's invoice.
      */
-    public function receive(PurchaseOrder $po, array $receipts, array $actor = []): PurchaseOrder
+    public function receive(PurchaseOrder $po, array $receipts, array $actor = [], ?array $invoiceData = null): PurchaseOrder
     {
         if ($po->stock_added) {
             throw new PurchaseOrderAlreadyReceivedException;
@@ -42,7 +43,7 @@ class ReceivePurchaseOrderService
             throw new IncompleteReceiptException;
         }
 
-        return DB::transaction(function () use ($po, $lines, $receiptsByLine, $actor) {
+        return DB::transaction(function () use ($po, $lines, $receiptsByLine, $actor, $invoiceData) {
             foreach ($lines as $line) {
                 $receipt = $receiptsByLine[$line->id];
 
@@ -63,6 +64,10 @@ class ReceivePurchaseOrderService
                 'stock_added' => true,
                 'status' => 'received',
                 'received_date' => now()->toDateString(),
+                'supplier_invoice_no' => $invoiceData['invoice_no'] ?? null,
+                'supplier_invoice_date' => $invoiceData['invoice_date'] ?? null,
+                'supplier_invoice_amount' => $invoiceData['amount'] ?? null,
+                'supplier_invoice_path' => $invoiceData['file_path'] ?? null,
             ]);
 
             $po->supplier()->decrement('balance', $po->total);

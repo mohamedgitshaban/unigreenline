@@ -205,7 +205,11 @@ $inventory = folder('Inventory', [
             'description' => "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator.",
         ]),
         req('GET', 'Get warehouse', '/warehouses/{{warehouse_id}}', [
-            'description' => 'Includes nested `batches`. 403 if this warehouse is not assigned to the caller.',
+            'description' => 'Includes `batches_count` — the batches themselves are paged by List warehouse batches. 403 if this warehouse is not assigned to the caller.',
+        ]),
+        req('GET', 'List warehouse batches', '/warehouses/{{warehouse_id}}/batches', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `inventory.view` + the warehouse assigned to the caller (403 otherwise). Each batch includes its `product`. Paginated (10 per page by default) — follow `links.next`. `sort_by=exp_date&sort_dir=asc` gives FEFO order.',
         ]),
         req('POST', 'Create warehouse', '/warehouses', [
             'description' => "Requires `inventory.add`. Only name/city/governorate are required — `manager_name` is derived server-side from `manager_id`, don't send it.",
@@ -234,6 +238,9 @@ $inventory = folder('Inventory', [
             'body' => ['name' => 'Postman Demo Category', 'code' => null, 'description' => null, 'active' => true],
             'tests' => saveId('category_id'),
         ]),
+        req('GET', 'Get category', '/categories/{{category_id}}', [
+            'description' => "Requires `inventory.view`. 404 for another tenant's category.",
+        ]),
         req('PUT', 'Update category', '/categories/{{category_id}}', [
             'description' => "Requires `inventory.edit`, and the category must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the category itself.",
             'body' => ['code' => 'PM-DEMO', 'description' => 'Updated from Postman'],
@@ -245,7 +252,11 @@ $inventory = folder('Inventory', [
             'description' => 'Requires `inventory.view`. Catalog-wide, not warehouse-scoped.',
         ]),
         req('GET', 'Get product', '/products/{{product_id}}', [
-            'description' => 'Includes nested `batches`.',
+            'description' => 'Includes `batches_count` — the batches themselves are paged by List product batches.',
+        ]),
+        req('GET', 'List product batches', '/products/{{product_id}}/batches', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'exp_date', 'sort_dir' => 'asc', 'filter[warehouse_id]' => '{{warehouse_id}}', 'filter[qty_cartons][gt]' => 0],
+            'description' => "Requires `inventory.view`. The product's batches as a paginated list (default 10 per page) — use this instead of the nested `batches` on Get product when a product has many batches. Follow `links.next` for the next page. Supports the usual `search` (batch_no, warehouse name), `filter[...]` and `sort_by`; `sort_by=exp_date&sort_dir=asc` gives FEFO order. 404 for another tenant's product.",
         ]),
         req('POST', 'Create product', '/products', [
             'description' => "Requires `inventory.add`. `sku` must be unique. `cost_price`/`selling_price` are computed server-side (pack price × carton_qty) and returned always in sync — don't send them.",
@@ -290,7 +301,15 @@ $sales = folder('Sales', [
             'description' => 'Requires `sales.view`. A Sales Rep only sees their own orders. Newest `order_date` first.',
         ]),
         req('GET', 'Get sales order', '/sales-orders/{{sales_order_id}}', [
-            'description' => 'Includes nested `lines`. 403 if a Sales Rep requests another rep\'s order.',
+            'description' => 'Includes `lines_count` and `invoices_count` — paged by List sales order lines / List sales order invoices. 403 if a Sales Rep requests another rep\'s order.',
+        ]),
+        req('GET', 'List sales order lines', '/sales-orders/{{sales_order_id}}/lines', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Same access as Get sales order. Each line includes its `product`. Paginated (10 per page by default) — follow `links.next`.',
+        ]),
+        req('GET', 'List sales order invoices', '/sales-orders/{{sales_order_id}}/invoices', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Same access as Get sales order. Paginated (10 per page by default) — follow `links.next`.',
         ]),
         req('POST', 'Create sales order', '/sales-orders', [
             'description' => "Requires `sales.add`. Validates FEFO stock availability and (for `pay_type: credit`) the customer's credit limit **before writing anything** — 422 with a `shortfalls` or credit-limit-exceeded body otherwise. `unit: Pack` rounds a line's stock need up to whole cartons.",
@@ -298,17 +317,19 @@ $sales = folder('Sales', [
             'tests' => saveId('sales_order_id'),
         ]),
         req('PUT', 'Update sales order status', '/sales-orders/{{sales_order_id}}/status', [
-            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.\n\nGoes straight to `delivered` (skipping `invoiced`) so this one call populates both `{{invoice_id}}` and `{{delivery_id}}` for the Invoices/Deliveries/Collections requests below — change the body to `invoiced` if you want to see that intermediate state instead.",
+            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.\n\nGoes straight to `delivered` (skipping `invoiced`). The response includes `invoices_count` and the `delivery` (saved into `{{delivery_id}}`); the next request saves the invoice into `{{invoice_id}}` for the Invoices/Collections requests below — change the body to `invoiced` if you want to see that intermediate state instead.",
             'body' => ['status' => 'delivered'],
             'tests' => [
                 'if (pm.response.code === 200) {',
-                '    const json = pm.response.json();',
-                '    const invoice = json.data?.invoices?.[0];',
-                "    if (invoice) { pm.collectionVariables.set('invoice_id', invoice.id); }",
-                '    const delivery = json.data?.delivery;',
+                '    const delivery = pm.response.json().data?.delivery;',
                 "    if (delivery) { pm.collectionVariables.set('delivery_id', delivery.id); }",
                 '}',
             ],
+        ]),
+        req('GET', 'List sales order invoices (after status update)', '/sales-orders/{{sales_order_id}}/invoices', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'The invoice created by the status update above, saved into `{{invoice_id}}`.',
+            'tests' => saveId('invoice_id', 'data.0.id'),
         ]),
     ]),
     folder('Invoices', [
@@ -317,7 +338,15 @@ $sales = folder('Sales', [
             'description' => 'Requires `sales.view` or `accounting.view`. No POST — invoices only come from the sales-order status transition.',
         ]),
         req('GET', 'Get invoice', '/invoices/{{invoice_id}}', [
-            'description' => 'Includes `lines` (mirrored from the originating order) and `collections`.',
+            'description' => 'Includes `lines_count` (lines mirrored from the originating order) and `collections_count` — paged by the two requests below.',
+        ]),
+        req('GET', 'List invoice lines', '/invoices/{{invoice_id}}/lines', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => "Same access as Get invoice. The originating sales order's lines. Paginated (10 per page by default) — follow `links.next`.",
+        ]),
+        req('GET', 'List invoice collections', '/invoices/{{invoice_id}}/collections', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Same access as Get invoice. Payments recorded against this invoice. Paginated (10 per page by default) — follow `links.next`.',
         ]),
     ]),
     folder('Deliveries', [
@@ -326,8 +355,17 @@ $sales = folder('Sales', [
             'description' => 'Requires `sales.view` (+ ownership if Sales Rep).',
         ]),
         req('GET', 'Get delivery', '/deliveries/{{delivery_id}}', []),
+        req('POST', 'Upload delivery invoice', '/deliveries/invoices', [
+            'description' => 'Requires `sales.edit`. **Step 1 of attaching the delivered invoice** (e.g. the copy signed by the customer) — jpg/png/pdf, max 5 MB. Returns `invoice_data` (the stored path), saved into `{{delivery_invoice_data}}`, which you then send as `invoice_data` on Mark delivery delivered. Attach a file to the `invoice` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.',
+            'files' => ['invoice' => 'Delivered invoice (jpg, png, pdf — max 5 MB).'],
+            'tests' => saveId('delivery_invoice_data', 'data.invoice_data'),
+        ]),
         req('PUT', 'Mark delivery delivered', '/deliveries/{{delivery_id}}/deliver', [
-            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition.",
+            'description' => "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition. `invoice_data` (optional) is the path from Upload delivery invoice; a new one replaces the previous file, which is deleted. Omit it to keep the current one.",
+            'body' => ['invoice_data' => '{{delivery_invoice_data}}'],
+        ]),
+        req('GET', 'Download delivery invoice', '/deliveries/{{delivery_id}}/invoice', [
+            'description' => 'Requires `sales.view` (+ ownership if Sales Rep). File download; 404 if the delivery has no invoice file, or belongs to another tenant.',
         ]),
     ]),
     folder('Collections', [
@@ -352,6 +390,10 @@ $sales = folder('Sales', [
         req('POST', 'Create return', '/returns', [
             'description' => "Requires `sales.add` or `purchasing.add`. No financial side effect — only ever moves stock (or doesn't). `type: \"Purchase Return\"` always deducts; the other 4 types only move stock if `restocked: true` (and then add back). The batch is never fabricated — a non-existent batch_no fails rather than guessing an expiry.",
             'body' => ['invoice_id' => null, 'customer_id' => '{{customer_id}}', 'supplier_id' => null, 'product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'BATCH-001', 'type' => 'Sales Return', 'qty' => 3, 'unit' => 'Carton', 'amount' => 60, 'restocked' => true, 'reason' => null, 'return_date' => '2026-09-20'],
+            'tests' => saveId('return_id'),
+        ]),
+        req('GET', 'Get return', '/returns/{{return_id}}', [
+            'description' => "Requires `sales.view` or `purchasing.view`. Includes nested invoice/customer/supplier/product/warehouse. 404 for another tenant's return.",
         ]),
     ]),
     req('GET', 'AR aging report', '/reports/ar-aging', [
@@ -369,16 +411,27 @@ $purchasing = folder('Purchasing', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `purchasing.view` (also reachable with `accounting.view`).',
         ]),
+        req('POST', 'Upload supplier contract', '/suppliers/contracts', [
+            'description' => 'Requires `purchasing.add` or `purchasing.edit`. **Step 1 of attaching a contract** — pdf/jpg/png/doc/docx, max 10 MB. Returns `contract_data` (the stored path), saved into `{{supplier_contract_data}}`, which you then send as `contract_data` on Create/Update supplier. Attach a file to the `contract` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.',
+            'files' => ['contract' => 'Contract file (pdf, jpg, png, doc, docx — max 10 MB).'],
+            'tests' => saveId('supplier_contract_data', 'data.contract_data'),
+        ]),
         req('POST', 'Create supplier', '/suppliers', [
             'description' => 'Requires `purchasing.add`. Only `name` required. `balance` starts at 0 and moves negative as POs are received — negative means we owe them.',
             // Not one of the 3 seeded suppliers' names (spec §7) — a real
             // collision here is a 422 (unique per tenant).
-            'body' => ['name' => 'Postman Demo Pharmaceutical Supplier', 'country' => 'Egypt', 'city' => 'Cairo', 'contact' => null, 'email' => null, 'phone' => null, 'pay_terms' => 'Net 30', 'currency' => 'EGP', 'rating' => null, 'status' => 'active'],
+            'body' => ['name' => 'Postman Demo Pharmaceutical Supplier', 'country' => 'Egypt', 'city' => 'Cairo', 'contact' => null, 'email' => null, 'phone' => null, 'pay_terms' => 'Net 30', 'currency' => 'EGP', 'rating' => null, 'status' => 'active', 'address' => null, 'contract_data' => '{{supplier_contract_data}}'],
             'tests' => saveId('supplier_id'),
         ]),
+        req('GET', 'Get supplier', '/suppliers/{{supplier_id}}', [
+            'description' => "Requires `purchasing.view` or `accounting.view`. 404 for another tenant's supplier.",
+        ]),
         req('PUT', 'Update supplier', '/suppliers/{{supplier_id}}', [
-            'description' => "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it.",
+            'description' => "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it. Send a new `contract_data` (from Upload supplier contract) to replace the contract — the old file is deleted — or `null` to remove it.",
             'body' => ['contact' => 'Postman Demo Contact', 'phone' => '+20 2 1234 5678', 'rating' => 4],
+        ]),
+        req('GET', 'Download supplier contract', '/suppliers/{{supplier_id}}/contract', [
+            'description' => 'Requires `purchasing.view` or `accounting.view`. File download; 404 if the supplier has no contract, or belongs to another tenant.',
         ]),
     ]),
     folder('Purchase Orders', [
@@ -387,21 +440,29 @@ $purchasing = folder('Purchasing', [
             'description' => 'Requires `purchasing.view`.',
         ]),
         req('GET', 'Get purchase order', '/purchase-orders/{{purchase_order_id}}', [
-            'description' => 'Includes nested `lines`.',
+            'description' => 'Includes `lines_count` — the lines are paged by List purchase order lines.',
         ]),
         req('POST', 'Create purchase order', '/purchase-orders', [
             'description' => 'Requires `purchasing.add`. `status` starts as `draft`.',
             'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'expected_date' => null, 'notes' => null, 'order_date' => '2026-09-19', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 50, 'cost_per_carton' => 40]]],
-            'tests' => array_merge(saveId('purchase_order_id'), [
-                'if (pm.response.code === 201) {',
-                '    const line = pm.response.json().data?.lines?.[0];',
-                "    if (line) { pm.collectionVariables.set('purchase_order_line_id', line.id); }",
-                '}',
-            ]),
+            'tests' => saveId('purchase_order_id'),
+        ]),
+        req('GET', 'List purchase order lines', '/purchase-orders/{{purchase_order_id}}/lines', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => "Requires `purchasing.view`. Each line includes its `product`. Paginated (10 per page by default) — follow `links.next`. Saves the first line's id into `{{purchase_order_line_id}}` for Receive purchase order.",
+            'tests' => saveId('purchase_order_line_id', 'data.0.id'),
+        ]),
+        req('POST', 'Upload supplier invoice', '/purchase-orders/invoices', [
+            'description' => 'Requires `purchasing.approve`. **Step 1 of attaching the supplier\'s invoice** — jpg/png/pdf, max 5 MB. Returns `file_path`, saved into `{{purchase_order_invoice_path}}`, which you then send as `invoice_data.file_path` on Receive purchase order. Attach a file to the `invoice` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.',
+            'files' => ['invoice' => 'Supplier invoice (jpg, png, pdf — max 5 MB).'],
+            'tests' => saveId('purchase_order_invoice_path', 'data.file_path'),
         ]),
         req('POST', 'Receive purchase order', '/purchase-orders/{{purchase_order_id}}/receive', [
-            'description' => "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by the Create Purchase Order request above — for a PO with more than one line, replace it with the specific line id you're receiving.",
-            'body' => ['receipts' => [['line_id' => '{{purchase_order_line_id}}', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]]],
+            'description' => "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by List purchase order lines above — for a PO with more than one line, replace it with the specific line id you're receiving.\n\n`invoice_data` (optional) records the supplier's own invoice: `invoice_no` is required when it's sent; `invoice_date`, `amount` and `file_path` (from Upload supplier invoice) are optional. It comes back as `supplier_invoice` on the PO.",
+            'body' => ['invoice_data' => ['invoice_no' => 'SUP-INV-4471', 'invoice_date' => '2026-10-05', 'amount' => '2280.00', 'file_path' => '{{purchase_order_invoice_path}}'], 'receipts' => [['line_id' => '{{purchase_order_line_id}}', 'batch_no' => 'PO-BATCH-1', 'exp_date' => '2028-01-01', 'mfg_date' => null, 'rcv_date' => null]]],
+        ]),
+        req('GET', 'Download supplier invoice', '/purchase-orders/{{purchase_order_id}}/invoice', [
+            'description' => 'Requires `purchasing.view`. File download; 404 if the PO has no supplier invoice file, or belongs to another tenant.',
         ]),
         req('POST', 'Create purchase order (to edit and delete)', '/purchase-orders', [
             'description' => 'A throwaway draft PO for the Update and Delete requests below — the main PO above has already been received by this point in the run, so it can no longer be edited or deleted.',
@@ -432,7 +493,19 @@ $crm = folder('CRM', [
             'description' => 'Requires `crm.view`. A Sales Rep sees only their own customers.',
         ]),
         req('GET', 'Get customer', '/customers/{{customer_id}}', [
-            'description' => 'Includes nested `orders`, `invoices`, and `visits`.',
+            'description' => 'Includes `orders_count`, `invoices_count` and `visits_count` — each list is paged by the three requests below.',
+        ]),
+        req('GET', 'List customer orders', '/customers/{{customer_id}}/orders', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`.',
+        ]),
+        req('GET', 'List customer invoices', '/customers/{{customer_id}}/invoices', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`.',
+        ]),
+        req('GET', 'List customer visits', '/customers/{{customer_id}}/visits', [
+            'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`.',
         ]),
         req('POST', 'Create customer', '/customers', [
             'description' => 'Requires `crm.add`. Only `name`/`type` required. A Sales Rep omitting `sales_rep_id` gets themselves; naming a different rep is 422.',
@@ -452,6 +525,10 @@ $crm = folder('CRM', [
         req('POST', 'Create lead', '/leads', [
             'description' => 'Requires `crm.add`.',
             'body' => ['assigned_to' => null, 'name' => 'Delta Farms', 'type' => 'Farm', 'contact' => null, 'phone' => null, 'email' => null, 'source' => 'Referral', 'status' => 'new', 'value' => null, 'notes' => null],
+            'tests' => saveId('lead_id'),
+        ]),
+        req('GET', 'Get lead', '/leads/{{lead_id}}', [
+            'description' => "Requires `crm.view`. 404 for another tenant's lead.",
         ]),
     ]),
     folder('Visits', [
@@ -462,6 +539,10 @@ $crm = folder('CRM', [
         req('POST', 'Create visit', '/visits', [
             'description' => 'Requires `crm.add`. `rep_id` defaults to the caller if omitted.',
             'body' => ['customer_id' => '{{customer_id}}', 'rep_id' => null, 'visit_date' => '2026-09-20', 'type' => 'Follow-up', 'outcome' => 'positive', 'notes' => null, 'next_visit' => null],
+            'tests' => saveId('visit_id'),
+        ]),
+        req('GET', 'Get visit', '/visits/{{visit_id}}', [
+            'description' => "Requires `crm.view`. Includes nested customer and rep. 404 for another tenant's visit.",
         ]),
     ]),
     folder('Complaints', [
@@ -473,6 +554,9 @@ $crm = folder('CRM', [
             'description' => 'Requires `crm.add`. `priority` defaults to `medium`, `status` defaults to `investigating`.',
             'body' => ['customer_id' => '{{customer_id}}', 'product_id' => null, 'assigned_to' => null, 'batch_no' => null, 'type' => 'Quality', 'description' => 'Vial arrived damaged.', 'priority' => 'medium', 'complaint_date' => '2026-09-20'],
             'tests' => saveId('complaint_id'),
+        ]),
+        req('GET', 'Get complaint', '/complaints/{{complaint_id}}', [
+            'description' => "Requires `crm.view`. 404 for another tenant's complaint.",
         ]),
         req('PUT', 'Resolve complaint', '/complaints/{{complaint_id}}/resolve', [
             'description' => 'Requires `crm.edit`. `resolution` required — sets `status: resolved` and `resolved_date` to today.',
@@ -488,6 +572,9 @@ $crm = folder('CRM', [
             'description' => 'Requires `crm.add`. `status` defaults to `active`.',
             'body' => ['name' => 'Autumn Vaccine Drive', 'type' => 'Discount', 'target' => 'Clinics', 'discount' => 10, 'start_date' => '2026-10-01', 'end_date' => null, 'description' => null],
             'tests' => saveId('campaign_id'),
+        ]),
+        req('GET', 'Get campaign', '/campaigns/{{campaign_id}}', [
+            'description' => "Requires `crm.view`. 404 for another tenant's campaign.",
         ]),
         req('PUT', 'End campaign', '/campaigns/{{campaign_id}}/end', [
             'description' => "Requires `crm.edit`. Sets `status: completed` and fills `end_date` with today if it wasn't already set.",
@@ -510,9 +597,20 @@ $accounting = folder('Accounting', [
             '}',
         ],
     ]),
+    req('GET', 'Get account', '/chart-of-accounts/{{expense_account_id}}', [
+        'description' => "Requires `accounting.view`. Uses `{{expense_account_id}}` (account 6200), captured by Chart of accounts. 404 for another tenant's account.",
+    ]),
     req('GET', 'Journal entries', '/journal-entries', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
-        'description' => 'Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting. Exported rows summarize lines into one column rather than one row per line.',
+        'description' => "Requires `accounting.view`. Includes `lines_count` (lines are paged per entry by List journal entry lines). No POST — entries only come from business events auto-posting. Exported rows still summarize every line into one column.\n\nSaves the first entry's id into `{{journal_entry_id}}` for Get journal entry.",
+        'tests' => saveId('journal_entry_id', 'data.0.id'),
+    ]),
+    req('GET', 'Get journal entry', '/journal-entries/{{journal_entry_id}}', [
+        'description' => "Requires `accounting.view`. Includes `lines_count` — the lines are paged by List journal entry lines. 404 for another tenant's entry.",
+    ]),
+    req('GET', 'List journal entry lines', '/journal-entries/{{journal_entry_id}}/lines', [
+        'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+        'description' => 'Requires `accounting.view`. Each line includes its `account`. Paginated (10 per page by default) — follow `links.next`.',
     ]),
     req('GET', 'Balance sheet', '/reports/balance-sheet', [
         'description' => 'Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. `balanced: false` is expected in this build (no period-close process sweeps net income into Retained Earnings).',
@@ -540,7 +638,7 @@ $expenses = folder('Expenses', [
             'tests' => saveId('expense_category_id'),
         ]),
         req('PUT', 'Update expense category', '/expense-categories/{{expense_category_id}}', [
-            'description' => 'Requires `expenses.edit`. Partial update. There is no delete — set `active: false` to retire a category; inactive categories can\'t take new expenses.',
+            'description' => 'Requires `expenses.edit`. Partial update. `DELETE` (needs `expenses.delete`) only works while no expense uses the category — otherwise set `active: false` to retire it; inactive categories can\'t take new expenses.',
             'body' => ['description' => 'Updated from Postman'],
         ]),
     ]),
@@ -644,7 +742,11 @@ $admin = folder('Admin', [
     folder('Audit Log', [
         req('GET', 'List audit log', '/audit-log', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'module' => '', 'entity_type' => '', 'export' => 'csv'],
-            'description' => 'Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.',
+            'description' => "Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.\n\nSaves the first entry's id into `{{audit_log_id}}`.",
+            'tests' => saveId('audit_log_id', 'data.0.id'),
+        ]),
+        req('GET', 'Get audit log entry', '/audit-log/{{audit_log_id}}', [
+            'description' => "Requires `admin.audit`. Includes `prev_values`/`new_values`. 404 for another tenant's entry.",
         ]),
         req('POST', 'Verify audit chain integrity', '/audit-log/verify-integrity', [
             'description' => 'Requires `admin.audit`. Re-walks the whole hash chain, returns `{ intact, broken_at }`. HTTP equivalent of the `audit:verify` console command.',
@@ -653,7 +755,11 @@ $admin = folder('Admin', [
     folder('Notifications', [
         req('GET', 'List notifications', '/notifications', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
-            'description' => "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data.",
+            'description' => "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data.\n\nSaves the first notification's id into `{{notification_id}}`.",
+            'tests' => saveId('notification_id', 'data.0.id'),
+        ]),
+        req('GET', 'Get notification', '/notifications/{{notification_id}}', [
+            'description' => "Own or broadcast only — another user's notification is 404. Does not mark it read.",
         ]),
         req('PUT', 'Mark all notifications read', '/notifications/read-all', [
             'description' => '`unread` is a single flag per row (spec §4.14 has no per-viewer read state) — marking a broadcast notification read here affects every user, not just the caller. See docs/api/admin.md for the full trade-off.',
@@ -667,6 +773,10 @@ $admin = folder('Admin', [
         req('POST', 'Save discarded action', '/discarded-actions', [
             'description' => "Any authenticated user — saves their own abandoned form draft. `payload` is free-form JSON. Not in the spec's own §6 table, but §4.15 explicitly asks for it to be wired up.",
             'body' => ['type' => 'sales_order', 'label' => 'Draft order for Al-Salam Vet Clinic', 'payload' => ['customer_id' => '{{customer_id}}', 'lines' => []]],
+            'tests' => saveId('discarded_action_id'),
+        ]),
+        req('GET', 'Get discarded action', '/discarded-actions/{{discarded_action_id}}', [
+            'description' => "Requires `admin.view`. Includes the full `payload`. 404 for another tenant's action.",
         ]),
     ]),
 ], "Spec §6/§9.4. See docs/api/admin.md — also documents why there's no Settings endpoint (no backing schema anywhere in the spec).");
@@ -723,6 +833,13 @@ $collection = [
             'delivery_id' => '',
             'collection_id' => '',
             'transfer_id' => '',
+            'return_id' => '',
+            'lead_id' => '',
+            'visit_id' => '',
+            'journal_entry_id' => '',
+            'audit_log_id' => '',
+            'notification_id' => '',
+            'discarded_action_id' => '',
             'purchase_order_id' => '',
             'purchase_order_line_id' => '',
             'deletable_purchase_order_id' => '',
@@ -731,6 +848,9 @@ $collection = [
             'expense_account_id' => '',
             'expense_category_id' => '',
             'expense_receipt_path' => '',
+            'supplier_contract_data' => '',
+            'purchase_order_invoice_path' => '',
+            'delivery_invoice_data' => '',
             'expense_id' => '',
             'rejectable_expense_id' => '',
             'deletable_expense_id' => '',

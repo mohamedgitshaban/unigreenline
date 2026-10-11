@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "VetPharma ERP API",
-        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 96 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 126 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "auth": {
@@ -106,6 +106,41 @@
             "type": "string"
         },
         {
+            "key": "return_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "lead_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "visit_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "journal_entry_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "audit_log_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "notification_id",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "discarded_action_id",
+            "value": "",
+            "type": "string"
+        },
+        {
             "key": "purchase_order_id",
             "value": "",
             "type": "string"
@@ -142,6 +177,21 @@
         },
         {
             "key": "expense_receipt_path",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "supplier_contract_data",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "purchase_order_invoice_path",
+            "value": "",
+            "type": "string"
+        },
+        {
+            "key": "delivery_invoice_data",
             "value": "",
             "type": "string"
         },
@@ -396,7 +446,48 @@
                                         "{{warehouse_id}}"
                                     ]
                                 },
-                                "description": "Includes nested `batches`. 403 if this warehouse is not assigned to the caller."
+                                "description": "Includes `batches_count` — the batches themselves are paged by List warehouse batches. 403 if this warehouse is not assigned to the caller."
+                            }
+                        },
+                        {
+                            "name": "List warehouse batches",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}/batches?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}",
+                                        "batches"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view` + the warehouse assigned to the caller (403 otherwise). Each batch includes its `product`. Paginated (10 per page by default) — follow `links.next`. `sort_by=exp_date&sort_dir=asc` gives FEFO order."
                             }
                         },
                         {
@@ -619,6 +710,24 @@
                             ]
                         },
                         {
+                            "name": "Get category",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/categories/{{category_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "categories",
+                                        "{{category_id}}"
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`. 404 for another tenant's category."
+                            }
+                        },
+                        {
                             "name": "Update category",
                             "request": {
                                 "method": "PUT",
@@ -714,7 +823,58 @@
                                         "{{product_id}}"
                                     ]
                                 },
-                                "description": "Includes nested `batches`."
+                                "description": "Includes `batches_count` — the batches themselves are paged by List product batches."
+                            }
+                        },
+                        {
+                            "name": "List product batches",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/products/{{product_id}}/batches?page=1&per_page=10&sort_by=exp_date&sort_dir=asc&filter%5Bwarehouse_id%5D=%7B%7Bwarehouse_id%7D%7D&filter%5Bqty_cartons%5D%5Bgt%5D=0",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "products",
+                                        "{{product_id}}",
+                                        "batches"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "exp_date",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "asc",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "filter[warehouse_id]",
+                                            "value": "{{warehouse_id}}",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "filter[qty_cartons][gt]",
+                                            "value": "0",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `inventory.view`. The product's batches as a paginated list (default 10 per page) — use this instead of the nested `batches` on Get product when a product has many batches. Follow `links.next` for the next page. Supports the usual `search` (batch_no, warehouse name), `filter[...]` and `sort_by`; `sort_by=exp_date&sort_dir=asc` gives FEFO order. 404 for another tenant's product."
                             }
                         },
                         {
@@ -1010,7 +1170,130 @@
                                         "{{customer_id}}"
                                     ]
                                 },
-                                "description": "Includes nested `orders`, `invoices`, and `visits`."
+                                "description": "Includes `orders_count`, `invoices_count` and `visits_count` — each list is paged by the three requests below."
+                            }
+                        },
+                        {
+                            "name": "List customer orders",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}/orders?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}",
+                                        "orders"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`."
+                            }
+                        },
+                        {
+                            "name": "List customer invoices",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}/invoices?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}",
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`."
+                            }
+                        },
+                        {
+                            "name": "List customer visits",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}/visits?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}",
+                                        "visits"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `crm.view` on the customer (+ ownership if Sales Rep). Paginated (10 per page by default) — follow `links.next`."
                             }
                         },
                         {
@@ -1169,6 +1452,39 @@
                                         }
                                     }
                                 }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('lead_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get lead",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/leads/{{lead_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "leads",
+                                        "{{lead_id}}"
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. 404 for another tenant's lead."
                             }
                         }
                     ]
@@ -1249,6 +1565,39 @@
                                         }
                                     }
                                 }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('visit_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get visit",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/visits/{{visit_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "visits",
+                                        "{{visit_id}}"
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. Includes nested customer and rep. 404 for another tenant's visit."
                             }
                         }
                     ]
@@ -1345,6 +1694,24 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "Get complaint",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/complaints/{{complaint_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "complaints",
+                                        "{{complaint_id}}"
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. 404 for another tenant's complaint."
+                            }
                         },
                         {
                             "name": "Resolve complaint",
@@ -1475,6 +1842,24 @@
                             ]
                         },
                         {
+                            "name": "Get campaign",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/campaigns/{{campaign_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "campaigns",
+                                        "{{campaign_id}}"
+                                    ]
+                                },
+                                "description": "Requires `crm.view`. 404 for another tenant's campaign."
+                            }
+                        },
+                        {
                             "name": "End campaign",
                             "request": {
                                 "method": "PUT",
@@ -1549,6 +1934,50 @@
                             }
                         },
                         {
+                            "name": "Upload supplier contract",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/contracts",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "contracts"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.add` or `purchasing.edit`. **Step 1 of attaching a contract** — pdf/jpg/png/doc/docx, max 10 MB. Returns `contract_data` (the stored path), saved into `{{supplier_contract_data}}`, which you then send as `contract_data` on Create/Update supplier. Attach a file to the `contract` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "contract",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Contract file (pdf, jpg, png, doc, docx — max 10 MB)."
+                                        }
+                                    ]
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.contract_data;",
+                                            "    if (value) { pm.collectionVariables.set('supplier_contract_data', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
                             "name": "Create supplier",
                             "request": {
                                 "method": "POST",
@@ -1570,7 +1999,7 @@
                                 "description": "Requires `purchasing.add`. Only `name` required. `balance` starts at 0 and moves negative as POs are received — negative means we owe them.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Postman Demo Pharmaceutical Supplier\",\n    \"country\": \"Egypt\",\n    \"city\": \"Cairo\",\n    \"contact\": null,\n    \"email\": null,\n    \"phone\": null,\n    \"pay_terms\": \"Net 30\",\n    \"currency\": \"EGP\",\n    \"rating\": null,\n    \"status\": \"active\"\n}",
+                                    "raw": "{\n    \"name\": \"Postman Demo Pharmaceutical Supplier\",\n    \"country\": \"Egypt\",\n    \"city\": \"Cairo\",\n    \"contact\": null,\n    \"email\": null,\n    \"phone\": null,\n    \"pay_terms\": \"Net 30\",\n    \"currency\": \"EGP\",\n    \"rating\": null,\n    \"status\": \"active\",\n    \"address\": null,\n    \"contract_data\": \"{{supplier_contract_data}}\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -1595,6 +2024,24 @@
                             ]
                         },
                         {
+                            "name": "Get supplier",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/{{supplier_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "{{supplier_id}}"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view` or `accounting.view`. 404 for another tenant's supplier."
+                            }
+                        },
+                        {
                             "name": "Update supplier",
                             "request": {
                                 "method": "PUT",
@@ -1614,7 +2061,7 @@
                                         "{{supplier_id}}"
                                     ]
                                 },
-                                "description": "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it.",
+                                "description": "Requires `purchasing.edit`, and the supplier must belong to the caller's tenant (403 otherwise). Partial update — send only the fields to change. `name` stays unique per tenant, ignoring the supplier itself. `balance` can't be set here — only receiving POs moves it. Send a new `contract_data` (from Upload supplier contract) to replace the contract — the old file is deleted — or `null` to remove it.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n    \"contact\": \"Postman Demo Contact\",\n    \"phone\": \"+20 2 1234 5678\",\n    \"rating\": 4\n}",
@@ -1624,6 +2071,25 @@
                                         }
                                     }
                                 }
+                            }
+                        },
+                        {
+                            "name": "Download supplier contract",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/suppliers/{{supplier_id}}/contract",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "suppliers",
+                                        "{{supplier_id}}",
+                                        "contract"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view` or `accounting.view`. File download; 404 if the supplier has no contract, or belongs to another tenant."
                             }
                         }
                     ]
@@ -1690,7 +2156,7 @@
                                         "{{purchase_order_id}}"
                                     ]
                                 },
-                                "description": "Includes nested `lines`."
+                                "description": "Includes `lines_count` — the lines are paged by List purchase order lines."
                             }
                         },
                         {
@@ -1733,10 +2199,106 @@
                                             "    const json = pm.response.json();",
                                             "    const value = json?.data?.id;",
                                             "    if (value) { pm.collectionVariables.set('purchase_order_id', value); }",
-                                            "}",
-                                            "if (pm.response.code === 201) {",
-                                            "    const line = pm.response.json().data?.lines?.[0];",
-                                            "    if (line) { pm.collectionVariables.set('purchase_order_line_id', line.id); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "List purchase order lines",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}/lines?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{purchase_order_id}}",
+                                        "lines"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view`. Each line includes its `product`. Paginated (10 per page by default) — follow `links.next`. Saves the first line's id into `{{purchase_order_line_id}}` for Receive purchase order."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('purchase_order_line_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Upload supplier invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/invoices",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "invoices"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.approve`. **Step 1 of attaching the supplier's invoice** — jpg/png/pdf, max 5 MB. Returns `file_path`, saved into `{{purchase_order_invoice_path}}`, which you then send as `invoice_data.file_path` on Receive purchase order. Attach a file to the `invoice` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "invoice",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Supplier invoice (jpg, png, pdf — max 5 MB)."
+                                        }
+                                    ]
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.file_path;",
+                                            "    if (value) { pm.collectionVariables.set('purchase_order_invoice_path', value); }",
                                             "}"
                                         ]
                                     }
@@ -1764,16 +2326,35 @@
                                         "receive"
                                     ]
                                 },
-                                "description": "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by the Create Purchase Order request above — for a PO with more than one line, replace it with the specific line id you're receiving.",
+                                "description": "Requires `purchasing.approve` (not just `add`). Every PO line needs exactly one matching `receipts` entry by `line_id` — partial receiving isn't supported. Adds stock (create-or-topup by batch_no), decreases supplier balance, posts a balanced journal entry. Rejects a second call outright — check `stock_added` on the PO first if unsure.\n\n`{{purchase_order_line_id}}` is captured automatically by List purchase order lines above — for a PO with more than one line, replace it with the specific line id you're receiving.\n\n`invoice_data` (optional) records the supplier's own invoice: `invoice_no` is required when it's sent; `invoice_date`, `amount` and `file_path` (from Upload supplier invoice) are optional. It comes back as `supplier_invoice` on the PO.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"receipts\": [\n        {\n            \"line_id\": \"{{purchase_order_line_id}}\",\n            \"batch_no\": \"PO-BATCH-1\",\n            \"exp_date\": \"2028-01-01\",\n            \"mfg_date\": null,\n            \"rcv_date\": null\n        }\n    ]\n}",
+                                    "raw": "{\n    \"invoice_data\": {\n        \"invoice_no\": \"SUP-INV-4471\",\n        \"invoice_date\": \"2026-10-05\",\n        \"amount\": \"2280.00\",\n        \"file_path\": \"{{purchase_order_invoice_path}}\"\n    },\n    \"receipts\": [\n        {\n            \"line_id\": \"{{purchase_order_line_id}}\",\n            \"batch_no\": \"PO-BATCH-1\",\n            \"exp_date\": \"2028-01-01\",\n            \"mfg_date\": null,\n            \"rcv_date\": null\n        }\n    ]\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
                                         }
                                     }
                                 }
+                            }
+                        },
+                        {
+                            "name": "Download supplier invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/purchase-orders/{{purchase_order_id}}/invoice",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "purchase-orders",
+                                        "{{purchase_order_id}}",
+                                        "invoice"
+                                    ]
+                                },
+                                "description": "Requires `purchasing.view`. File download; 404 if the PO has no supplier invoice file, or belongs to another tenant."
                             }
                         },
                         {
@@ -1960,7 +2541,89 @@
                                         "{{sales_order_id}}"
                                     ]
                                 },
-                                "description": "Includes nested `lines`. 403 if a Sales Rep requests another rep's order."
+                                "description": "Includes `lines_count` and `invoices_count` — paged by List sales order lines / List sales order invoices. 403 if a Sales Rep requests another rep's order."
+                            }
+                        },
+                        {
+                            "name": "List sales order lines",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}/lines?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}",
+                                        "lines"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Same access as Get sales order. Each line includes its `product`. Paginated (10 per page by default) — follow `links.next`."
+                            }
+                        },
+                        {
+                            "name": "List sales order invoices",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}/invoices?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}",
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Same access as Get sales order. Paginated (10 per page by default) — follow `links.next`."
                             }
                         },
                         {
@@ -2030,7 +2693,7 @@
                                         "status"
                                     ]
                                 },
-                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.\n\nGoes straight to `delivered` (skipping `invoiced`) so this one call populates both `{{invoice_id}}` and `{{delivery_id}}` for the Invoices/Deliveries/Collections requests below — change the body to `invoiced` if you want to see that intermediate state instead.",
+                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole lifecycle: `draft → picking/invoiced/delivered/cancelled`, `picking → invoiced/delivered/cancelled`, `invoiced → delivered`. First transition to `invoiced`/`delivered` deducts stock (FEFO), auto-creates the invoice + a balanced journal entry, and (on `delivered`) the delivery record. Idempotent — re-running or advancing further never repeats these.\n\nGoes straight to `delivered` (skipping `invoiced`). The response includes `invoices_count` and the `delivery` (saved into `{{delivery_id}}`); the next request saves the invoice into `{{invoice_id}}` for the Invoices/Collections requests below — change the body to `invoiced` if you want to see that intermediate state instead.",
                                 "body": {
                                     "mode": "raw",
                                     "raw": "{\n    \"status\": \"delivered\"\n}",
@@ -2048,11 +2711,64 @@
                                         "type": "text/javascript",
                                         "exec": [
                                             "if (pm.response.code === 200) {",
-                                            "    const json = pm.response.json();",
-                                            "    const invoice = json.data?.invoices?.[0];",
-                                            "    if (invoice) { pm.collectionVariables.set('invoice_id', invoice.id); }",
-                                            "    const delivery = json.data?.delivery;",
+                                            "    const delivery = pm.response.json().data?.delivery;",
                                             "    if (delivery) { pm.collectionVariables.set('delivery_id', delivery.id); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "List sales order invoices (after status update)",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}/invoices?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}",
+                                        "invoices"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "The invoice created by the status update above, saved into `{{invoice_id}}`."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('invoice_id', value); }",
                                             "}"
                                         ]
                                     }
@@ -2123,7 +2839,89 @@
                                         "{{invoice_id}}"
                                     ]
                                 },
-                                "description": "Includes `lines` (mirrored from the originating order) and `collections`."
+                                "description": "Includes `lines_count` (lines mirrored from the originating order) and `collections_count` — paged by the two requests below."
+                            }
+                        },
+                        {
+                            "name": "List invoice lines",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{invoice_id}}/lines?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "lines"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Same access as Get invoice. The originating sales order's lines. Paginated (10 per page by default) — follow `links.next`."
+                            }
+                        },
+                        {
+                            "name": "List invoice collections",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{invoice_id}}/collections?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "collections"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_by",
+                                            "value": "id",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "sort_dir",
+                                            "value": "desc",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Same access as Get invoice. Payments recorded against this invoice. Paginated (10 per page by default) — follow `links.next`."
                             }
                         }
                     ]
@@ -2193,10 +2991,59 @@
                             }
                         },
                         {
+                            "name": "Upload delivery invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries/invoices",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries",
+                                        "invoices"
+                                    ]
+                                },
+                                "description": "Requires `sales.edit`. **Step 1 of attaching the delivered invoice** (e.g. the copy signed by the customer) — jpg/png/pdf, max 5 MB. Returns `invoice_data` (the stored path), saved into `{{delivery_invoice_data}}`, which you then send as `invoice_data` on Mark delivery delivered. Attach a file to the `invoice` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.",
+                                "body": {
+                                    "mode": "formdata",
+                                    "formdata": [
+                                        {
+                                            "key": "invoice",
+                                            "type": "file",
+                                            "src": [],
+                                            "description": "Delivered invoice (jpg, png, pdf — max 5 MB)."
+                                        }
+                                    ]
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.invoice_data;",
+                                            "    if (value) { pm.collectionVariables.set('delivery_invoice_data', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
                             "name": "Mark delivery delivered",
                             "request": {
                                 "method": "PUT",
-                                "header": [],
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
                                 "url": {
                                     "raw": "{{base_url}}/deliveries/{{delivery_id}}/deliver",
                                     "host": [
@@ -2208,7 +3055,35 @@
                                         "deliver"
                                     ]
                                 },
-                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition."
+                                "description": "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition. `invoice_data` (optional) is the path from Upload delivery invoice; a new one replaces the previous file, which is deleted. Omit it to keep the current one.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"invoice_data\": \"{{delivery_invoice_data}}\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Download delivery invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries/{{delivery_id}}/invoice",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries",
+                                        "{{delivery_id}}",
+                                        "invoice"
+                                    ]
+                                },
+                                "description": "Requires `sales.view` (+ ownership if Sales Rep). File download; 404 if the delivery has no invoice file, or belongs to another tenant."
                             }
                         }
                     ]
@@ -2402,6 +3277,39 @@
                                         }
                                     }
                                 }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('return_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get return",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/returns/{{return_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "returns",
+                                        "{{return_id}}"
+                                    ]
+                                },
+                                "description": "Requires `sales.view` or `purchasing.view`. Includes nested invoice/customer/supplier/product/warehouse. 404 for another tenant's return."
                             }
                         }
                     ]
@@ -2489,6 +3397,24 @@
                     ]
                 },
                 {
+                    "name": "Get account",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/chart-of-accounts/{{expense_account_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "chart-of-accounts",
+                                "{{expense_account_id}}"
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Uses `{{expense_account_id}}` (account 6200), captured by Chart of accounts. 404 for another tenant's account."
+                    }
+                },
+                {
                     "name": "Journal entries",
                     "request": {
                         "method": "GET",
@@ -2539,7 +3465,81 @@
                                 }
                             ]
                         },
-                        "description": "Requires `accounting.view`. Includes nested `lines`. No POST — entries only come from business events auto-posting. Exported rows summarize lines into one column rather than one row per line."
+                        "description": "Requires `accounting.view`. Includes `lines_count` (lines are paged per entry by List journal entry lines). No POST — entries only come from business events auto-posting. Exported rows still summarize every line into one column.\n\nSaves the first entry's id into `{{journal_entry_id}}` for Get journal entry."
+                    },
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                    "    const json = pm.response.json();",
+                                    "    const value = json?.data[0]?.id;",
+                                    "    if (value) { pm.collectionVariables.set('journal_entry_id', value); }",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "Get journal entry",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/journal-entries/{{journal_entry_id}}",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "journal-entries",
+                                "{{journal_entry_id}}"
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Includes `lines_count` — the lines are paged by List journal entry lines. 404 for another tenant's entry."
+                    }
+                },
+                {
+                    "name": "List journal entry lines",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/journal-entries/{{journal_entry_id}}/lines?page=1&per_page=10&sort_by=id&sort_dir=desc",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "journal-entries",
+                                "{{journal_entry_id}}",
+                                "lines"
+                            ],
+                            "query": [
+                                {
+                                    "key": "page",
+                                    "value": "1",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "per_page",
+                                    "value": "10",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_by",
+                                    "value": "id",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "sort_dir",
+                                    "value": "desc",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "Requires `accounting.view`. Each line includes its `account`. Paginated (10 per page by default) — follow `links.next`."
                     }
                 },
                 {
@@ -3487,7 +4487,40 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes."
+                                "description": "Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.\n\nSaves the first entry's id into `{{audit_log_id}}`."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('audit_log_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get audit log entry",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/audit-log/{{audit_log_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "audit-log",
+                                        "{{audit_log_id}}"
+                                    ]
+                                },
+                                "description": "Requires `admin.audit`. Includes `prev_values`/`new_values`. 404 for another tenant's entry."
                             }
                         },
                         {
@@ -3549,7 +4582,40 @@
                                         }
                                     ]
                                 },
-                                "description": "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data."
+                                "description": "Any authenticated user — own inbox (personal + broadcast, `user_id: null`). Not exportable — it's a personal inbox, not business data.\n\nSaves the first notification's id into `{{notification_id}}`."
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data[0]?.id;",
+                                            "    if (value) { pm.collectionVariables.set('notification_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get notification",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/notifications/{{notification_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "notifications",
+                                        "{{notification_id}}"
+                                    ]
+                                },
+                                "description": "Own or broadcast only — another user's notification is 404. Does not mark it read."
                             }
                         },
                         {
@@ -3648,6 +4714,39 @@
                                         }
                                     }
                                 }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('discarded_action_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "Get discarded action",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/discarded-actions/{{discarded_action_id}}",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "discarded-actions",
+                                        "{{discarded_action_id}}"
+                                    ]
+                                },
+                                "description": "Requires `admin.view`. Includes the full `payload`. 404 for another tenant's action."
                             }
                         }
                     ]

@@ -1,0 +1,11 @@
+{
+    "name": "Recap",
+    "alias": "recap",
+    "description": "",
+    "keywords": [],
+    "priority": 0,
+    "providers": [
+        "Modules\\Recap\\Providers\\RecapServiceProvider"
+    ],
+    "files": []
+}

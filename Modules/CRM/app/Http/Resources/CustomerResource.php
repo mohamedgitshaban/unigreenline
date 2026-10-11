@@ -27,19 +27,13 @@ class CustomerResource extends JsonResource
             'pay_terms' => $this->pay_terms,
             'balance' => $this->balance,
             'status' => $this->status,
-            'visits' => CustomerVisitResource::collection($this->whenLoaded('visits')),
+            // Paginated at GET /customers/{id}/visits, /orders and /invoices.
             // orders/invoices aren't Eloquent relations on this model (Sales
             // already depends on CRM for Customer; the reverse would create
-            // a cycle) — the controller attaches them as plain attributes
-            // for the show endpoint only.
-            'orders' => $this->when(
-                array_key_exists('orders', $this->resource->getAttributes()),
-                fn () => $this->orders
-            ),
-            'invoices' => $this->when(
-                array_key_exists('invoices', $this->resource->getAttributes()),
-                fn () => $this->invoices
-            ),
+            // a cycle) — the controller selects those two counts as subqueries.
+            'visits_count' => $this->whenCounted('visits'),
+            'orders_count' => $this->whenCounted('orders'),
+            'invoices_count' => $this->whenCounted('invoices'),
         ];
     }
 }

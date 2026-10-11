@@ -21,6 +21,9 @@ class SupplierResource extends JsonResource
             'currency' => $this->currency,
             'balance' => $this->balance,
             'rating' => $this->rating,
+            'address' => $this->address,
+            'contract_data' => $this->contract_data,
+            'contract_url' => $this->contract_data !== null ? url("/api/v1/suppliers/{$this->id}/contract") : null,
             'status' => $this->status,
         ];
     }

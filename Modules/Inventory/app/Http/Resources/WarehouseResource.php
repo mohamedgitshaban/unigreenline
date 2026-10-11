@@ -23,7 +23,8 @@ class WarehouseResource extends JsonResource
             'phone' => $this->phone,
             'status' => $this->status,
             'stock_value' => $this->stock_value,
-            'batches' => InventoryBatchResource::collection($this->whenLoaded('batches')),
+            // Paginated at GET /warehouses/{id}/batches.
+            'batches_count' => $this->whenCounted('batches'),
         ];
     }
 }

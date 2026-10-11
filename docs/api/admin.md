@@ -73,6 +73,11 @@ Each row includes `prev_hash`/`entry_hash` (spec §5.7) so the frontend can
 display or spot-check the tamper-evident chain, not just the business
 fields.
 
+### `GET /api/v1/audit-log/{id}`
+
+Requires `admin.audit`. A single entry, including `prev_values`/`new_values`.
+**404** — the entry belongs to another account.
+
 ### `POST /api/v1/audit-log/verify-integrity`
 
 Requires `admin.audit`. Re-walks the entire chain and reports the first row
@@ -100,6 +105,12 @@ user's own inbox.
 
 Paginated, newest first (sortable — see README's "Sorting a list"). Returns notifications where `user_id` is the
 caller's own id, or `user_id` is `null` (broadcast — spec §4.14).
+
+### `GET /api/v1/notifications/{id}`
+
+A single notification. Same visibility as the list — the caller's own or a
+broadcast; anything else (another user's, another account's) is **404**.
+Does not mark it read.
 
 ### `PUT /api/v1/notifications/read-all`
 
@@ -140,6 +151,11 @@ Any authenticated user — saves their own abandoned form.
 
 Requires `admin.view`. Tenant-wide list (not scoped to the caller) — the
 admin screen for reviewing everyone's discarded drafts.
+
+### `GET /api/v1/discarded-actions/{id}`
+
+Requires `admin.view`. A single discarded action, including its full
+`payload`. **404** — the action belongs to another account.
 
 ---
 

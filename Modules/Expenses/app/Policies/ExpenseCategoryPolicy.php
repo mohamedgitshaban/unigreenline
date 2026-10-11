@@ -23,4 +23,9 @@ class ExpenseCategoryPolicy
     {
         return $user->can('expenses.edit');
     }
+
+    public function delete(User $user): bool
+    {
+        return $user->can('expenses.delete');
+    }
 }

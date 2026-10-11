@@ -26,4 +26,9 @@ class WarehousePolicy
     {
         return $user->can('inventory.edit') && $warehouse->isVisibleTo($user);
     }
+
+    public function delete(User $user, Warehouse $warehouse): bool
+    {
+        return $user->can('inventory.delete') && $warehouse->isVisibleTo($user);
+    }
 }

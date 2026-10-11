@@ -52,7 +52,7 @@ class CustomerIndexShowTest extends TestCase
         $this->assertCount(3, $response->json('data'));
     }
 
-    public function test_show_includes_orders_invoices_and_visits(): void
+    public function test_show_includes_order_invoice_and_visit_counts(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
@@ -68,9 +68,14 @@ class CustomerIndexShowTest extends TestCase
         $response = $this->getJson("/api/v1/customers/{$customer->id}");
 
         $response->assertOk();
-        $response->assertJsonPath('data.orders.0.id', $order->id);
-        $response->assertJsonPath('data.invoices.0.id', $invoice->id);
-        $response->assertJsonPath('data.visits.0.id', $visit->id);
+        $response->assertJsonPath('data.orders_count', 1);
+        $response->assertJsonPath('data.invoices_count', 1);
+        $response->assertJsonPath('data.visits_count', 1);
+        $response->assertJsonMissingPath('data.orders');
+
+        $this->getJson("/api/v1/customers/{$customer->id}/orders")->assertOk()->assertJsonPath('data.0.id', $order->id);
+        $this->getJson("/api/v1/customers/{$customer->id}/invoices")->assertOk()->assertJsonPath('data.0.id', $invoice->id);
+        $this->getJson("/api/v1/customers/{$customer->id}/visits")->assertOk()->assertJsonPath('data.0.id', $visit->id);
     }
 
     public function test_sales_rep_cannot_view_another_reps_customer(): void

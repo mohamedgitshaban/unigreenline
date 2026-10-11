@@ -15,6 +15,12 @@ class AuditLogController extends Controller
 {
     use Exportable, Filterable, Sortable;
 
+    private const RELATIONS = [
+        'user',
+        'user.roles.permissions',
+        'user.permissions',
+    ];
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     public function index(Request $request)
@@ -26,11 +32,7 @@ class AuditLogController extends Controller
             ->when($request->filled('module'), fn ($query) => $query->where('module', $request->query('module')))
             ->when($request->filled('entity_type'), fn ($query) => $query->where('entity_type', $request->query('entity_type')));
 
-        $query->with([
-            'user',
-            'user.roles.permissions',
-            'user.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['user_name', 'module', 'entity_type', 'entity_id', 'operation', 'ip_address', 'request_id']);
 
@@ -48,6 +50,18 @@ class AuditLogController extends Controller
         $entries = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return AuditLogResource::collection($entries);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        $this->authorize('admin.audit');
+
+        $auditLog = AuditLog::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
+
+        return new AuditLogResource($auditLog);
     }
 
     /**

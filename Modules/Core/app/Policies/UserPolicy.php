@@ -25,4 +25,9 @@ class UserPolicy
     {
         return $user->can('admin.edit');
     }
+
+    public function delete(User $user, User $target): bool
+    {
+        return $user->can('admin.delete');
+    }
 }

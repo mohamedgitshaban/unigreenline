@@ -27,9 +27,13 @@ there are usually few enough accounts that one page covers it).
 }
 ```
 
+## `GET /api/v1/chart-of-accounts/{id}`
+
+A single account, same shape as a list row. **404** — the account belongs to another account.
+
 ## `GET /api/v1/journal-entries`
 
-Paginated, includes nested `lines`. Optional `?start_date=&end_date=` filter
+Paginated, includes `lines_count`. Optional `?start_date=&end_date=` filter
 on `entry_date`.
 
 ```json
@@ -38,11 +42,7 @@ on `entry_date`.
     {
       "id": "01m...", "created_by": "01m...", "ref": "<invoice id>",
       "description": "Invoice for sales order ...", "entry_date": "2026-09-20", "posted": true,
-      "lines": [
-        { "id": "01m...", "account_id": "01m...", "account_code": "1200", "account_name": "Accounts Receivable", "debit": "741.00", "credit": "0.00" },
-        { "id": "01m...", "account_id": "01m...", "account_code": "4100", "account_name": "Sales Revenue", "debit": "0.00", "credit": "650.00" },
-        { "id": "01m...", "account_id": "01m...", "account_code": "2300", "account_name": "VAT Payable", "debit": "0.00", "credit": "91.00" }
-      ]
+      "lines_count": 3
     }
   ]
 }
@@ -51,6 +51,28 @@ There's no `POST` here — entries only come from business events auto-posting
 (invoice creation, collections, PO receiving).
 
 ---
+
+## `GET /api/v1/journal-entries/{id}`
+
+A single entry with `lines_count`. **404** — the entry belongs to another account.
+
+## `GET /api/v1/journal-entries/{id}/lines`
+
+Requires `accounting.view`. The entry's debit/credit lines as their own
+list. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
+
+```json
+{
+  "data": [
+    { "id": "01m...", "account": { "id": "01m...", "code": "1200", "...": "" }, "account_code": "1200", "account_name": "Accounts Receivable", "debit": "741.00", "credit": "0.00" },
+    { "id": "01m...", "account": { "...": "" }, "account_code": "4100", "account_name": "Sales Revenue", "debit": "0.00", "credit": "650.00" }
+  ],
+  "links": { "...": "" }, "meta": { "...": "" }
+}
+```
+
+The CSV/XLSX export of `GET /journal-entries` still flattens every line
+into one column per entry.
 
 ## `GET /api/v1/reports/balance-sheet`
 

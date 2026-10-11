@@ -46,6 +46,6 @@ class AccountSeederTest extends TestCase
         $this->seed(AccountSeeder::class);
         $this->seed(AccountSeeder::class);
 
-        $this->assertSame(21, Account::query()->count());
+        $this->assertSame(23, Account::query()->count());
     }
 }

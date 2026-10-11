@@ -25,4 +25,9 @@ class ProductPolicy
     {
         return $user->can('inventory.edit');
     }
+
+    public function delete(User $user): bool
+    {
+        return $user->can('inventory.delete');
+    }
 }

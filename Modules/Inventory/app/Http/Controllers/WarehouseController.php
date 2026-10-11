@@ -6,17 +6,27 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreWarehouseRequest;
 use Modules\Inventory\Http\Requests\UpdateWarehouseRequest;
+use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\WarehouseResource;
+use Modules\Inventory\Imports\WarehouseImport;
 use Modules\Inventory\Models\Warehouse;
 
 class WarehouseController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+
+    private const RELATIONS = [
+        'manager',
+        'manager.roles.permissions',
+        'manager.permissions',
+    ];
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -28,11 +38,7 @@ class WarehouseController extends Controller
             ->where('tenant_id', $request->user()->tenant_id)
             ->visibleTo($request->user());
 
-        $query->with([
-            'manager',
-            'manager.roles.permissions',
-            'manager.permissions',
-        ]);
+        $query->with(self::RELATIONS)->withCount('batches');
 
         $this->applyFilters($request, $query, ['name', 'city', 'governorate', 'address', 'manager_name', 'phone']);
 
@@ -52,11 +58,39 @@ class WarehouseController extends Controller
         return WarehouseResource::collection($warehouses);
     }
 
-    public function show(Warehouse $warehouse)
+    public function show(Request $request, string $id)
     {
+        $warehouse = $this->findForTenant($request, $id);
+
         $this->authorize('view', $warehouse);
 
-        return new WarehouseResource($warehouse->load('batches.product'));
+        return new WarehouseResource($warehouse);
+    }
+
+    /**
+     * The warehouse's batches as their own paginated list.
+     */
+    public function batches(Request $request, string $id)
+    {
+        $warehouse = Warehouse::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->findOrFail($id);
+
+        $this->authorize('view', $warehouse);
+
+        $query = $warehouse->batches()->getQuery()->with([
+            'product',
+            'product.category',
+            'product.supplier',
+        ]);
+
+        $this->applyFilters($request, $query, ['batch_no', 'product.name', 'product.sku']);
+
+        $this->applySorting($request, $query);
+
+        $batches = $query->paginate($request->integer('per_page', 10))->withQueryString();
+
+        return InventoryBatchResource::collection($batches);
     }
 
     public function store(StoreWarehouseRequest $request)
@@ -82,7 +116,7 @@ class WarehouseController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return new WarehouseResource($warehouse);
+        return (new WarehouseResource($this->findForTenant($request, $warehouse->id)))->response()->setStatusCode(201);
     }
 
     public function update(UpdateWarehouseRequest $request, Warehouse $warehouse)
@@ -109,6 +143,34 @@ class WarehouseController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return new WarehouseResource($warehouse);
+        return new WarehouseResource($this->findForTenant($request, $warehouse->id));
+    }
+
+    private function findForTenant(Request $request, string $id): Warehouse
+    {
+        return Warehouse::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->withCount('batches')
+            ->findOrFail($id);
+    }
+
+    public function destroy(Request $request, Warehouse $warehouse)
+    {
+        return $this->destroyRecord($request, $warehouse, 'inventory', 'Warehouse');
+    }
+
+    public function import(Request $request)
+    {
+        $this->authorize('create', Warehouse::class);
+
+        return $this->runImport($request, new WarehouseImport($request->user()));
+    }
+
+    public function importTemplate(Request $request)
+    {
+        $this->authorize('create', Warehouse::class);
+
+        return $this->templateResponse(new WarehouseImport($request->user()), 'warehouses');
     }
 }

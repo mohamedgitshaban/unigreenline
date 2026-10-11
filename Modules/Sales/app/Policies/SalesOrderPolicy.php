@@ -42,4 +42,14 @@ class SalesOrderPolicy
 
         return true;
     }
+
+    public function update(User $user, SalesOrder $salesOrder): bool
+    {
+        return $this->updateStatus($user, $salesOrder);
+    }
+
+    public function delete(User $user, SalesOrder $salesOrder): bool
+    {
+        return $user->can('sales.delete') && (! $user->hasRole('Sales Rep') || $salesOrder->sales_rep_id === $user->id);
+    }
 }

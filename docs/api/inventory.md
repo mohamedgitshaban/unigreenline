@@ -41,26 +41,31 @@ Requires `inventory.view`.
 
 ## `GET /api/v1/warehouses/{id}`
 
-Requires `inventory.view` + the warehouse being visible to this user. Includes
-nested `batches`.
+Requires `inventory.view` + the warehouse being visible to this user.
 
-**200** — same shape as above, plus:
-```json
-{
-  "data": {
-    "...": "warehouse fields",
-    "batches": [
-      {
-        "id": "01m...", "product_id": "01m...", "warehouse_id": "01m...",
-        "batch_no": "PRD-00001-B1", "mfg_date": "2026-06-17", "exp_date": "2028-03-17",
-        "rcv_date": "2026-08-18", "qty_cartons": 150, "qty_packs": 0, "cost_per_carton": "900.00"
-      }
-    ]
-  }
-}
-```
+**200** — same shape as above, plus `"batches_count": 12`. The batches
+themselves are paged by the endpoint below.
 
 **403** — warehouse exists but isn't assigned to this user.
+
+## `GET /api/v1/warehouses/{id}/batches`
+
+Same access as the warehouse show (**403** if it isn't assigned to this
+user). Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. Each batch includes its `product`; `search` matches
+`batch_no` and the product's name/SKU.
+
+```json
+{
+  "data": [
+    {
+      "id": "01m...", "product": { "id": "01m...", "name": "Oxytetracycline 20% Injectable", "...": "" },
+      "batch_no": "PRD-00001-B1", "mfg_date": "2026-06-17", "exp_date": "2028-03-17",
+      "rcv_date": "2026-08-18", "qty_cartons": 150, "qty_packs": 0, "cost_per_carton": "900.00"
+    }
+  ],
+  "links": { "...": "" }, "meta": { "...": "" }
+}
+```
 
 ## `POST /api/v1/warehouses`
 
@@ -77,7 +82,7 @@ Requires `inventory.add`. `manager_name` is derived server-side from
 ```
 Only `name`, `city`, `governorate` are required.
 
-**201** — the created warehouse (same shape as show, without batches).
+**201** — the created warehouse (same shape as show).
 
 ## `PUT /api/v1/warehouses/{id}`
 
@@ -91,7 +96,46 @@ Requires `inventory.view`. Not warehouse-scoped (catalog-wide).
 
 ## `GET /api/v1/products/{id}`
 
-Includes nested `batches` (same shape as the warehouse show endpoint's batches).
+Includes `batches_count`; the batches themselves are paged by the endpoint
+below.
+
+## `GET /api/v1/products/{id}/batches`
+
+Requires `inventory.view`. The product's batches as a normal paginated list —
+**10 per page by default**, `?per_page=` to change it. Each batch includes its
+`warehouse`.
+
+```
+GET /api/v1/products/{id}/batches?per_page=10
+GET /api/v1/products/{id}/batches?per_page=10&page=2
+GET /api/v1/products/{id}/batches?sort_by=exp_date&sort_dir=asc          (earliest expiry first — FEFO)
+GET /api/v1/products/{id}/batches?filter[warehouse_id]=01m...&filter[qty_cartons][gt]=0
+```
+
+```json
+{
+  "data": [
+    {
+      "id": "01m...",
+      "warehouse": { "id": "01m...", "name": "Main Warehouse", "...": "full warehouse object" },
+      "batch_no": "PRD-00001-B1",
+      "mfg_date": "2026-06-30", "exp_date": "2028-03-30", "rcv_date": "2026-08-31",
+      "qty_cartons": 150, "qty_packs": 0, "cost_per_carton": "900.00"
+    }
+  ],
+  "links": {
+    "first": ".../api/v1/products/01m.../batches?per_page=10&page=1",
+    "last": ".../api/v1/products/01m.../batches?per_page=10&page=12",
+    "prev": null,
+    "next": ".../api/v1/products/01m.../batches?per_page=10&page=2"
+  },
+  "meta": { "current_page": 1, "last_page": 12, "per_page": 10, "total": 120, "...": "" }
+}
+```
+
+`links.next` is `null` on the last page. `search` matches `batch_no` and the
+warehouse name; sorting and `filter[...]` work as described in the README.
+**404** — the product belongs to another account.
 
 ## `POST /api/v1/products`
 
@@ -135,6 +179,10 @@ Requires `inventory.edit`. All fields optional.
 ## `GET /api/v1/categories`
 
 Requires `inventory.view`.
+
+## `GET /api/v1/categories/{id}`
+
+Requires `inventory.view`. **404** — the category belongs to another account.
 
 ## `POST /api/v1/categories`
 

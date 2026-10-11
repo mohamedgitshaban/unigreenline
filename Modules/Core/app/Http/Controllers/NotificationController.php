@@ -32,6 +32,22 @@ class NotificationController extends Controller
     }
 
     /**
+     * Same visibility as the list: the caller's own notifications plus
+     * tenant-wide broadcasts (no user_id). Anything else is a 404.
+     */
+    public function show(Request $request, string $id)
+    {
+        $user = $request->user();
+
+        $notification = Notification::query()
+            ->where('tenant_id', $user->tenant_id)
+            ->where(fn (Builder $query) => $query->where('user_id', $user->id)->orWhereNull('user_id'))
+            ->findOrFail($id);
+
+        return new NotificationResource($notification);
+    }
+
+    /**
      * `unread` is a single flag per row, not per-viewer (spec §4.14 has no
      * per-user read-state table) — marking a broadcast notification (user_id
      * null) read here hides it for every user, not just the caller. This is

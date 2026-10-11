@@ -19,9 +19,10 @@ category returns **404**.
 
 Each category points at one **Expense-type** chart-of-accounts account
 (e.g. `6200` General & Administrative Expense) — approving an expense in
-that category debits it. There is no delete: retire a category with
-`active: false` (inactive categories can't take new expenses, existing ones
-keep it).
+that category debits it. `DELETE /api/v1/expense-categories/{id}` (needs
+`expenses.delete`) works only while no expense uses the category (otherwise
+409) — retire a used one with `active: false` (inactive categories can't take
+new expenses, existing ones keep it).
 
 ### `GET /api/v1/expense-categories`
 

@@ -14,7 +14,33 @@ with the same `GET/POST` shape every other reference entity gets
 
 ## `GET /api/v1/suppliers`
 
-Requires `purchasing.view`.
+Requires `purchasing.view` or `accounting.view`.
+
+## `GET /api/v1/suppliers/{id}`
+
+Same permissions as the list. **404** — the supplier belongs to another account.
+
+## `POST /api/v1/suppliers/contracts`
+
+Requires `purchasing.add` or `purchasing.edit`. **Step 1 of attaching a
+contract.** `multipart/form-data` with a single `contract` file — `pdf`,
+`jpg`, `jpeg`, `png`, `doc` or `docx`, max 10 MB.
+
+**201**
+```json
+{
+  "data": {
+    "contract_data": "supplier-contracts/01m.../a1b2c3.pdf",
+    "original_name": "egyvet-contract-2026.pdf",
+    "mime_type": "application/pdf",
+    "size": 482113
+  }
+}
+```
+
+Send `contract_data` on create/update to attach it. A path is only accepted
+if it was uploaded by this endpoint for your account, still exists, and isn't
+already attached to another supplier — otherwise `422`.
 
 ## `POST /api/v1/suppliers`
 
@@ -22,11 +48,16 @@ Requires `purchasing.add`. Only `name` is required.
 
 ```json
 {
-  "name": "EgyVet Pharmaceutical", "country": "Egypt", "city": "Cairo",
+  "name": "EgyVet Pharmaceutical", "country": "Egypt", "city": "Cairo", "address": null,
   "contact": null, "email": null, "phone": null,
-  "pay_terms": "Net 30", "currency": "EGP", "rating": null, "status": "active"
+  "pay_terms": "Net 30", "currency": "EGP", "rating": null, "status": "active",
+  "contract_data": "supplier-contracts/01m.../a1b2c3.pdf"
 }
 ```
+
+`contract_data` is optional — the path from `POST /suppliers/contracts`. The
+response includes it plus `contract_url` (the download link below, `null`
+when there's no contract).
 
 **201** — includes `balance`: the AP balance, **negative** means we owe
 them (per spec §4.5) — it starts at 0 and moves further negative every time
@@ -43,15 +74,33 @@ a supplier's own current name is fine.
 { "contact": "Ahmed Hassan", "rating": 5, "status": "inactive" }
 ```
 
+Send a new `contract_data` (from `POST /suppliers/contracts`) to replace the
+contract — the old file is deleted — or `null` to remove it. Omit it to keep
+the current one.
+
 **200** — the updated supplier. **422** if `name` is taken by another
 supplier. `balance` is not editable — it's ignored if sent; only receiving a
 PO moves it.
+
+## `GET /api/v1/suppliers/{id}/contract`
+
+Requires `purchasing.view` or `accounting.view`. Downloads the contract file
+(`contract-{id}.pdf` etc.) — this is what `contract_url` points at. Send the
+bearer token; it isn't a public link.
+
+**404** — the supplier has no contract, or belongs to another account.
 
 ---
 
 ## `GET /api/v1/purchase-orders`, `GET /api/v1/purchase-orders/{id}`
 
-Requires `purchasing.view`. Show includes `lines`.
+Requires `purchasing.view`. Includes `lines_count`.
+
+## `GET /api/v1/purchase-orders/{id}/lines`
+
+Requires `purchasing.view`. The PO's lines (each with its `product`) as
+their own list. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. A line's `id` is the `line_id` that receive
+expects.
 
 ## `POST /api/v1/purchase-orders`
 
@@ -73,7 +122,8 @@ cost_per_carton`. `order.subtotal = Σ line.total`, `order.tax_amount = Σ
 (line.total × product.tax_pct/100)`, `order.total = subtotal + tax_amount`.
 No discount field at this level — POs don't have one in the spec.
 
-**201** — the created PO, `status: "draft"`.
+**201** — the created PO, `status: "draft"`, with `lines_count`. Get the
+line ids from `GET /purchase-orders/{id}/lines`.
 
 ---
 
@@ -130,11 +180,29 @@ matched by `line_id` — partial receiving isn't supported in this build.
 **Request**
 ```json
 {
+  "invoice_data": {
+    "invoice_no": "SUP-INV-4471", "invoice_date": "2026-10-05", "amount": "2280.00",
+    "file_path": "purchase-order-invoices/01m.../a1b2c3.pdf"
+  },
   "receipts": [
     { "line_id": "01m...", "batch_no": "PO-BATCH-1", "exp_date": "2028-01-01", "mfg_date": null, "rcv_date": null }
   ]
 }
 ```
+
+`invoice_data` is **optional** — the supplier's own invoice that came with the
+goods. When sent, `invoice_no` is required; `invoice_date`, `amount` and
+`file_path` are optional. `file_path` must come from
+`POST /purchase-orders/invoices` (below). It comes back on the PO as:
+
+```json
+"supplier_invoice": {
+  "invoice_no": "SUP-INV-4471", "invoice_date": "2026-10-05", "amount": "2280.00",
+  "file_path": "purchase-order-invoices/01m.../a1b2c3.pdf",
+  "file_url": ".../api/v1/purchase-orders/01m.../invoice"
+}
+```
+(`null` on a PO received without one.)
 
 **On success**:
 - A batch is created (or topped up, if `batch_no` matches an existing one
@@ -146,14 +214,39 @@ matched by `line_id` — partial receiving isn't supported in this build.
 - A balanced journal entry posts: Dr Inventory (1300), Cr Accounts Payable
   (2100), both for the PO total.
 
-**200** — the PO with refreshed `lines`.
+**200** — the updated PO (with `lines_count` and `supplier_invoice`).
 
-**422** — a `receipts` entry is missing `exp_date`, the `receipts` array
+**422** — `invoice_data` without `invoice_no` or with a `file_path` not from
+the upload endpoint, a `receipts` entry is missing `exp_date`, the `receipts` array
 doesn't exactly cover every PO line, or the PO was already received (a
 second `receive` call is rejected, not silently ignored — if you need to
 know whether one already happened, check `stock_added` on the PO first).
 
 **403** — user has `purchasing.add` but not `purchasing.approve`.
+
+## `POST /api/v1/purchase-orders/invoices`
+
+Requires `purchasing.approve`. **Step 1 of attaching the supplier's invoice
+file.** `multipart/form-data` with a single `invoice` file — `jpg`, `jpeg`,
+`png` or `pdf`, max 5 MB.
+
+**201**
+```json
+{
+  "data": {
+    "file_path": "purchase-order-invoices/01m.../a1b2c3.pdf",
+    "original_name": "SUP-INV-4471.pdf", "mime_type": "application/pdf", "size": 91244
+  }
+}
+```
+
+Send `file_path` as `invoice_data.file_path` on receive.
+
+## `GET /api/v1/purchase-orders/{id}/invoice`
+
+Requires `purchasing.view`. Downloads the supplier invoice file
+(`supplier-invoice-{id}.pdf` etc.) — what `supplier_invoice.file_url` points
+at. **404** — no file attached, or the PO belongs to another account.
 
 ---
 

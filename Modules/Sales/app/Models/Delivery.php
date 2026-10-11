@@ -11,7 +11,7 @@ use Modules\Core\Models\Tenant;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Database\Factories\DeliveryFactory;
 
-#[Fillable(['tenant_id', 'so_id', 'invoice_id', 'customer_id', 'driver', 'delivery_date', 'status', 'delivered_at', 'notes'])]
+#[Fillable(['tenant_id', 'so_id', 'invoice_id', 'customer_id', 'driver', 'delivery_date', 'status', 'delivered_at', 'notes', 'invoice_data'])]
 class Delivery extends Model
 {
     use HasFactory, HasUlids;
@@ -22,6 +22,11 @@ class Delivery extends Model
             'delivery_date' => 'date',
             'delivered_at' => 'datetime',
         ];
+    }
+
+    public static function invoiceDirectory(string $tenantId): string
+    {
+        return "delivery-invoices/{$tenantId}";
     }
 
     public function tenant(): BelongsTo

@@ -5,6 +5,7 @@ namespace Modules\Expenses\Http\Controllers;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Expenses\Http\Requests\StoreExpenseCategoryRequest;
 use Modules\Expenses\Http\Requests\UpdateExpenseCategoryRequest;
@@ -12,12 +13,12 @@ use Modules\Expenses\Http\Resources\ExpenseCategoryResource;
 use Modules\Expenses\Models\ExpenseCategory;
 
 /**
- * No delete: categories referenced by expenses must stay, so retire one by
- * setting `active` to false — inactive categories can't take new expenses.
+ * A category referenced by expenses can't be deleted (409) — retire it by
+ * setting `active` to false instead; inactive categories can't take new expenses.
  */
 class ExpenseCategoryController extends Controller
 {
-    use Filterable, Sortable;
+    use Filterable, ManagesRecords, Sortable;
 
     public function index(Request $request)
     {
@@ -51,5 +52,10 @@ class ExpenseCategoryController extends Controller
         $expenseCategory->update($request->validated());
 
         return new ExpenseCategoryResource($expenseCategory->load('account'));
+    }
+
+    public function destroy(Request $request, ExpenseCategory $expenseCategory)
+    {
+        return $this->destroyRecord($request, $expenseCategory, 'expenses', 'ExpenseCategory');
     }
 }

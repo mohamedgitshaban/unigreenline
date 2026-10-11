@@ -9,7 +9,7 @@ use Modules\Core\Models\Tenant;
 /**
  * Standard Asset/Liability/Equity/Revenue/Expense hierarchy, codes 1000–6200
  * (spec §7). The exact codes the auto-posting logic in §5.3 depends on
- * (1110, 1120, 1200, 1300, 2100, 2300, 4100) are seeded here and must not
+ * (1110, 1120, 1200, 1300, 2100, 2300, 4100, 6300, 6400) are seeded here and must not
  * change without updating every caller of JournalPostingService::post().
  *
  * The prototype's exact seed figures beyond those named codes weren't
@@ -45,6 +45,8 @@ class AccountSeeder extends Seeder
         ['code' => '6000', 'name' => 'Operating Expenses', 'type' => 'Expense', 'level' => 1, 'parent' => null],
         ['code' => '6100', 'name' => 'Salaries Expense', 'type' => 'Expense', 'level' => 2, 'parent' => '6000'],
         ['code' => '6200', 'name' => 'General & Administrative Expense', 'type' => 'Expense', 'level' => 2, 'parent' => '6000'],
+        ['code' => '6300', 'name' => 'Inventory Write-off Expense', 'type' => 'Expense', 'level' => 2, 'parent' => '6000'],
+        ['code' => '6400', 'name' => 'Manufacturing Overhead Absorbed', 'type' => 'Expense', 'level' => 2, 'parent' => '6000'],
     ];
 
     public function run(): void

@@ -27,7 +27,7 @@ class RolePermissionSeederTest extends TestCase
 
         $administrator = Role::findByName('Administrator');
 
-        $this->assertSame(64, $administrator->permissions()->count());
+        $this->assertSame(80, $administrator->permissions()->count());
     }
 
     /**
@@ -54,7 +54,7 @@ class RolePermissionSeederTest extends TestCase
         $auditor = Role::findByName('Auditor');
         $permissions = $auditor->permissions()->pluck('name')->sort()->values()->all();
 
-        $this->assertCount(24, $permissions);
+        $this->assertCount(30, $permissions);
         $this->assertContains('inventory.view', $permissions);
         $this->assertContains('accounting.audit', $permissions);
         $this->assertNotContains('inventory.add', $permissions);

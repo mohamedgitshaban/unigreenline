@@ -16,9 +16,13 @@ Requires `crm.view`. Sales Rep sees only their own customers.
 
 ### `GET /api/v1/customers/{id}`
 
-Includes nested `orders`, `invoices` (from the Sales module — sales orders
-and invoices for this customer), and `visits` (below). `403` for a Sales
-Rep requesting another rep's customer.
+Includes `orders_count`, `invoices_count` and `visits_count`. `403` for a
+Sales Rep requesting another rep's customer.
+
+### `GET /api/v1/customers/{id}/orders`, `/invoices`, `/visits`
+
+The customer's sales orders, invoices and visits, each as its own list.
+Same access as the customer show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
 
 ### `POST /api/v1/customers`
 
@@ -49,6 +53,10 @@ Requires `crm.view`/`crm.add`. No update/delete endpoint (not in the spec's
 table). Same `type` enum as customers; `status`: `new` (default),
 `qualified`, `proposal`, `won`, `lost`.
 
+### `GET /api/v1/leads/{id}`
+
+Requires `crm.view`. Includes `assigned_to`. **404** — the lead belongs to another account.
+
 ---
 
 ## `GET/POST /api/v1/visits`
@@ -56,6 +64,10 @@ table). Same `type` enum as customers; `status`: `new` (default),
 Requires `crm.view`/`crm.add`. A rep logging a visit gets `rep_id`
 defaulted to themselves if omitted. `outcome`: `positive`, `neutral`,
 `negative`.
+
+### `GET /api/v1/visits/{id}`
+
+Requires `crm.view`. Includes the nested `customer` and `rep`. **404** — the visit belongs to another account.
 
 ---
 
@@ -65,6 +77,11 @@ defaulted to themselves if omitted. `outcome`: `positive`, `neutral`,
 
 Requires `crm.view`/`crm.add`. `priority` defaults to `medium`, `status`
 defaults to `investigating`.
+
+### `GET /api/v1/complaints/{id}`
+
+Requires `crm.view`. Includes the nested `customer`, `product` and
+`assigned_to`. **404** — the complaint belongs to another account.
 
 ### `PUT /api/v1/complaints/{id}/resolve`
 
@@ -84,6 +101,10 @@ required — `422` without it.
 
 Requires `crm.view`/`crm.add`. `status` defaults to `active`.
 
+### `GET /api/v1/campaigns/{id}`
+
+Requires `crm.view`. **404** — the campaign belongs to another account.
+
 ### `PUT /api/v1/campaigns/{id}/end`
 
 Requires `crm.edit`. Sets `status: "completed"` and fills `end_date` with
@@ -93,6 +114,7 @@ today if it wasn't already set.
 
 ## Not built in this step
 
-- Leads/visits/complaints/campaigns have no `PUT` (edit) beyond the
-  specific `resolve`/`end` actions — matches the spec's endpoint table.
-- No delete anywhere in CRM.
+- Customers, leads, visits, complaints and campaigns all take `PUT /{id}`
+  (needs `crm.edit`) and `DELETE /{id}` (needs `crm.delete`, which an admin can
+  grant to any role). A customer with sales orders or invoices can't be deleted
+  (409). `resolve`/`end` remain separate actions.

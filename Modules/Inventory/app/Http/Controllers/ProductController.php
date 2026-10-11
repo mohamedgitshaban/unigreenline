@@ -6,16 +6,29 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreProductRequest;
 use Modules\Inventory\Http\Requests\UpdateProductRequest;
+use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\ProductResource;
+use Modules\Inventory\Imports\ProductImport;
 use Modules\Inventory\Models\Product;
 
 class ProductController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+
+    private const RELATIONS = ['category', 'supplier'];
+
+    private const BATCH_RELATIONS = [
+        'warehouse',
+        'warehouse.manager',
+        'warehouse.manager.roles.permissions',
+        'warehouse.manager.permissions',
+    ];
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -25,11 +38,7 @@ class ProductController extends Controller
 
         $query = Product::query()->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'category',
-            'supplier',
-            'batches.warehouse',
-        ]);
+        $query->with(self::RELATIONS)->withCount('batches');
 
         $this->applyFilters($request, $query, ['name', 'sku', 'brand', 'category.name', 'supplier.name']);
 
@@ -49,11 +58,36 @@ class ProductController extends Controller
         return ProductResource::collection($products);
     }
 
-    public function show(Product $product)
+    public function show(Request $request, string $id)
     {
+        $product = $this->findForTenant($request, $id);
+
         $this->authorize('view', $product);
 
-        return new ProductResource($product->load(['category', 'supplier', 'batches.warehouse']));
+        return new ProductResource($product);
+    }
+
+    /**
+     * A product's batches as their own paginated list, so a product with
+     * many batches doesn't have to return all of them from show.
+     */
+    public function batches(Request $request, string $id)
+    {
+        $product = Product::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->findOrFail($id);
+
+        $this->authorize('view', $product);
+
+        $query = $product->batches()->getQuery()->with(self::BATCH_RELATIONS);
+
+        $this->applyFilters($request, $query, ['batch_no', 'warehouse.name']);
+
+        $this->applySorting($request, $query);
+
+        $batches = $query->paginate($request->integer('per_page', 10))->withQueryString();
+
+        return InventoryBatchResource::collection($batches);
     }
 
     public function store(StoreProductRequest $request)
@@ -75,7 +109,7 @@ class ProductController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return new ProductResource($product);
+        return (new ProductResource($this->findForTenant($request, $product->id)))->response()->setStatusCode(201);
     }
 
     public function update(UpdateProductRequest $request, Product $product)
@@ -98,6 +132,34 @@ class ProductController extends Controller
             'ip_address' => $request->ip(),
         ]);
 
-        return new ProductResource($product);
+        return new ProductResource($this->findForTenant($request, $product->id));
+    }
+
+    private function findForTenant(Request $request, string $id): Product
+    {
+        return Product::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->withCount('batches')
+            ->findOrFail($id);
+    }
+
+    public function destroy(Request $request, Product $product)
+    {
+        return $this->destroyRecord($request, $product, 'inventory', 'Product');
+    }
+
+    public function import(Request $request)
+    {
+        $this->authorize('create', Product::class);
+
+        return $this->runImport($request, new ProductImport($request->user()));
+    }
+
+    public function importTemplate(Request $request)
+    {
+        $this->authorize('create', Product::class);
+
+        return $this->templateResponse(new ProductImport($request->user()), 'products');
     }
 }

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Tenant;
 use Modules\Purchasing\Database\Factories\SupplierFactory;
 
-#[Fillable(['tenant_id', 'name', 'country', 'city', 'contact', 'email', 'phone', 'pay_terms', 'currency', 'rating', 'status'])]
+#[Fillable(['tenant_id', 'name', 'country', 'city', 'contact', 'email', 'phone', 'pay_terms', 'currency', 'rating', 'status', 'balance', 'address', 'contract_data'])]
 class Supplier extends Model
 {
     use HasFactory, HasUlids;
@@ -30,6 +30,16 @@ class Supplier extends Model
             'balance' => 'decimal:2',
             'rating' => 'integer',
         ];
+    }
+
+    /**
+     * File types accepted for a supplier contract upload.
+     */
+    public const CONTRACT_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'doc', 'docx'];
+
+    public static function contractDirectory(string $tenantId): string
+    {
+        return "supplier-contracts/{$tenantId}";
     }
 
     public function tenant(): BelongsTo

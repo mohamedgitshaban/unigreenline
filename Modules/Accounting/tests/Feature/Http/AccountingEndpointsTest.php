@@ -30,7 +30,7 @@ class AccountingEndpointsTest extends TestCase
         $response = $this->getJson('/api/v1/chart-of-accounts?per_page=100');
 
         $response->assertOk();
-        $this->assertCount(21, $response->json('data'));
+        $this->assertCount(23, $response->json('data'));
     }
 
     public function test_sales_rep_cannot_list_the_chart_of_accounts(): void
@@ -46,7 +46,7 @@ class AccountingEndpointsTest extends TestCase
         $response->assertForbidden();
     }
 
-    public function test_journal_entries_endpoint_returns_nested_lines(): void
+    public function test_journal_entries_endpoint_returns_a_line_count(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
@@ -64,7 +64,8 @@ class AccountingEndpointsTest extends TestCase
         $response = $this->getJson('/api/v1/journal-entries');
 
         $response->assertOk();
-        $response->assertJsonPath('data.0.lines.0.account_code', '1200');
+        $response->assertJsonPath('data.0.lines_count', 2);
+        $response->assertJsonMissingPath('data.0.lines');
     }
 
     public function test_balance_sheet_endpoint_returns_a_snapshot(): void

@@ -6,14 +6,22 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\CRM\Http\Requests\StoreCampaignRequest;
+use Modules\CRM\Http\Requests\UpdateCampaignRequest;
 use Modules\CRM\Http\Resources\CampaignResource;
 use Modules\CRM\Models\Campaign;
 
 class CampaignController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ManagesRecords, Sortable;
+
+    private const RELATIONS = [
+        'createdBy',
+        'createdBy.roles.permissions',
+        'createdBy.permissions',
+    ];
 
     public function index(Request $request)
     {
@@ -22,11 +30,7 @@ class CampaignController extends Controller
         $query = Campaign::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'createdBy',
-            'createdBy.roles.permissions',
-            'createdBy.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['name', 'type', 'target', 'description']);
 
@@ -44,6 +48,18 @@ class CampaignController extends Controller
         $campaigns = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return CampaignResource::collection($campaigns);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        $campaign = Campaign::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
+
+        $this->authorize('view', $campaign);
+
+        return new CampaignResource($campaign);
     }
 
     public function store(StoreCampaignRequest $request)
@@ -67,5 +83,17 @@ class CampaignController extends Controller
         ]);
 
         return new CampaignResource($campaign);
+    }
+
+    public function update(UpdateCampaignRequest $request, Campaign $campaign)
+    {
+        $this->updateRecord($request, $campaign, $request->validated(), 'crm', 'Campaign');
+
+        return new CampaignResource($campaign->load(self::RELATIONS));
+    }
+
+    public function destroy(Request $request, Campaign $campaign)
+    {
+        return $this->destroyRecord($request, $campaign, 'crm', 'Campaign');
     }
 }

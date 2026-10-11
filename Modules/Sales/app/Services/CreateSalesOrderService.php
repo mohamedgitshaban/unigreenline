@@ -42,36 +42,9 @@ class CreateSalesOrderService
     public function create(array $data): SalesOrder
     {
         $customer = Customer::findOrFail($data['customer_id']);
-        $products = Product::query()->whereIn('id', array_column($data['lines'], 'product_id'))->get()->keyBy('id');
+        ['lines' => $computedLines, 'subtotal' => $subtotal, 'tax' => $taxAmount, 'discount' => $invoiceDiscount, 'total' => $total] = $this->price($data['lines'], $data['invoice_discount'] ?? 0);
 
-        $computedLines = array_map(
-            fn (array $line) => $this->computeLine($line, $products[$line['product_id']]),
-            $data['lines']
-        );
-
-        $subtotal = round(array_sum(array_column($computedLines, 'subtotal')), 2);
-        $taxAmount = round(array_sum(array_column($computedLines, 'tax')), 2);
-        $invoiceDiscount = $data['invoice_discount'] ?? 0;
-        $total = round($subtotal + $taxAmount - $invoiceDiscount, 2);
-
-        if ($data['pay_type'] === 'credit') {
-            $this->enforceCreditLimit($customer, $total);
-        }
-
-        $fefoLines = array_map(
-            fn (array $line) => [
-                'product_id' => $line['product_id'],
-                'warehouse_id' => $data['warehouse_id'],
-                'cartons_needed' => $line['cartons_needed'],
-            ],
-            $computedLines
-        );
-
-        $shortfalls = $this->fefoStock->checkAvailability($fefoLines);
-
-        if ($shortfalls !== []) {
-            throw new InsufficientStockException($shortfalls);
-        }
+        $this->assertCanFulfil($customer, $data['pay_type'], $total, $computedLines, $data['warehouse_id']);
 
         return DB::transaction(function () use ($data, $customer, $computedLines, $subtotal, $taxAmount, $invoiceDiscount, $total) {
             $order = SalesOrder::create([
@@ -139,6 +112,59 @@ class CreateSalesOrderService
 
             return $order->load('lines');
         });
+    }
+
+    /**
+     * Prices every line and totals the order.
+     *
+     * @param  array<int, array{product_id: string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>  $lines
+     * @return array{lines: array<int, array<string, mixed>>, subtotal: float, tax: float, discount: float, total: float}
+     */
+    public function price(array $lines, float $invoiceDiscount = 0): array
+    {
+        $products = Product::query()->whereIn('id', array_column($lines, 'product_id'))->get()->keyBy('id');
+
+        $computedLines = array_map(
+            fn (array $line) => $this->computeLine($line, $products[$line['product_id']]),
+            $lines
+        );
+
+        $subtotal = round(array_sum(array_column($computedLines, 'subtotal')), 2);
+        $tax = round(array_sum(array_column($computedLines, 'tax')), 2);
+
+        return [
+            'lines' => $computedLines,
+            'subtotal' => $subtotal,
+            'tax' => $tax,
+            'discount' => $invoiceDiscount,
+            'total' => round($subtotal + $tax - $invoiceDiscount, 2),
+        ];
+    }
+
+    /**
+     * Credit-limit and FEFO stock-availability checks shared by create and
+     * update; neither writes anything.
+     *
+     * @param  array<int, array<string, mixed>>  $computedLines
+     */
+    public function assertCanFulfil(Customer $customer, string $payType, float $total, array $computedLines, string $warehouseId): void
+    {
+        if ($payType === 'credit') {
+            $this->enforceCreditLimit($customer, $total);
+        }
+
+        $shortfalls = $this->fefoStock->checkAvailability(array_map(
+            fn (array $line) => [
+                'product_id' => $line['product_id'],
+                'warehouse_id' => $warehouseId,
+                'cartons_needed' => $line['cartons_needed'],
+            ],
+            $computedLines
+        ));
+
+        if ($shortfalls !== []) {
+            throw new InsufficientStockException($shortfalls);
+        }
     }
 
     /**

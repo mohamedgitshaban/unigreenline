@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
+use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Http\Requests\StoreUserRequest;
 use Modules\Core\Http\Requests\UpdateUserRequest;
@@ -17,7 +18,7 @@ use Modules\Core\Services\AuditLogService;
 
 class UserController extends Controller
 {
-    use Exportable, Filterable, Sortable;
+    use Exportable, Filterable, ManagesRecords, Sortable;
 
     public function __construct(private readonly AuditLogService $auditLog) {}
 
@@ -26,7 +27,7 @@ class UserController extends Controller
         $this->authorize('viewAny', User::class);
 
         $query = User::query()
-            ->with('roles')
+            ->with(['roles.permissions', 'permissions'])
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('role'), fn ($query) => $query->role($request->query('role')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->query('status')));
@@ -136,6 +137,15 @@ class UserController extends Controller
         $user->setAttribute('warehouse_ids', $this->warehouseIds($user));
 
         return new UserResource($user);
+    }
+
+    public function destroy(Request $request, User $user)
+    {
+        abort_if($user->is($request->user()), 422, 'You cannot delete your own account.');
+
+        return $this->destroyRecord($request, $user, 'admin', 'User', function (User $user) {
+            $user->tokens()->delete();
+        });
     }
 
     /**

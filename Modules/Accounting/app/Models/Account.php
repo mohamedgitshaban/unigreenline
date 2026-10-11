@@ -19,6 +19,18 @@ class Account extends Model
     /** Account types whose balance increases on the debit side. */
     private const DEBIT_NORMAL_TYPES = ['Asset', 'Expense'];
 
+    /** @var array<int, string> */
+    public const TYPES = ['Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
+
+    /**
+     * Codes that auto-posting logic (sales, purchasing, expenses, recap,
+     * manufacturing) looks accounts up by. They can't be deleted, re-coded
+     * or re-typed.
+     *
+     * @var array<int, string>
+     */
+    public const SYSTEM_CODES = ['1110', '1120', '1200', '1300', '2100', '2300', '4100', '6300', '6400'];
+
     protected $table = 'chart_of_accounts';
 
     protected function casts(): array
@@ -28,6 +40,24 @@ class Account extends Model
             'balance' => 'decimal:2',
             'active' => 'boolean',
         ];
+    }
+
+    public function journalLines(): HasMany
+    {
+        return $this->hasMany(JournalLine::class);
+    }
+
+    public function isSystemAccount(): bool
+    {
+        return in_array($this->code, self::SYSTEM_CODES, true);
+    }
+
+    /**
+     * True when changing the code or type could corrupt existing postings.
+     */
+    public function isLocked(): bool
+    {
+        return $this->isSystemAccount() || $this->journalLines()->exists();
     }
 
     public function tenant(): BelongsTo

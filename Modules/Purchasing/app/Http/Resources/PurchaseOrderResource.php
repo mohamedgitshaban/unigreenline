@@ -25,7 +25,16 @@ class PurchaseOrderResource extends JsonResource
             'tax_amount' => $this->tax_amount,
             'total' => $this->total,
             'notes' => $this->notes,
-            'lines' => PurchaseOrderLineResource::collection($this->lines),
+            // Recorded on receive; null until then (or if none was sent).
+            'supplier_invoice' => $this->supplier_invoice_no !== null || $this->supplier_invoice_path !== null ? [
+                'invoice_no' => $this->supplier_invoice_no,
+                'invoice_date' => $this->supplier_invoice_date?->toDateString(),
+                'amount' => $this->supplier_invoice_amount,
+                'file_path' => $this->supplier_invoice_path,
+                'file_url' => $this->supplier_invoice_path !== null ? url("/api/v1/purchase-orders/{$this->id}/invoice") : null,
+            ] : null,
+            // Paginated at GET /purchase-orders/{id}/lines.
+            'lines_count' => $this->whenCounted('lines'),
         ];
     }
 }

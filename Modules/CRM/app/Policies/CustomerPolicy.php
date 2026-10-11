@@ -45,4 +45,9 @@ class CustomerPolicy
 
         return true;
     }
+
+    public function delete(User $user, Customer $customer): bool
+    {
+        return $user->can('crm.delete') && (! $user->hasRole('Sales Rep') || $customer->sales_rep_id === $user->id);
+    }
 }

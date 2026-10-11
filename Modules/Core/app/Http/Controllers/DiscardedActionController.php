@@ -15,6 +15,12 @@ class DiscardedActionController extends Controller
 {
     use Exportable, Filterable, Sortable;
 
+    private const RELATIONS = [
+        'user',
+        'user.roles.permissions',
+        'user.permissions',
+    ];
+
     public function index(Request $request)
     {
         $this->authorize('admin.view');
@@ -22,11 +28,7 @@ class DiscardedActionController extends Controller
         $query = DiscardedAction::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
-        $query->with([
-            'user',
-            'user.roles.permissions',
-            'user.permissions',
-        ]);
+        $query->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['user_name', 'type', 'label']);
 
@@ -44,6 +46,18 @@ class DiscardedActionController extends Controller
         $actions = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return DiscardedActionResource::collection($actions);
+    }
+
+    public function show(Request $request, string $id)
+    {
+        $this->authorize('admin.view');
+
+        $discardedAction = DiscardedAction::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->with(self::RELATIONS)
+            ->findOrFail($id);
+
+        return new DiscardedActionResource($discardedAction);
     }
 
     public function store(StoreDiscardedActionRequest $request)

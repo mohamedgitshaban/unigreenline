@@ -16,7 +16,7 @@ class WarehouseShowTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_returns_the_warehouse_with_its_batches(): void
+    public function test_returns_the_warehouse_with_a_batch_count(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
@@ -34,7 +34,26 @@ class WarehouseShowTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonPath('data.id', $warehouse->id);
-        $response->assertJsonPath('data.batches.0.id', $batch->id);
+        $response->assertJsonPath('data.batches_count', 1);
+
+        $this->getJson("/api/v1/warehouses/{$warehouse->id}/batches")
+            ->assertOk()
+            ->assertJsonPath('data.0.id', $batch->id)
+            ->assertJsonPath('data.0.product.id', $product->id);
+    }
+
+    public function test_batches_of_an_unassigned_warehouse_are_forbidden(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
+
+        $user = User::factory()->recycle($tenant)->create();
+        $user->assignRole('Warehouse Manager');
+        Sanctum::actingAs($user);
+
+        $warehouse = Warehouse::factory()->recycle($tenant)->create();
+
+        $this->getJson("/api/v1/warehouses/{$warehouse->id}/batches")->assertForbidden();
     }
 
     public function test_returns_403_when_the_warehouse_is_not_assigned_to_the_user(): void

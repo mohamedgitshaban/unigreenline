@@ -17,7 +17,8 @@ class JournalEntryResource extends JsonResource
             'description' => $this->description,
             'entry_date' => $this->entry_date->toDateString(),
             'posted' => $this->posted,
-            'lines' => JournalLineResource::collection($this->whenLoaded('lines')),
+            // Paginated at GET /journal-entries/{id}/lines.
+            'lines_count' => $this->whenCounted('lines'),
         ];
     }
 }

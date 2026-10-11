@@ -29,4 +29,22 @@ class InvoicePolicy
 
         return true;
     }
+
+    public function create(User $user): bool
+    {
+        return $user->can('sales.add');
+    }
+
+    public function void(User $user, Invoice $invoice): bool
+    {
+        if (! $user->can('sales.delete')) {
+            return false;
+        }
+
+        if ($user->hasRole('Sales Rep')) {
+            return $invoice->salesOrder?->sales_rep_id === $user->id;
+        }
+
+        return true;
+    }
 }

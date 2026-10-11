@@ -8,6 +8,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('expense-categories', [ExpenseCategoryController::class, 'index']);
     Route::post('expense-categories', [ExpenseCategoryController::class, 'store']);
     Route::put('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update']);
+    Route::delete('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'destroy']);
 
     Route::get('expenses', [ExpenseController::class, 'index']);
     Route::post('expenses', [ExpenseController::class, 'store']);

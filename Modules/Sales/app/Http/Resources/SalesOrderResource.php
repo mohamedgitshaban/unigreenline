@@ -28,8 +28,9 @@ class SalesOrderResource extends JsonResource
             'stock_deducted' => $this->stock_deducted,
             'notes' => $this->notes,
             'order_date' => $this->order_date->toDateString(),
-            'lines' => SalesOrderLineResource::collection($this->whenLoaded('lines')),
-            'invoices' => InvoiceResource::collection($this->whenLoaded('invoices')),
+            // Paginated at GET /sales-orders/{id}/lines and /sales-orders/{id}/invoices.
+            'lines_count' => $this->whenCounted('lines'),
+            'invoices_count' => $this->whenCounted('invoices'),
             // hasOne, and doesn't exist until the order reaches `delivered`
             // (UpdateSalesOrderStatusService::upsertDelivery) — eager-loaded
             // but genuinely null before that, so this can't just be

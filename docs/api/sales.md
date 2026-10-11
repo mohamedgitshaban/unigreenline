@@ -21,7 +21,13 @@ Requires `sales.view`. Paginated, newest `order_date` first.
 
 ## `GET /api/v1/sales-orders/{id}`
 
-Includes nested `lines`. `403` if a Sales Rep requests another rep's order.
+Includes `lines_count` and `invoices_count`. `403` if a Sales Rep requests
+another rep's order.
+
+## `GET /api/v1/sales-orders/{id}/lines`, `/invoices`
+
+The order's lines (each with its `product`) and invoices, each as its own
+list. Same access as the order show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
 
 ## `POST /api/v1/sales-orders`
 
@@ -140,11 +146,11 @@ repeats these):
 record is created (or updated) with `status: "delivered"` and a real
 `delivered_at` timestamp.
 
-**200** — the order, with `invoices` (array, empty until the first
-`invoiced`/`delivered` transition) and `delivery` (`null` until the order
-actually reaches `delivered`) refreshed. This is the only sales-order
-endpoint that includes these two — `GET /sales-orders`/`GET
-/sales-orders/{id}` don't, to avoid the extra joins on every list request.
+**200** — the order, with `invoices_count` (0 until the first
+`invoiced`/`delivered` transition — the invoice itself is at
+`GET /sales-orders/{id}/invoices`) and `delivery` (`null` until the order
+actually reaches `delivered`). This is the only sales-order endpoint that
+includes `delivery`.
 **422** — invalid transition, or insufficient stock (same shortfall shape
 as order creation).
 **403** — Sales Rep on someone else's order, or missing `sales.edit`.
@@ -155,9 +161,9 @@ as order creation).
 
 ### `GET /api/v1/invoices`, `GET /api/v1/invoices/{id}`
 
-Requires `sales.view` or `accounting.view`. Show includes `lines` (mirrored
-from the originating sales order — there's no separate invoice-lines table)
-and `collections`.
+Requires `sales.view` or `accounting.view`. Includes `lines_count` (lines
+are mirrored from the originating sales order — there's no separate
+invoice-lines table) and `collections_count`.
 
 ```json
 {
@@ -166,8 +172,8 @@ and `collections`.
     "issued_date": "2026-09-18", "due_date": null,
     "subtotal": "650.00", "tax_amount": "91.00", "total": "741.00",
     "paid": "300.00", "balance": "441.00", "status": "partial",
-    "lines": [ "...sales order lines..." ],
-    "collections": [ "...collections below..." ]
+    "lines_count": 3,
+    "collections_count": 1
   }
 }
 ```
@@ -175,6 +181,12 @@ and `collections`.
 (paid ≥ total). There's no `overdue` job yet — that's a scheduled command,
 still to come. Invoices are never deleted, only voided (voiding isn't
 built yet either).
+
+### `GET /api/v1/invoices/{id}/lines`, `/collections`
+
+The invoice's lines (from its sales order, each with its `product`) and the
+collections recorded against it, each as its own list. Same access as the
+invoice show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
 
 There's no `POST /invoices` — they only come from the status-transition
 endpoint above.
@@ -193,15 +205,49 @@ Requires `sales.edit` (+ ownership if Sales Rep). Marks a delivery
 delivered directly — for one not already completed by its order's own
 status transition to `delivered`.
 
+**Request** (optional body)
+```json
+{ "invoice_data": "delivery-invoices/01m.../a1b2c3.jpg" }
+```
+
+`invoice_data` is the delivered invoice file (e.g. the copy signed by the
+customer), uploaded first via `POST /deliveries/invoices`. A new path
+replaces the previous file (which is deleted); omit it to keep the current
+one. A path not from the upload endpoint is `422`.
+
 ```json
 {
   "data": {
     "id": "01m...", "so_id": "01m...", "invoice_id": "01m...", "customer_id": "01m...",
     "driver": null, "delivery_date": "2026-09-18", "status": "delivered",
-    "delivered_at": "2026-09-18T10:15:00+00:00", "notes": null
+    "delivered_at": "2026-09-18T10:15:00+00:00", "notes": null,
+    "invoice_data": "delivery-invoices/01m.../a1b2c3.jpg",
+    "invoice_url": ".../api/v1/deliveries/01m.../invoice"
   }
 }
 ```
+
+### `POST /api/v1/deliveries/invoices`
+
+Requires `sales.edit`. **Step 1 of attaching the delivered invoice.**
+`multipart/form-data` with a single `invoice` file — `jpg`, `jpeg`, `png` or
+`pdf`, max 5 MB.
+
+**201**
+```json
+{
+  "data": {
+    "invoice_data": "delivery-invoices/01m.../a1b2c3.jpg",
+    "original_name": "signed-invoice.jpg", "mime_type": "image/jpeg", "size": 204811
+  }
+}
+```
+
+### `GET /api/v1/deliveries/{id}/invoice`
+
+Requires `sales.view` (+ ownership if Sales Rep). Downloads the delivered
+invoice file (`delivery-invoice-{id}.jpg` etc.) — what `invoice_url` points
+at. **404** — no file attached, or the delivery belongs to another account.
 
 ---
 
@@ -248,6 +294,11 @@ Purchase Return is squarely their job. Requires `sales.add` **or**
 `purchasing.add` to create, `sales.view` **or** `purchasing.view` to list.
 
 ### `GET /api/v1/returns`
+
+### `GET /api/v1/returns/{id}`
+
+Requires `sales.view` or `purchasing.view`. Includes the nested `invoice`,
+`customer`, `supplier`, `product` and `warehouse`. **404** — the return belongs to another account.
 
 ### `POST /api/v1/returns`
 
