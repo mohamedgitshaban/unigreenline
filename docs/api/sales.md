@@ -463,7 +463,7 @@ Requires `returns.view`. Includes the nested `invoice`,
 - **Purchase Return**: **Dr Accounts Payable (2100) / Cr Inventory (1300)** for `amount`, and what is owed the supplier drops by `amount`.
 - The credit applies to the customer's / supplier's balance, **not to a specific invoice** — an invoice's own `paid`/`balance` are untouched.
 
-Stock rules are unchanged: only a Purchase Return, or a restocked customer return, moves stock.
+Stock rules are unchanged: only a Purchase Return, or a restocked customer return, moves stock. 🔄 A Purchase Return cannot send back cartons that a manufacturing order has reserved (**422** with the free quantity).
 
 **Request**
 ```json

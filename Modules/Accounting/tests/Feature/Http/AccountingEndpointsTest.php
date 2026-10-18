@@ -30,7 +30,7 @@ class AccountingEndpointsTest extends TestCase
         $response = $this->getJson('/api/v1/chart-of-accounts?per_page=100');
 
         $response->assertOk();
-        $this->assertCount(29, $response->json('data'));
+        $this->assertCount(count(AccountSeeder::ACCOUNTS), $response->json('data'));
     }
 
     public function test_sales_rep_cannot_list_the_chart_of_accounts(): void

@@ -2,6 +2,7 @@
 
 namespace Modules\Manufacturing\Tests\Feature\Http;
 
+use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Models\Account;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Manufacturing\Models\Bom;
@@ -461,6 +462,31 @@ class ProductionRecordingTest extends ManufacturingTestCase
         $this->assertEqualsCanonicalizing([$this->herbStock->batch_no, $this->bottleStock->batch_no], array_column($trace['consumed'], 'batch_no'));
         $this->assertSame($order->batch_no, $trace['produced'][0]['batch_no']);
         $this->assertSame(10, $trace['produced'][0]['qty_on_hand']);
+    }
+
+    public function test_receiving_output_for_an_order_with_many_components_needs_a_bounded_number_of_queries(): void
+    {
+        $count = 25;
+        $tonic = $this->product('Big Tonic');
+        $components = collect(range(1, $count))->map(fn ($i) => $this->product("Part {$i}", ['pack_cost_price' => 1]));
+        $bom = $this->bom($tonic, $components->map(fn ($c) => [$c, 2])->all(), ['output_qty_cartons' => 10]);
+        foreach ($components as $component) {
+            $this->stock($component, 50, 10);
+        }
+
+        $id = $this->postJson('/api/v1/production-orders', ['bom_id' => $bom->id, 'warehouse_id' => $this->warehouse->id, 'qty_cartons' => 10, 'exp_date' => $this->future()])->json('data.id');
+        $this->postJson("/api/v1/production-orders/{$id}/confirm")->assertOk();
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $this->postJson("/api/v1/production-orders/{$id}/record-production", ['qty' => 10, 'exp_date' => $this->future()])->assertOk();
+        $queries = count(DB::getQueryLog());
+        DB::disableQueryLog();
+
+        // A fixed handful per component (lock the reservation and batch, move the stock, write the consumption row) plus the order's own work —
+        // growing linearly with the components, not with anything else.
+        $this->assertLessThan(20 * $count + 200, $queries, "Receiving an order with {$count} components took {$queries} queries.");
+        $this->assertSame(10, ProductionOrder::findOrFail($id)->produced_qty_cartons);
     }
 
     public function test_the_stock_value_of_the_warehouse_follows_production(): void

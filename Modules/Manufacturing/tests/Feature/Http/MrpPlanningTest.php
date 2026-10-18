@@ -4,8 +4,10 @@ namespace Modules\Manufacturing\Tests\Feature\Http;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Queue;
-use Modules\CRM\Models\Customer;
+use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
+use Modules\CRM\Models\Customer;
+use Modules\Inventory\Models\InventoryBatch;
 use Modules\Manufacturing\Jobs\RunMrpPlanningJob;
 use Modules\Manufacturing\Models\Bom;
 use Modules\Manufacturing\Models\MrpDemand;
@@ -110,7 +112,7 @@ class MrpPlanningTest extends ManufacturingTestCase
     {
         $this->demand($this->herb, 8, 3);
         $batch = $this->stock($this->herb, 10);
-        \Modules\Inventory\Models\InventoryBatch::query()->whereKey($batch->id)->update(['reserved_cartons' => 4]);
+        InventoryBatch::query()->whereKey($batch->id)->update(['reserved_cartons' => 4]);
 
         $this->plan();
 
@@ -144,8 +146,8 @@ class MrpPlanningTest extends ManufacturingTestCase
     public function test_incoming_purchase_orders_and_open_manufacturing_orders_count_as_supply(): void
     {
         $this->demand($this->tonic, 20, 10);
-        // 12 Tonic is already on a (draft) manufacturing order...
-        $this->makeOrder($this->bom, 12);
+        // 12 Tonic is already on a (draft) manufacturing order starting on day 5...
+        $this->makeOrder($this->bom, 12, ['planned_start' => now()->addDays(5)->toDateString()]);
         // ...and 4 Herb and 3 Bottle are already on order from the supplier.
         $this->purchaseOrder($this->herb, 4, 'sent');
         $this->purchaseOrder($this->bottle, 3, 'pending_pricing');
@@ -156,10 +158,12 @@ class MrpPlanningTest extends ManufacturingTestCase
         $this->assertSame(8, MrpSuggestion::query()->where('type', 'manufacture')->sole()->qty_cartons);
 
         // Materials: the existing 12 need 1.2 runs (6.0 Herb, 3.6 Bottle) and the new 8 need 0.8 run (4.0 Herb, 2.4 Bottle):
-        // 10.0 Herb and 6.0 Bottle in all. 4 Herb and 3 Bottle are on order, so buy 6 Herb and 3 Bottle.
-        $buys = MrpSuggestion::query()->where('type', 'purchase')->get()->keyBy('product_id');
-        $this->assertSame(6, $buys[$this->herb->id]->qty_cartons);
-        $this->assertSame(3, $buys[$this->bottle->id]->qty_cartons);
+        // 10.0 Herb and 6.0 Bottle in all. The purchase orders land on day 3, before either need, so 4 Herb and 3 Bottle
+        // are covered and 6 Herb and 3 Bottle are still to buy.
+        // (Two dated orders each: what the first order needs on day 5, and what the new one needs on day 8.)
+        $bought = MrpSuggestion::query()->where('type', 'purchase')->get()->groupBy('product_id')->map->sum('qty_cartons');
+        $this->assertSame(6, (int) $bought[$this->herb->id]);
+        $this->assertSame(3, (int) $bought[$this->bottle->id]);
     }
 
     public function test_materials_an_open_order_has_already_reserved_are_not_needed_twice(): void
@@ -531,7 +535,7 @@ class MrpPlanningTest extends ManufacturingTestCase
 
         // Another company's suggestion is simply not found.
         $other = MrpSuggestion::query()->create([
-            'tenant_id' => \Modules\Core\Models\Tenant::factory()->create()->id, 'type' => 'purchase', 'product_id' => $this->herb->id, 'warehouse_id' => $this->warehouse->id,
+            'tenant_id' => Tenant::factory()->create()->id, 'type' => 'purchase', 'product_id' => $this->herb->id, 'warehouse_id' => $this->warehouse->id,
             'qty_cartons' => 1, 'start_date' => now(), 'due_date' => now(), 'fingerprint' => 'x', 'status' => 'proposed',
         ]);
         $this->actingAsRole('Administrator');

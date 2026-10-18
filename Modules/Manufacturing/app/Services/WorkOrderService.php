@@ -349,6 +349,8 @@ class WorkOrderService
         foreach ($operations as $operation) {
             $center = WorkCenter::query()->where('tenant_id', $order->tenant_id)->findOrFail($operation['work_center_id']);
             $minutes = (int) ceil($operation['setup_minutes'] + (float) $operation['run_minutes'] * $order->output_qty_cartons * (100 / max(1, (float) $center->efficiency_pct)) + $operation['cleanup_minutes']);
+            // An operation with no times of its own takes the company's default duration.
+            $minutes = $minutes > 0 ? $minutes : $settings->default_operation_minutes;
             $explicit = $operation['depends_on_id'] ?? null;
             $dependsOn = $explicit !== null ? ($byOperation[$explicit] ?? null) : $previous;
 

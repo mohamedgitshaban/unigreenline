@@ -56,6 +56,11 @@ class LegacyPermissionMap
         'users.view' => 'audit',
         'audit-log.view' => 'audit',
         'purchase-orders.upload-invoice' => 'approve',
+        // What things cost in production is for the people who audit or sign off, like other cost figures.
+        'manufacturing-cost-reports.view' => 'audit',
+        'manufacturing-cost-reports.export' => 'audit',
+        // Changes how production is costed and which moves are allowed: never given by the grid, only granted by name.
+        'manufacturing-settings.update' => 'manage',
     ];
 
     /**

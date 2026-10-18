@@ -51,9 +51,12 @@ class RolePermissionSeederTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
 
-        $actions = collect($this->permissionsOf('Auditor'))->map(fn (string $name) => explode('.', $name, 2)[1])->unique()->sort()->values()->all();
+        // Chat is talking to colleagues, not changing business records, so every role has it, auditors included.
+        $chat = PermissionCatalogue::all()->where('module', 'chat')->keys()->all();
 
-        $this->assertSame(['export', 'verify', 'view'], array_values(array_diff($actions, ['availability', 'lifecycle'])));
+        $actions = collect($this->permissionsOf('Auditor'))->diff($chat)->map(fn (string $name) => explode('.', $name, 2)[1])->unique()->sort()->values()->all();
+
+        $this->assertSame(['export', 'verify', 'view'], array_values(array_diff($actions, ['availability', 'lifecycle', 'costs', 'history', 'schedule', 'traceability'])));
         $this->assertContains('products.view', $this->permissionsOf('Auditor'));
         $this->assertContains('audit-log.view', $this->permissionsOf('Auditor'));
         $this->assertNotContains('products.create', $this->permissionsOf('Auditor'));

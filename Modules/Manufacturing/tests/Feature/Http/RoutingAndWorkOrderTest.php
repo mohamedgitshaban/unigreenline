@@ -310,6 +310,19 @@ class RoutingAndWorkOrderTest extends ManufacturingTestCase
         $this->assertSame([['1350', 90.0, 0.0], ['6400', 0.0, 90.0]], $this->entries($order->id)[0]);
     }
 
+    public function test_an_operation_with_no_times_takes_the_default_duration_from_the_settings(): void
+    {
+        $this->travelTo(Carbon::parse('2026-11-01 07:00:00'));
+        $this->putJson('/api/v1/manufacturing/settings', ['default_operation_minutes' => 45])->assertOk();
+        $this->routing->operations()->where('sequence', 20)->update(['run_minutes' => 0]);   // "Fill" has no times at all
+
+        $order = $this->confirmed();
+        $this->postJson("/api/v1/production-orders/{$order->id}/plan")->assertOk();
+
+        $this->assertSame([60, 45], $order->fresh()->workOrders->pluck('planned_minutes')->all());
+        $this->assertSame('2026-11-01 09:45:00', $order->fresh()->workOrders->last()->scheduled_end->toDateTimeString());
+    }
+
     public function test_work_center_management_and_its_permissions(): void
     {
         $id = $this->postJson('/api/v1/work-centers', [

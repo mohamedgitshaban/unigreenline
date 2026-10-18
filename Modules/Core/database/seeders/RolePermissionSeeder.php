@@ -35,8 +35,9 @@ class RolePermissionSeeder extends Seeder
         'Administrator' => ['modules' => '*', 'capabilities' => self::CAPABILITIES],
         // Expense approval sits with Accountant/Administrator only, so Owner's
         // module-wide approve stops short of expenses.
-        'Owner' => ['modules' => '*', 'capabilities' => ['view', 'approve', 'print', 'export', 'audit'], 'except' => ['expenses.approve']],
-        'Sales Manager' => ['modules' => ['sales'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export']],
+        'Owner' => ['modules' => '*', 'capabilities' => ['view', 'approve', 'print', 'export', 'audit'], 'except' => ['expenses.approve'], 'grant' => ['manufacturing-settings.update']],
+        // Can also ask production to make what an open sales order needs, and see how that is going.
+        'Sales Manager' => ['modules' => ['sales'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['production-orders.view', 'production-orders.from-sales-order']],
         // Spec §2 groups "Own orders/customers only" as one scope for Sales
         // Rep — crm.* is included here (not just sales.*) so a rep can
         // manage their own customers, not only their own orders.
@@ -45,10 +46,18 @@ class RolePermissionSeeder extends Seeder
         'Warehouse Employee' => ['modules' => ['inventory', 'manufacturing'], 'capabilities' => ['view', 'add', 'edit']],
         // Approving an expense posts it to the journal, so the accountant
         // approves/rejects expenses — but still not accounting.approve.
-        'Accountant' => ['modules' => ['accounting', 'expenses'], 'capabilities' => ['view', 'add', 'edit', 'print', 'export'], 'extra' => ['expenses.approve', 'recap.view'], 'grant' => ['payroll-runs.view', 'payslips.view']],
+        'Accountant' => ['modules' => ['accounting', 'expenses'], 'capabilities' => ['view', 'add', 'edit', 'print', 'export'], 'extra' => ['expenses.approve', 'recap.view'], 'grant' => [
+            'payroll-runs.view', 'payslips.view',
+            // What production cost, for the books.
+            'production-orders.view', 'production-orders.costs', 'production-orders.history', 'manufacturing-reports.view', 'manufacturing-reports.export',
+            'manufacturing-cost-reports.view', 'manufacturing-cost-reports.export',
+        ]],
         'Customer Service' => ['modules' => ['crm'], 'capabilities' => ['view', 'add', 'edit']],
         // Purchasing records expenses but can't approve them.
-        'Purchasing' => ['modules' => ['purchasing'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print'], 'extra' => ['expenses.view', 'expenses.add', 'expenses.edit']],
+        'Purchasing' => ['modules' => ['purchasing'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print'], 'extra' => ['expenses.view', 'expenses.add', 'expenses.edit'], 'grant' => [
+            // Planning proposes what to buy; purchasing turns it into purchase orders.
+            'mrp-runs.view', 'mrp-requirements.view', 'mrp-shortages.view', 'mrp-suggestions.view', 'mrp-suggestions.convert', 'mrp-suggestions.dismiss', 'mrp-suggestions.export',
+        ]],
         // Runs the people side: employees, attendance, leave, time permissions and payroll — including
         // approving and paying a payroll run. (The salaries themselves are only visible to roles that
         // can view payroll.)
@@ -84,6 +93,8 @@ class RolePermissionSeeder extends Seeder
     public static function expandedRoles(): array
     {
         $catalogue = PermissionCatalogue::names();
+        // Chat is for everyone: every role can talk to colleagues (an admin can still take it away from a role).
+        $chat = PermissionCatalogue::all()->where('module', 'chat')->keys()->all();
         $roles = [];
 
         foreach (self::ROLES as $roleName => $definition) {
@@ -111,6 +122,7 @@ class RolePermissionSeeder extends Seeder
             $roles[$roleName] = array_values(array_unique([
                 ...array_diff(LegacyPermissionMap::expand($legacy), $except),
                 ...($definition['grant'] ?? []),
+                ...$chat,
             ]));
             sort($roles[$roleName]);
         }

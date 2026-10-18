@@ -2,6 +2,7 @@
 
 namespace Modules\Inventory\Services;
 
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\StockReservation;
@@ -78,7 +79,7 @@ class StockReservationService
             }
 
             return $cartons - $remaining;
-        });
+        }, 3);
     }
 
     /**
@@ -182,7 +183,7 @@ class StockReservationService
     /**
      * Active reservations with their batches locked (FEFO order, so concurrent callers lock in the same order).
      *
-     * @return \Illuminate\Support\Collection<int, StockReservation>
+     * @return Collection<int, StockReservation>
      */
     private function lockedReservations(string $sourceType, string $sourceId, ?string $sourceLineId, bool $latestFirst)
     {

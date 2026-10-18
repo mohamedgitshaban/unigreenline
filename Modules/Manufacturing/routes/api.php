@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Manufacturing\Http\Controllers\BomController;
+use Modules\Manufacturing\Http\Controllers\ManufacturingAttachmentController;
+use Modules\Manufacturing\Http\Controllers\ManufacturingReportController;
 use Modules\Manufacturing\Http\Controllers\ManufacturingSettingsController;
 use Modules\Manufacturing\Http\Controllers\MrpController;
 use Modules\Manufacturing\Http\Controllers\MrpDemandController;
@@ -34,6 +36,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('production-orders', [ProductionOrderController::class, 'index'])->can('production-orders.view')->exportable('production-orders.export');
     Route::post('production-orders', [ProductionOrderController::class, 'store'])->can('production-orders.create');
+    Route::post('production-orders/from-sales-order', [ProductionOrderController::class, 'fromSalesOrder'])->can('production-orders.from-sales-order');
     Route::get('production-orders/{productionOrder}', [ProductionOrderController::class, 'show'])->can('production-orders.view');
     Route::put('production-orders/{productionOrder}', [ProductionOrderController::class, 'update'])->can('production-orders.update');
     Route::delete('production-orders/{productionOrder}', [ProductionOrderController::class, 'destroy'])->can('production-orders.delete');
@@ -123,4 +126,18 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('mrp/suggestions/{suggestion}', [MrpController::class, 'showSuggestion'])->can('mrp-suggestions.view');
     Route::post('mrp/suggestions/{suggestion}/convert', [MrpController::class, 'convert'])->can('mrp-suggestions.convert');
     Route::post('mrp/suggestions/{suggestion}/dismiss', [MrpController::class, 'dismiss'])->can('mrp-suggestions.dismiss');
+
+    Route::get('reports/manufacturing/production', [ManufacturingReportController::class, 'production'])->can('manufacturing-reports.view')->exportable('manufacturing-reports.export');
+    Route::get('reports/manufacturing/material-consumption', [ManufacturingReportController::class, 'materialConsumption'])->can('manufacturing-reports.view')->exportable('manufacturing-reports.export');
+    Route::get('reports/manufacturing/scrap', [ManufacturingReportController::class, 'scrap'])->can('manufacturing-reports.view')->exportable('manufacturing-reports.export');
+    Route::get('reports/manufacturing/work-center-utilization', [ManufacturingReportController::class, 'workCenterUtilization'])->can('manufacturing-reports.view')->exportable('manufacturing-reports.export');
+    Route::get('reports/manufacturing/lead-times', [ManufacturingReportController::class, 'leadTimes'])->can('manufacturing-reports.view')->exportable('manufacturing-reports.export');
+    Route::get('reports/manufacturing/traceability', [ManufacturingReportController::class, 'traceability'])->can('manufacturing-reports.view');
+    Route::get('reports/manufacturing/cost-variance', [ManufacturingReportController::class, 'costVariance'])->can('manufacturing-cost-reports.view')->exportable('manufacturing-cost-reports.export');
+    Route::get('reports/manufacturing/wip-valuation', [ManufacturingReportController::class, 'wipValuation'])->can('manufacturing-cost-reports.view')->exportable('manufacturing-cost-reports.export');
+
+    Route::get('manufacturing/attachments', [ManufacturingAttachmentController::class, 'index'])->can('manufacturing-attachments.view');
+    Route::post('manufacturing/attachments', [ManufacturingAttachmentController::class, 'store'])->can('manufacturing-attachments.create');
+    Route::get('manufacturing/attachments/{attachment}/download', [ManufacturingAttachmentController::class, 'download'])->can('manufacturing-attachments.view');
+    Route::delete('manufacturing/attachments/{attachment}', [ManufacturingAttachmentController::class, 'destroy'])->can('manufacturing-attachments.delete');
 });

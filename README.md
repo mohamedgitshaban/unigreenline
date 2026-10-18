@@ -16,7 +16,7 @@ with a **permission on every endpoint**.
 | Accounting | 🔄 chart of accounts (editable, 🆕 connections map), journal entries (🆕 manual + reversal), 🔄 statements (balance sheet now balances) |
 | Expenses | categories, expenses, approval |
 | 🆕 Recap | stock write-offs for expired / damaged / lost stock, posted to the chart of accounts |
-| 🆕 Manufacturing | bills of materials and production orders |
+| 🔄 Manufacturing | recipes with revisions, an order workflow with partial production and backorders, stock reservations, routing / work centers / work orders, quality control, scrap and by-products, costing (optional WIP accounting), material requirements planning, reports |
 | 🆕 HR | employees, work schedules, global holidays, attendance, time permissions (late / early leave / partial), leave, monthly payroll connected to the chart of accounts |
 | Analytics | dashboard, reports, 🆕 product life cycle |
 
@@ -33,6 +33,16 @@ on expenses and nothing else. The list is derived from the routes —
 [`docs/api/permissions.md`](docs/api/permissions.md) lists every permission, the
 endpoints it guards and which seeded roles hold it (regenerate with
 `php artisan permissions:docs`). `Administrator` holds all of them.
+
+### Manufacturing
+
+A full manufacturing and planning module: bills of materials (versions, approval, alternatives, multi-level, by-products), manufacturing
+orders that move through a validated workflow, batch-level **stock reservations** that sales, transfers and write-offs respect, routings and
+work centers with capacity-aware scheduling, work orders on the shop floor, quality checks, scrap, costing against the chart of accounts (cost on receipt or
+work-in-progress), **material requirements planning** that proposes purchase and manufacturing orders, and reports. Start with
+[`docs/manufacturing/architecture-analysis.md`](docs/manufacturing/architecture-analysis.md); the full endpoint reference is
+[`docs/api/manufacturing.md`](docs/api/manufacturing.md), and operating notes (migrations, settings, queue worker, scheduler) are in
+[`docs/manufacturing/installation-and-operations.md`](docs/manufacturing/installation-and-operations.md).
 
 ### Documentation
 

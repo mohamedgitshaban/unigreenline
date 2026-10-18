@@ -18,6 +18,8 @@ use Modules\Manufacturing\Services\ManageProductionOrderService;
 use Modules\Manufacturing\Services\ProductionCostingService;
 use Modules\Manufacturing\Services\ProductionOrderLifecycleService;
 use Modules\Manufacturing\Services\ProductionRecordingService;
+use Modules\Manufacturing\Services\SalesDemandOrderService;
+use Modules\Sales\Models\SalesOrder;
 
 class ProductionOrderController extends Controller
 {
@@ -32,6 +34,7 @@ class ProductionOrderController extends Controller
         private readonly ProductionOrderLifecycleService $lifecycle,
         private readonly ProductionRecordingService $recording,
         private readonly ProductionCostingService $costing,
+        private readonly SalesDemandOrderService $salesDemand,
     ) {}
 
     public function index(Request $request)
@@ -104,6 +107,25 @@ class ProductionOrderController extends Controller
         $this->manageOrder->delete($productionOrder, $this->actor($request));
 
         return response()->noContent();
+    }
+
+    /**
+     * Make-to-order: raises draft orders for the manufactured products on an open sales order that stock does not cover.
+     * Needs the right to view that sales order as well.
+     */
+    public function fromSalesOrder(Request $request)
+    {
+        $data = $request->validate(['sales_order_id' => ['required', 'string']]);
+
+        // Asking for production against a sales order needs the right to see sales orders, checked before anything is looked up.
+        abort_unless($request->user()->can('sales-orders.view'), 403);
+
+        $salesOrder = SalesOrder::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($data['sales_order_id']);
+
+        $result = $this->salesDemand->raise($salesOrder, $this->actor($request));
+
+        return ProductionOrderResource::collection(collect($result['created'])->map(fn ($o) => $o->load(self::LIST_RELATIONS)))
+            ->additional(['skipped' => $result['skipped']])->response()->setStatusCode(201);
     }
 
     /**

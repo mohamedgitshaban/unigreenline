@@ -78,3 +78,37 @@ that the system did **not** have.
 * Forecast module (a `forecast` kind of manual MRP demand stands in).
 * Company/branch scope beyond tenant.
 * Incoming-material inspection triggered automatically from Purchasing receipts.
+
+## 7. Outcome against the acceptance criteria
+
+| # | Criterion | Result |
+|---|---|---|
+| 1 | A user can create a valid BoM for an existing product | Done — versions, revisions, approval, alternatives, by-products, unit lines, loop check (`BomManagementTest`) |
+| 2 | Component requirements are calculated correctly | Done — exact need with scrap, rounded up to whole cartons at issue (`ProductionOrderLifecycleTest`, `BomManagementTest` explosion) |
+| 3 | An order can be created, confirmed, planned and executed | Done — validated state machine, history (`ProductionOrderLifecycleTest`, `RoutingAndWorkOrderTest`) |
+| 4 | Reservations cannot oversubscribe stock | Done — batch-level reservations under row locks, honoured by every stock-taking flow (`StockReservationTest`, lifecycle test) |
+| 5 | Consumption has the correct inventory effects | Done — FEFO, own reservation first, never expired stock, rollback on shortfall (`ProductionRecordingTest`) |
+| 6 | Finished production creates the correct receipt | Done — batch, unit cost, by-products |
+| 7 | Partial production and backorders work | Done — 4 + 6 of 10 with hand-worked costs; backorder policies |
+| 8 | Scrap and by-products are traceable and valued | Done — scrap documents with approval, both cost policies; by-product allocation by share or selling value; traceability endpoint and report |
+| 9 | Work orders respect dependencies and capacity | Done — dependency chain, lock-protected finite-capacity scheduling, downtime, holidays (`RoutingAndWorkOrderTest`) |
+| 10 | Multi-level MRP gives correct requirements and shortages | Done — level ordering, netting with stock/reservations/supply, lot rules, safety stock (`MrpPlanningTest`) |
+| 11 | Purchasing and sales integration follow existing workflows | Done — suggestions → draft purchase orders pending pricing; open sales orders as demand; make-to-order |
+| 12 | Costs can be calculated and reconciled | Done — planned vs actual, variance, unit cost; reconciliation notes in the API reference |
+| 13 | Accounting entries use the existing financial subsystem | Done — `JournalPostingService`, two policies, new accounts 1350 and 5200 |
+| 14 | Retries do not duplicate stock movements or entries | Done — idempotency keys, atomic run claim, quantity caps (`ProductionRecordingTest`, `MrpPlanningTest`) |
+| 15 | Unauthorized users cannot run restricted operations | Done — per-endpoint permissions, role × endpoint matrix, cross-company 404s (`ManufacturingAuthorizationTest`) |
+| 16 | Tests cover the critical workflows and failure cases | Done — see [testing.md](testing.md) |
+| 17 | Migrations and deployment are documented | Done — [installation-and-operations.md](installation-and-operations.md) |
+| 18 | No existing functionality broken | The original nine manufacturing tests pass unchanged; the full suite is run before delivery (see the plan's progress log) |
+| 19 | No known critical defects hidden by skipped tests or swallowed exceptions | No test is skipped; the only swallowed exception is documented (an order that cannot be auto-cancelled stays open and is counted as orphaned) |
+| 20 | Every claimed feature is implemented or documented as blocked | See the limits below |
+
+### Limits that remain (by design or by platform)
+
+* No serial numbers, no stock locations below the warehouse, no forecasting engine, no company/branch scope beyond the tenant.
+* Stock is whole cartons: fractional requirements are rounded up when ordered or issued.
+* Incoming-material inspections are raised by hand (Purchasing receipts are not hooked).
+* Planning is per warehouse and does not reschedule existing supply; safety stock and reorder point are per product.
+* A reservation holds specific batches; batches that expire after being reserved are refused at issue with a message to release and write them off.
+* Concurrency safety rests on row locks, atomic claims and unique keys; the tests assert the outcomes but cannot run truly parallel requests.

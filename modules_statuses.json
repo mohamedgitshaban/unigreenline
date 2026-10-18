@@ -9,5 +9,6 @@
     "Expenses": true,
     "Recap": true,
     "Manufacturing": true,
-    "HR": true
+    "HR": true,
+    "Chat": true
 }

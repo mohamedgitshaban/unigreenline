@@ -318,14 +318,17 @@ from a different warehouse.
     "total_available_cartons": 70, "total_available_base_units": 2100,
     "warehouses": [
       { "id": "01m...", "name": "Main Warehouse", "city": "Cairo", "governorate": "Cairo",
-        "available_cartons": 50, "available_base_units": 1500, "batches_count": 3, "nearest_expiry": "2027-03-01" }
+        "available_cartons": 50, "available_base_units": 1500, "reserved_cartons": 10, "batches_count": 3, "nearest_expiry": "2027-03-01" }
     ]
   }
 }
 ```
 
 Counts include free-gift batches (`is_free_gift`); the sales order decides which
-kind a line draws from. Another tenant's product is **404**.
+kind a line draws from. 🔄 **Reserved stock is not available:** cartons a confirmed
+[manufacturing order](./manufacturing.md) has set aside are subtracted from
+`available_cartons` (and shown as `reserved_cartons`), and no sales order, transfer,
+write-off or purchase return can take them. Another tenant's product is **404**.
 
 ## `POST /api/v1/products/import` 🆕 NEW
 
@@ -457,6 +460,10 @@ Requires `transfers.view`. Includes the nested `product`, `from_warehouse`,
 account.
 
 ## `POST /api/v1/transfers`
+
+> 🔄 Cartons reserved by a manufacturing order cannot be transferred away: the
+> source batch must hold enough **free** (on hand, not reserved) cartons (**422**
+> `shortfalls` otherwise).
 
 Requires `transfers.create` + both warehouses visible to this user (unlike
 Sales Orders — a transfer is warehouse-staff work, so the same assignment

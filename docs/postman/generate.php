@@ -1123,66 +1123,290 @@ $recap = nw(folder('Recap', [
 ], 'Stock write-offs (expired / damaged / lost / recall). Draft → approved (removes stock and posts Dr 6300 / Cr 1300) or rejected. See docs/api/recap.md.'));
 
 $manufacturing = nw(folder('Manufacturing', [
-    req('POST', 'Create finished product', '/products', [
-        'description' => 'Existing endpoint — the finished good the BOM below makes. Saves the id into `{{finished_product_id}}`.',
-        'body' => ['category_id' => '{{category_id}}', 'name' => 'Postman Finished Good', 'sku' => 'POSTMAN-FG-0001', 'pack_unit' => 'Bottle', 'carton_qty' => 10, 'pack_cost_price' => 10, 'pack_selling_price' => 20],
-        'tests' => saveId('finished_product_id'),
-    ]),
-    nw(req('POST', 'Create BOM', '/boms', [
-        'description' => 'Requires `manufacturing.add`. A recipe: one run consumes the listed component cartons and yields `output_qty_cartons` of the finished product, plus a per-run `conversion_cost` (labour/overhead). Components must be distinct and not the finished product. Saves the id into `{{bom_id}}`.',
-        'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM', 'output_qty_cartons' => 5, 'conversion_cost' => 10, 'notes' => null, 'active' => true, 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1]]],
-        'tests' => saveId('bom_id'),
-    ])),
-    nw(req('GET', 'List BOMs', '/boms', [
-        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => 'Requires `manufacturing.view`. `search` matches name, notes, product name/SKU.',
-    ])),
-    nw(req('GET', 'Get BOM', '/boms/{{bom_id}}', [
-        'description' => 'Requires `manufacturing.view`. Includes the finished product and component lines.',
-    ])),
-    nw(req('PUT', 'Update BOM', '/boms/{{bom_id}}', [
-        'description' => 'Requires `manufacturing.edit`. Partial; `lines`, if sent, replace every line. Does not touch production orders already raised.',
-        'body' => ['notes' => 'Updated from Postman'],
-    ])),
-    nw(req('POST', 'Create production order', '/production-orders', [
-        'description' => 'Requires `manufacturing.add` + warehouse visible. `runs` repetitions of the BOM in a warehouse; `output_qty_cartons` and the default `conversion_cost` (BOM cost x runs) are derived. `batch_no` defaults to a generated MO-... number; `exp_date` is required. A draft touches no stock. Saves the id into `{{production_order_id}}`.',
-        'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'runs' => 1, 'batch_no' => 'POSTMAN-MO-1', 'production_date' => '2026-10-11', 'exp_date' => '2028-06-30', 'notes' => null],
-        'tests' => saveId('production_order_id'),
-    ])),
-    nw(req('GET', 'List production orders', '/production-orders', [
-        'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => 'Requires `manufacturing.view`. Export needs `production-orders.export`.',
-    ])),
-    nw(req('GET', 'Get production order', '/production-orders/{{production_order_id}}', [
-        'description' => 'Requires `manufacturing.view`. After completion includes `consumptions` (which batches were used, at what cost).',
-    ])),
-    nw(req('PUT', 'Update production order', '/production-orders/{{production_order_id}}', [
-        'description' => 'Requires `manufacturing.edit`. **Draft only** (else 422). Changing `runs` or `bom_id` re-derives the output and (unless sent) the conversion cost.',
-        'body' => ['notes' => 'Updated from Postman'],
-    ])),
-    nw(req('POST', 'Complete production order', '/production-orders/{{production_order_id}}/complete', [
-        'description' => 'Requires `manufacturing.approve`. In one transaction: consumes every component x runs from the warehouse **FEFO** (422 with `shortfalls` and nothing written if any is short), costs the output (material + conversion cost, per carton), creates the finished-goods batch, and posts Dr 1300 (finished goods) / Cr 1300 (materials used) / Cr 6400 Manufacturing Overhead Absorbed (conversion cost). 422 if the batch number already exists in the warehouse.',
-    ])),
-    req('POST', 'Create production order (to cancel)', '/production-orders', [
-        'description' => 'A throwaway draft for the Cancel request below.',
-        'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'POSTMAN-MO-CANCEL', 'exp_date' => '2028-06-30'],
-        'tests' => saveId('cancellable_production_order_id'),
-    ]),
-    nw(req('POST', 'Cancel production order', '/production-orders/{{cancellable_production_order_id}}/cancel', [
-        'description' => 'Requires `manufacturing.edit`. Draft → cancelled. 422 for anything not a draft.',
-    ])),
-    nw(req('DELETE', 'Delete production order', '/production-orders/{{cancellable_production_order_id}}', [
-        'description' => 'Requires `manufacturing.delete`. Drafts and cancelled orders only — a completed order cannot be deleted (422). 204.',
-    ])),
-    req('POST', 'Create BOM (to delete)', '/boms', [
-        'description' => 'A throwaway BOM with no production orders, for the Delete request below.',
-        'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM Delete Me', 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1]]],
-        'tests' => saveId('deletable_bom_id'),
-    ]),
-    nw(req('DELETE', 'Delete BOM', '/boms/{{deletable_bom_id}}', [
-        'description' => 'Requires `manufacturing.delete`. 204; lines cascade. **409** when production orders were raised from it — set `active: false` instead.',
-    ])),
-], 'Bills of materials and production orders. Completing an order consumes components FEFO, creates the finished batch and posts the cost. See docs/api/manufacturing.md.'));
+    folder('Settings', [
+        nw(req('GET', 'Get manufacturing settings', '/manufacturing/settings', [
+            'description' => 'The company\'s manufacturing configuration (created with defaults on first read): document prefixes, default warehouse, reservation / consumption / backorder / scrap policies, WIP accounting, planning horizon and the allowed order transitions.',
+        ])),
+        nw(req('PUT', 'Update manufacturing settings', '/manufacturing/settings', [
+            'description' => 'Partial. Sets the default warehouse (used by planning runs and orders that name none) and a 2-day lead time. `allowed_transitions` may only remove moves of the order state machine, never add one.',
+            'body' => ['default_warehouse_id' => '{{warehouse_id}}', 'lead_time_days' => 2, 'reservation_policy' => 'on_confirm', 'consumption_policy' => 'backflush', 'backorder_policy' => 'ask', 'wip_accounting' => false],
+        ])),
+    ], 'Per-company configuration: numbering, policies, costing mode, planning horizon.'),
+    folder('Work centers and routings', [
+        nw(req('POST', 'Create work center', '/work-centers', [
+            'description' => 'A machine or line. `capacity` = operations at once; `efficiency_pct` below 100 lengthens run time; `calendar` is the weekly shifts (0 = Sunday ... 6 = Saturday). Saves the id into `{{work_center_id}}`.',
+            'body' => ['code' => 'PM-MIX', 'name' => 'Postman Mixer', 'capacity' => 1, 'efficiency_pct' => 100, 'cost_per_hour' => 60, 'labor_cost_per_hour' => 30, 'calendar' => [['weekday' => 0, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 1, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 2, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 3, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 4, 'start_time' => '08:00', 'end_time' => '16:00']]],
+            'tests' => saveId('work_center_id'),
+        ])),
+        nw(req('GET', 'List work centers', '/work-centers', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches code, name, notes. Filter `active`.',
+        ])),
+        nw(req('GET', 'Get work center', '/work-centers/{{work_center_id}}', ['description' => 'With its weekly shifts and downtimes.'])),
+        nw(req('PUT', 'Update work center', '/work-centers/{{work_center_id}}', [
+            'description' => 'Partial.',
+            'body' => ['capacity' => 2, 'notes' => 'Second mixing tank added'],
+        ])),
+        nw(req('PUT', 'Replace work center calendar', '/work-centers/{{work_center_id}}/calendar', [
+            'description' => 'Replaces the weekly shifts.',
+            'body' => ['shifts' => [['weekday' => 0, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 1, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 2, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 3, 'start_time' => '08:00', 'end_time' => '16:00'], ['weekday' => 4, 'start_time' => '08:00', 'end_time' => '16:00']]],
+        ])),
+        nw(req('POST', 'Declare work center downtime', '/work-centers/{{work_center_id}}/downtimes', [
+            'description' => 'A period the center cannot be used. The response lists `work_orders_to_reschedule` booked inside it. Saves the id into `{{downtime_id}}`.',
+            'body' => ['starts_at' => '2030-01-06 08:00:00', 'ends_at' => '2030-01-06 10:00:00', 'reason' => 'Belt change'],
+            'tests' => saveId('downtime_id'),
+        ])),
+        nw(req('GET', 'List work center downtimes', '/work-centers/{{work_center_id}}/downtimes', ['description' => 'Declared downtime, oldest first.'])),
+        nw(req('DELETE', 'Delete work center downtime', '/work-centers/{{work_center_id}}/downtimes/{{downtime_id}}', ['description' => '204.'])),
+        nw(req('GET', 'Work center schedule', '/work-centers/{{work_center_id}}/schedule', [
+            'query' => ['from' => '2030-01-01', 'to' => '2030-01-14'],
+            'description' => 'Working time available in the period (shifts less holidays and downtime), time booked, and the operations booked.',
+        ])),
+        nw(req('POST', 'Create routing', '/routings', [
+            'description' => 'The ordered operations needed to make a product. In this array `depends_on_id` is the **sequence** of an earlier operation. Operation time = setup + run x cartons (÷ efficiency) + cleanup. Saves the id into `{{routing_id}}`.',
+            'body' => ['code' => 'PM-R1', 'name' => 'Postman routing', 'operations' => [['sequence' => 10, 'name' => 'Mix', 'work_center_id' => '{{work_center_id}}', 'setup_minutes' => 30, 'run_minutes' => 2, 'cleanup_minutes' => 10], ['sequence' => 20, 'name' => 'Fill', 'work_center_id' => '{{work_center_id}}', 'run_minutes' => 1, 'depends_on_id' => 10]]],
+            'tests' => saveId('routing_id'),
+        ])),
+        nw(req('GET', 'List routings', '/routings', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches code, name, notes.',
+        ])),
+        nw(req('GET', 'Get routing', '/routings/{{routing_id}}', ['description' => 'With its operations in sequence.'])),
+        nw(req('PUT', 'Update routing', '/routings/{{routing_id}}', ['description' => 'Name, code, notes, active.', 'body' => ['notes' => 'Updated from Postman']])),
+        nw(req('POST', 'Add routing operation', '/routings/{{routing_id}}/operations', [
+            'description' => '`depends_on_id` here is an operation **id** that comes earlier in the sequence. Changing a routing makes a new version of every approved recipe that uses it. Saves the id into `{{routing_operation_id}}`.',
+            'body' => ['sequence' => 30, 'name' => 'Label', 'work_center_id' => '{{work_center_id}}', 'run_minutes' => 0.5],
+            'tests' => saveId('routing_operation_id', 'data.id'),
+        ])),
+        nw(req('PUT', 'Update routing operation', '/routings/{{routing_id}}/operations/{{routing_operation_id}}', ['description' => 'Partial.', 'body' => ['run_minutes' => 0.75]])),
+        nw(req('DELETE', 'Delete routing operation', '/routings/{{routing_id}}/operations/{{routing_operation_id}}', ['description' => '204.'])),
+    ], 'Work centers (capacity, shifts, downtime, costs) and routings (ordered operations). See docs/api/manufacturing.md.'),
+    folder('Bills of materials', [
+        req('POST', 'Create finished product', '/products', [
+            'description' => 'Existing endpoint — the finished good the BOM below makes. Saves the id into `{{finished_product_id}}`.',
+            'body' => ['category_id' => '{{category_id}}', 'name' => 'Postman Finished Good', 'sku' => 'POSTMAN-FG-0001', 'pack_unit' => 'Bottle', 'carton_qty' => 10, 'pack_cost_price' => 10, 'pack_selling_price' => 20],
+            'tests' => saveId('finished_product_id'),
+        ]),
+        chg(req('POST', 'Create BOM', '/boms', [
+            'description' => 'A recipe: one run consumes the listed component cartons (plus `scrap_pct`) and yields `output_qty_cartons`, plus a per-run `conversion_cost`. Lines can be entered in a packaging unit (`unit_id` + `unit_qty`), be `optional`, and belong to a routing operation. **Circular recipes are refused.** Gets a `code` and version 1 (approved at once unless the company requires approval). Saves the id into `{{bom_id}}`.',
+            'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM', 'output_qty_cartons' => 5, 'conversion_cost' => 10, 'priority' => 10, 'routing_id' => '{{routing_id}}', 'instructions' => 'Blend for 20 minutes', 'notes' => null, 'active' => true, 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1, 'scrap_pct' => 5]], 'by_products' => []],
+            'tests' => saveId('bom_id'),
+        ]), 'now has a code, version, priority, effective dates, routing, instructions, scrap %, optional lines, unit-based lines and by-products; circular recipes are refused.'),
+        chg(req('GET', 'List BOMs', '/boms', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches code, name, notes, product name/SKU.',
+        ]), 'rows now carry code, version, status and priority.'),
+        chg(req('GET', 'Get BOM', '/boms/{{bom_id}}', ['description' => 'Includes the product, routing, component lines and by-products.']), 'adds code, version, status, routing, by-products.'),
+        chg(req('PUT', 'Update BOM', '/boms/{{bom_id}}', [
+            'description' => 'Partial; `lines` and `by_products`, if sent, replace the existing ones. A structural change to an approved BoM makes a new version and an immutable revision. Confirmed orders keep their own components.',
+            'body' => ['notes' => 'Updated from Postman', 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1, 'scrap_pct' => 5]]],
+        ]), 'a structural edit makes a new version and revision.'),
+        nw(req('GET', 'BOM components (multi-level)', '/boms/{{bom_id}}/components', [
+            'query' => ['qty' => 10],
+            'description' => 'Everything needed to make `qty` cartons, sub-assemblies expanded through their own recipes, scrap included.',
+        ])),
+        nw(req('GET', 'List BOM revisions', '/boms/{{bom_id}}/revisions', [
+            'description' => 'The version history, newest first. Saves the newest revision id into `{{revision_id}}`.',
+            'tests' => saveId('revision_id', 'data.0.id'),
+        ])),
+        nw(req('GET', 'Get BOM revision', '/boms/{{bom_id}}/revisions/{{revision_id}}', ['description' => 'One immutable snapshot: header, lines, by-products and the routing\'s operations as they were.'])),
+        nw(req('POST', 'Create BOM revision', '/boms/{{bom_id}}/revisions', ['description' => 'Starts a new version of an approved recipe with a reason.', 'body' => ['change_note' => 'Quarterly review']])),
+        nw(req('POST', 'Approve BOM', '/boms/{{bom_id}}/approve', ['description' => 'Draft → approved. **422** here because the BoM above is already approved; it only applies when the company requires approval (`require_bom_approval`).'])),
+        req('POST', 'Create BOM (to archive and delete)', '/boms', [
+            'description' => 'A throwaway BOM with no orders.',
+            'body' => ['product_id' => '{{finished_product_id}}', 'name' => 'Postman BOM Archive Me', 'lines' => [['component_product_id' => '{{product_id}}', 'qty_cartons' => 1]]],
+            'tests' => saveId('deletable_bom_id'),
+        ]),
+        nw(req('POST', 'Archive BOM', '/boms/{{deletable_bom_id}}/archive', ['description' => 'No new orders can be raised from it; existing ones are untouched.'])),
+        nw(req('POST', 'Restore BOM', '/boms/{{deletable_bom_id}}/restore', ['description' => 'Makes it usable again.'])),
+        nw(req('DELETE', 'Delete BOM', '/boms/{{deletable_bom_id}}', ['description' => '204; lines cascade. **409** when production orders were raised from it — archive it instead.'])),
+    ], 'Recipes: versions, revisions, approval, archive, multi-level components.'),
+    folder('Production orders', [
+        chg(req('POST', 'Create production order', '/production-orders', [
+            'description' => 'Give `qty_cartons` (any quantity) **or** `runs` (multiples of the recipe\'s yield). The BOM must be approved and active. Numbered `MO00001`...; the default conversion cost is the recipe\'s per-run cost scaled to the quantity. `exp_date` is needed when goods are received. Saves the id into `{{production_order_id}}`.',
+            'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty_cartons' => 5, 'priority' => 2, 'planned_start' => '2030-01-06', 'exp_date' => '2031-06-30', 'notes' => null],
+            'tests' => saveId('production_order_id'),
+        ]), 'now has a number, quantity in cartons, priority, planned dates, assignee and a source document; `exp_date` is optional.'),
+        chg(req('GET', 'List production orders', '/production-orders', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'status' => '', 'priority' => '', 'product_id' => '', 'source_type' => '', 'export' => 'csv'],
+            'description' => 'Filters: status, priority, warehouse_id, bom_id, product_id, assigned_to, source_type, source_id, planned_from, planned_to. `search` matches number, batch, notes, BoM.',
+        ]), 'adds filters and the new status/progress fields.'),
+        chg(req('GET', 'Get production order', '/production-orders/{{production_order_id}}', ['description' => 'Includes components, work orders, outputs and consumptions; `costs` only for users who may see cost.']), 'adds components, work orders, outputs, reservation status and quantities.'),
+        chg(req('PUT', 'Update production order', '/production-orders/{{production_order_id}}', [
+            'description' => 'A draft may change anything; once confirmed only priority, assignee, planned dates and notes. `status` is ignored.',
+            'body' => ['priority' => 3, 'notes' => 'Updated from Postman'],
+        ]), 'confirmed orders accept planning details; `status` can never be set directly.'),
+        nw(req('POST', 'Confirm production order', '/production-orders/{{production_order_id}}/confirm', ['description' => 'Draft → confirmed: copies the recipe\'s components into the order (with scrap), records the BoM revision, estimates cost, raises quality checks and reserves the materials.'])),
+        nw(req('POST', 'Reserve materials', '/production-orders/{{production_order_id}}/reserve-materials', ['description' => 'Reserves what is still missing (earliest-expiring, unexpired batches). The response lists `shortages`.'])),
+        nw(req('POST', 'Release materials', '/production-orders/{{production_order_id}}/release-materials', ['description' => 'Gives every reservation back.'])),
+        nw(req('POST', 'Plan production order', '/production-orders/{{production_order_id}}/plan', ['description' => 'Confirmed → planned: creates and schedules the work orders from the routing.'])),
+        nw(req('POST', 'Start production order', '/production-orders/{{production_order_id}}/start', ['description' => 'Confirmed/planned → in progress; makes the first operations ready.'])),
+        nw(req('POST', 'Pause production order', '/production-orders/{{production_order_id}}/pause', ['description' => 'In progress → paused; pauses running operations.', 'body' => ['reason' => 'Machine check']])),
+        nw(req('POST', 'Resume production order', '/production-orders/{{production_order_id}}/resume', ['description' => 'Paused → in progress.'])),
+        nw(req('POST', 'Record production (partial)', '/production-orders/{{production_order_id}}/record-production', [
+            'description' => 'Receives finished goods. With backflush the materials for this output are issued first; **422 with `shortfalls`** (nothing changes) if stock is short. With work orders you can only receive what the last operation processed. Safe to retry with an `Idempotency-Key` header.',
+            'body' => ['qty' => 2, 'rejected' => 0, 'exp_date' => '2031-06-30', 'notes' => null],
+        ])),
+        nw(req('POST', 'Consume materials', '/production-orders/{{production_order_id}}/consume-materials', [
+            'description' => 'Issues materials by hand (manual consumption, optional components, extra material).',
+            'body' => ['lines' => [['product_id' => '{{product_id}}', 'cartons' => 1]]],
+        ])),
+        nw(req('POST', 'Record scrap', '/production-orders/{{production_order_id}}/record-scrap', [
+            'description' => '`kind: component` wastes material (leaves stock; expensed or carried by the product); `kind: finished` writes off output. May wait for approval. Saves the scrap id into `{{scrap_id}}`.',
+            'body' => ['kind' => 'component', 'product_id' => '{{product_id}}', 'cartons' => 1, 'reason' => 'Spilled', 'notes' => null],
+            'tests' => saveId('scrap_id', 'scrap.id'),
+        ])),
+        chg(req('POST', 'Complete production order', '/production-orders/{{production_order_id}}/complete', [
+            'description' => 'Makes whatever is left, requires work orders done and mandatory quality checks passed, writes off variance, releases reservations and — if units were not made — follows the backorder policy (`ask` → send `create_backorder`). With no body on a draft it still does what it always did in one call. Safe to retry with an `Idempotency-Key` header.',
+            'body' => ['produce_remaining' => true, 'create_backorder' => null],
+        ]), 'runs on the new workflow engine; accepts produce_remaining / create_backorder / idempotency key.'),
+        nw(req('GET', 'Production order costs', '/production-orders/{{production_order_id}}/costs', ['description' => 'Planned against actual by material / operation / overhead, variance, scrap, unit cost and the ledger entries.'])),
+        nw(req('GET', 'Production order traceability', '/production-orders/{{production_order_id}}/traceability', ['description' => 'Material batches issued and batches produced (with what is left of each).'])),
+        nw(req('GET', 'Production order history', '/production-orders/{{production_order_id}}/history', ['description' => 'The append-only history of what happened and who did it.'])),
+        nw(req('POST', 'Create backorder', '/production-orders/{{production_order_id}}/create-backorder', ['description' => 'A draft order for what a completed order did not make. **422** unless the completed order is short and has no backorder yet.'])),
+        req('POST', 'Create production order (to cancel)', '/production-orders', [
+            'description' => 'A throwaway draft for the Cancel request below.',
+            'body' => ['bom_id' => '{{bom_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty_cartons' => 5],
+            'tests' => saveId('cancellable_production_order_id'),
+        ]),
+        chg(req('POST', 'Cancel production order', '/production-orders/{{cancellable_production_order_id}}/cancel', [
+            'description' => 'Releases reservations and cancels open operations. **422** once stock has moved or an operation has run.',
+            'body' => ['reason' => 'No longer needed'],
+        ]), 'accepts a reason; refused once stock has moved.'),
+        nw(req('POST', 'Reopen production order', '/production-orders/{{cancellable_production_order_id}}/reopen', ['description' => 'Cancelled → draft. **422** unless `allow_reopen_cancelled` is on in the settings.'])),
+        chg(req('DELETE', 'Delete production order', '/production-orders/{{cancellable_production_order_id}}', ['description' => 'Drafts and cancelled orders only. 204.']), 'orders in progress must be cancelled first.'),
+        nw(req('POST', 'Production orders from a sales order', '/production-orders/from-sales-order', [
+            'description' => 'Make-to-order: raises draft orders for the manufactured products on an **open** (draft/picking) sales order that free stock does not cover. Never twice for the same product and order. Uses the draft order from the Sales folder, so it is **422** if that order has since moved on.',
+            'body' => ['sales_order_id' => '{{gift_sales_order_id}}'],
+        ])),
+    ], 'The order workflow: confirm → plan → start → record production → complete, with reservations, scrap, backorders, costs and history.'),
+    folder('Scrap', [
+        nw(req('GET', 'List production scraps', '/production-scraps', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'status' => '', 'export' => 'csv'],
+            'description' => 'Filters: status, kind, product_id, production_order_id, from, to.',
+        ])),
+        nw(req('GET', 'Get production scrap', '/production-scraps/{{scrap_id}}', ['description' => 'One scrap document.'])),
+        nw(req('POST', 'Approve production scrap', '/production-scraps/{{scrap_id}}/approve', ['description' => 'Only a `pending` request (needs `scrap_requires_approval`); **422** otherwise.'])),
+        nw(req('POST', 'Reject production scrap', '/production-scraps/{{scrap_id}}/reject', ['description' => 'Only a `pending` request; moves nothing.'])),
+    ], 'Production scrap documents and their approval.'),
+    folder('Work orders', [
+        nw(req('GET', 'List work orders', '/work-orders', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'scheduled_start', 'sort_dir' => 'asc', 'status' => '', 'production_order_id' => '{{production_order_id}}', 'export' => 'csv'],
+            'description' => 'Filters: status, work_center_id, production_order_id, assigned_to, from, to. Saves the first id into `{{work_order_id}}`.',
+            'tests' => saveId('work_order_id', 'data.0.id'),
+        ])),
+        nw(req('GET', 'Get work order', '/work-orders/{{work_order_id}}', ['description' => 'With time logs and quality checks.'])),
+        nw(req('POST', 'Start work order', '/work-orders/{{work_order_id}}/start', ['description' => 'Must be `ready` (the operation before it completed); starts the order if needed; opens a time log.'])),
+        nw(req('POST', 'Pause work order', '/work-orders/{{work_order_id}}/pause', ['description' => 'Closes the time log.', 'body' => ['reason' => 'Lunch']])),
+        nw(req('POST', 'Resume work order', '/work-orders/{{work_order_id}}/resume', ['description' => 'Opens a new time log.'])),
+        nw(req('POST', 'Complete work order', '/work-orders/{{work_order_id}}/complete', [
+            'description' => 'Defaults to everything the previous operation passed on; costs the time at the work center rates, issues the materials tied to the operation, records rejects. Does **not** complete the order.',
+            'body' => ['qty_rejected' => 0, 'notes' => 'Smooth'],
+        ])),
+        nw(req('POST', 'Reschedule work order', '/work-orders/{{work_order_id}}/reschedule', [
+            'description' => 'A busy or non-working time is **422** with `next_free_start` unless `auto_shift` is true.',
+            'body' => ['scheduled_start' => '2030-01-08 09:00:00', 'auto_shift' => true],
+        ])),
+        nw(req('POST', 'Assign work order operator', '/work-orders/{{work_order_id}}/assign', ['description' => 'The operator.', 'body' => ['user_id' => '{{user_id}}']])),
+    ], 'Shop-floor execution of an order\'s operations.'),
+    folder('Quality', [
+        nw(req('POST', 'Create quality check definition', '/quality-check-definitions', [
+            'description' => 'What to check, where (incoming / in_process / final), what passes (pass_fail, or a measured value within limits). A mandatory check blocks completion. Saves the id into `{{quality_definition_id}}`.',
+            'body' => ['name' => 'Fill volume', 'point' => 'final', 'type' => 'measure', 'min_value' => 98, 'max_value' => 102, 'unit_label' => 'ml', 'mandatory' => false, 'instructions' => 'Measure 5 bottles'],
+            'tests' => saveId('quality_definition_id'),
+        ])),
+        nw(req('GET', 'List quality check definitions', '/quality-check-definitions', ['query' => ['point' => 'final'], 'description' => 'Filters: point, active.'])),
+        nw(req('GET', 'Get quality check definition', '/quality-check-definitions/{{quality_definition_id}}', ['description' => 'One definition.'])),
+        nw(req('PUT', 'Update quality check definition', '/quality-check-definitions/{{quality_definition_id}}', ['description' => 'Partial.', 'body' => ['max_value' => 103]])),
+        nw(req('POST', 'Create quality check', '/quality-checks', [
+            'description' => 'An inspection by hand, e.g. incoming material. Saves the id into `{{quality_check_id}}`.',
+            'body' => ['definition_id' => '{{quality_definition_id}}', 'point' => 'incoming', 'product_id' => '{{product_id}}', 'reference_type' => 'purchase_order', 'reference_id' => '{{purchase_order_id}}'],
+            'tests' => saveId('quality_check_id'),
+        ])),
+        nw(req('GET', 'List quality checks', '/quality-checks', ['query' => ['status' => 'pending'], 'description' => 'Filters: status, point, production_order_id, work_order_id, product_id, mandatory.'])),
+        nw(req('GET', 'Get quality check', '/quality-checks/{{quality_check_id}}', ['description' => 'With its alerts.'])),
+        nw(req('POST', 'Record quality check result', '/quality-checks/{{quality_check_id}}/record', [
+            'description' => 'A measured check passes when the value is inside the limits; a failure opens an alert.',
+            'body' => ['measured_value' => 105, 'defect_class' => 'Under-fill', 'severity' => 'medium', 'corrective_action' => 'Re-calibrate the filler'],
+        ])),
+        nw(req('GET', 'List quality alerts', '/quality-alerts', [
+            'query' => ['status' => 'open'],
+            'description' => 'Filters: status, severity, production_order_id, product_id. Saves the first id into `{{quality_alert_id}}`.',
+            'tests' => saveId('quality_alert_id', 'data.0.id'),
+        ])),
+        nw(req('POST', 'Resolve quality alert', '/quality-alerts/{{quality_alert_id}}/resolve', ['description' => 'Closes the alert once the cause is dealt with.', 'body' => ['corrective_action' => 'Filler re-calibrated']])),
+        nw(req('DELETE', 'Delete quality check definition', '/quality-check-definitions/{{quality_definition_id}}', ['description' => '204.'])),
+    ], 'Quality definitions, checks and alerts. Mandatory checks block completion.'),
+    folder('Planning (MRP)', [
+        nw(req('POST', 'Set product planning policy', '/product-planning', [
+            'description' => 'How planning treats a product: `procurement` make/buy/auto, lead time, lot rule (exact / fixed / multiple / min_max), make-to-order. Safety stock and reorder point are the product\'s own `min_stock_cartons` and `reorder_level`. Saving a product that already has a policy updates it. Saves the id into `{{planning_id}}`.',
+            'body' => ['product_id' => '{{product_id}}', 'procurement' => 'buy', 'lead_time_days' => 3, 'lot_rule' => 'multiple', 'multiple_qty' => 12, 'make_to_order' => false],
+            'tests' => saveId('planning_id'),
+        ])),
+        nw(req('GET', 'List product planning policies', '/product-planning', ['query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'], 'description' => 'Filters: procurement, lot_rule.'])),
+        nw(req('GET', 'Get product planning policy', '/product-planning/{{planning_id}}', ['description' => 'One policy.'])),
+        nw(req('PUT', 'Update product planning policy', '/product-planning/{{planning_id}}', ['description' => 'Partial.', 'body' => ['lead_time_days' => 5]])),
+        nw(req('DELETE', 'Delete product planning policy', '/product-planning/{{planning_id}}', ['description' => '204.'])),
+        nw(req('POST', 'Create manual demand', '/mrp-demands', [
+            'description' => 'A planned requirement that is not a sales order: a manual need or a forecast. Saves the id into `{{demand_id}}`.',
+            'body' => ['product_id' => '{{finished_product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty_cartons' => 20, 'due_date' => '2030-02-01', 'kind' => 'forecast', 'notes' => 'Q1 forecast'],
+            'tests' => saveId('demand_id'),
+        ])),
+        nw(req('GET', 'List manual demands', '/mrp-demands', ['query' => ['page' => 1, 'per_page' => 15, 'status' => 'open', 'export' => 'csv'], 'description' => 'Filters: status, kind, product_id, warehouse_id, from, to.'])),
+        nw(req('GET', 'Get manual demand', '/mrp-demands/{{demand_id}}', ['description' => 'One demand.'])),
+        nw(req('PUT', 'Update manual demand', '/mrp-demands/{{demand_id}}', ['description' => 'Partial.', 'body' => ['qty_cartons' => 25]])),
+        nw(req('POST', 'Run planning', '/mrp/plan', [
+            'description' => 'Records and runs a planning run for one warehouse: demand (sales orders, manual demands, open orders) against stock and incoming supply, level by level, with lot sizing. It only **proposes**. `async: true` queues it (202). A failure is reported in the run, not as a server error. Saves the id into `{{mrp_run_id}}`.',
+            'body' => ['warehouse_id' => '{{warehouse_id}}', 'horizon_days' => 90, 'async' => false],
+            'tests' => saveId('mrp_run_id'),
+        ])),
+        nw(req('GET', 'List planning runs', '/mrp/runs', ['query' => ['page' => 1, 'per_page' => 15], 'description' => 'Filter: status.'])),
+        nw(req('GET', 'Get planning run', '/mrp/runs/{{mrp_run_id}}', ['description' => 'Inputs, statistics, timing, and any error.'])),
+        nw(req('GET', 'MRP requirements report', '/mrp/requirements', [
+            'query' => ['page' => 1, 'per_page' => 25],
+            'description' => 'Per product, shallowest first: gross requirement, on hand, reserved, incoming, safety stock, net requirement, planned quantity, due date, action. Filters: action, product_id, level, short_only, run_id.',
+        ])),
+        nw(req('GET', 'MRP shortages', '/mrp/shortages', ['description' => 'Only products that need something ordered, each with the suggestions that cover it.'])),
+        nw(req('GET', 'List MRP suggestions', '/mrp/suggestions', [
+            'query' => ['page' => 1, 'per_page' => 25, 'status' => 'proposed', 'export' => 'csv'],
+            'description' => 'Filters: status, type, product_id, warehouse_id, mrp_run_id. Saves the first id into `{{mrp_suggestion_id}}`.',
+            'tests' => saveId('mrp_suggestion_id', 'data.0.id'),
+        ])),
+        nw(req('GET', 'Get MRP suggestion', '/mrp/suggestions/{{mrp_suggestion_id}}', ['description' => 'One suggestion with its sources.'])),
+        nw(req('POST', 'Convert purchase suggestions', '/mrp/suggestions/convert-purchases', [
+            'description' => 'Turns purchase suggestions into draft purchase orders, one per supplier and warehouse, **without costs** (each waits to be priced). **422** when a product has no supplier.',
+            'body' => ['suggestion_ids' => ['{{mrp_suggestion_id}}']],
+        ])),
+        nw(req('POST', 'Convert manufacture suggestion', '/mrp/suggestions/{{mrp_suggestion_id}}/convert', ['description' => 'A manufacture suggestion becomes a **draft** manufacturing order (`source_type: mrp_suggestion`). **422** for a purchase suggestion.'])),
+        nw(req('POST', 'Dismiss MRP suggestion', '/mrp/suggestions/{{mrp_suggestion_id}}/dismiss', ['description' => 'Stays dismissed while the same need remains.'])),
+        nw(req('DELETE', 'Delete manual demand', '/mrp-demands/{{demand_id}}', ['description' => '204.'])),
+    ], 'Material requirements planning: policies, manual demand, runs, requirements, shortages and suggestions. See docs/manufacturing/mrp-algorithm.md.'),
+    folder('Attachments', [
+        nw(req('POST', 'Attach a file', '/manufacturing/attachments', [
+            'description' => 'Attach a drawing, instruction sheet, certificate or photo to a BoM (`attachable_type`: bom, production_order, work_order, routing, quality_check). pdf / jpg / png / doc / docx / xls / xlsx / csv / txt, up to 10 MB. Attach a file to the `file` field before sending — in an unattended collection run this returns 422. Saves the id into `{{attachment_id}}`.',
+            'files' => ['file' => 'The document (max 10 MB).'],
+            'body' => ['attachable_type' => 'bom', 'attachable_id' => '{{bom_id}}', 'description' => 'Blending instructions'],
+            'tests' => saveId('attachment_id'),
+        ])),
+        nw(req('GET', 'List attachments', '/manufacturing/attachments', [
+            'query' => ['attachable_type' => 'bom', 'attachable_id' => '{{bom_id}}'],
+            'requiredQuery' => ['attachable_type', 'attachable_id'],
+            'description' => 'The files attached to one record.',
+        ])),
+        nw(req('GET', 'Download attachment', '/manufacturing/attachments/{{attachment_id}}/download', ['description' => 'File download; 404 for another company\'s file.'])),
+        nw(req('DELETE', 'Delete attachment', '/manufacturing/attachments/{{attachment_id}}', ['description' => 'Removes the record and the stored file. 204.'])),
+    ], 'Documents attached to recipes, orders, operations, routings and quality checks.'),
+    folder('Reports', [
+        nw(req('GET', 'Production report', '/reports/manufacturing/production', ['query' => ['group_by' => 'product', 'from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Planned vs produced vs rejected, completion % and yield %. `group_by`: product, month, warehouse.'])),
+        nw(req('GET', 'Material consumption report', '/reports/manufacturing/material-consumption', ['query' => ['from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Used and scrapped cartons per component; values only for users who may see cost.'])),
+        nw(req('GET', 'Scrap report', '/reports/manufacturing/scrap', ['query' => ['from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Scrap and rejections by kind / reason / product, and the period\'s rejection rate.'])),
+        nw(req('GET', 'Work center utilization report', '/reports/manufacturing/work-center-utilization', ['query' => ['from' => '2030-01-01', 'to' => '2030-01-31', 'export' => 'csv'], 'description' => 'Available, scheduled and worked minutes per work center, duration variance, load % and utilization %.'])),
+        nw(req('GET', 'Lead times report', '/reports/manufacturing/lead-times', ['query' => ['from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Completed orders: lead time, delay against plan, on-time %.'])),
+        nw(req('GET', 'Traceability report', '/reports/manufacturing/traceability', ['query' => ['batch_no' => 'POSTMAN-MO-1'], 'requiredQuery' => ['batch_no'], 'description' => 'Where a batch came from and where it went (give a finished or a material batch number).'])),
+        nw(req('GET', 'Cost variance report', '/reports/manufacturing/cost-variance', ['query' => ['from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Completed orders: planned vs actual cost, variance, scrap, unit cost.'])),
+        nw(req('GET', 'WIP valuation report', '/reports/manufacturing/wip-valuation', ['description' => 'What is in progress per open work-in-progress order, and the balance of account 1350 to reconcile with.'])),
+    ], 'Manufacturing reports: database aggregations with filters, pagination and export.'),
+], 'Full manufacturing: recipes, order workflow, reservations, routing and work orders, quality, scrap, costing, planning and reports. See docs/api/manufacturing.md and docs/manufacturing/.'));
 
 $hr = nw(folder('HR', [
     folder('Departments', [
@@ -1688,6 +1912,21 @@ $collection = [
             'payroll_run_id' => '',
             'deletable_payroll_run_id' => '',
             'payslip_id' => '',
+            'work_center_id' => '',
+            'downtime_id' => '',
+            'routing_id' => '',
+            'routing_operation_id' => '',
+            'revision_id' => '',
+            'work_order_id' => '',
+            'scrap_id' => '',
+            'quality_definition_id' => '',
+            'quality_check_id' => '',
+            'quality_alert_id' => '',
+            'planning_id' => '',
+            'demand_id' => '',
+            'mrp_run_id' => '',
+            'mrp_suggestion_id' => '',
+            'attachment_id' => '',
         ]),
         $vars
     ),

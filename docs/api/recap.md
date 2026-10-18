@@ -15,6 +15,10 @@ for the batches' cost, so the loss shows on the income statement and the
 inventory asset drops by the same amount. Accounts `6300` and `1300` are
 looked up by code — run `AccountSeeder` so `6300` exists.
 
+🔄 Stock that a manufacturing order has **reserved** cannot be written off: approving
+is refused (**422**) when the batch's free cartons — on hand less reserved — are
+fewer than the line asks for. Release the reservation (or cancel the order) first.
+
 Status flow: `draft → approved` or `draft → rejected`. A draft changes no stock
 and posts nothing. Only drafts can be edited, deleted, approved or rejected —
 anything else returns **422** `{"message": "Only draft recaps can be changed."}`.

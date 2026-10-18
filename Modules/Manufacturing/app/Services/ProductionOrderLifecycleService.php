@@ -80,7 +80,7 @@ class ProductionOrderLifecycleService
             }
 
             return $locked->refresh();
-        });
+        }, 3);
     }
 
     /**
@@ -106,7 +106,7 @@ class ProductionOrderLifecycleService
                 : new MaterialShortageDetected($locked->tenant_id, $locked->id, ['shortages' => $shortages]));
 
             return ['order' => $locked, 'shortages' => $shortages];
-        });
+        }, 3);
     }
 
     /**
@@ -180,7 +180,7 @@ class ProductionOrderLifecycleService
             event(new ProductionStarted($locked->tenant_id, $locked->id));
 
             return $locked->refresh();
-        });
+        }, 3);
     }
 
     /**
@@ -247,7 +247,7 @@ class ProductionOrderLifecycleService
             event(new ProductionOrderCancelled($locked->tenant_id, $locked->id, ['reason' => $reason]));
 
             return $locked->refresh();
-        });
+        }, 3);
     }
 
     /**
@@ -375,7 +375,7 @@ class ProductionOrderLifecycleService
                 'backorder' => $backorderId ? ProductionOrder::query()->find($backorderId) : null,
                 'replayed' => $outcome['replayed'],
             ];
-        });
+        }, 3);
     }
 
     /**
@@ -448,8 +448,9 @@ class ProductionOrderLifecycleService
             return;
         }
 
+        // Without operations the dates are the ones asked for, or the lead time from the start.
         $start = $order->planned_start ?? now();
-        $order->update(['planned_start' => $start, 'planned_finish' => Carbon::parse($start)->addDays($settings->lead_time_days)]);
+        $order->update(['planned_start' => $start, 'planned_finish' => $order->planned_finish ?? Carbon::parse($start)->addDays($settings->lead_time_days)]);
     }
 
     /**

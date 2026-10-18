@@ -62,10 +62,11 @@ is **404**.
 
 **System accounts** (auto-posting looks these up by code; never deleted or
 re-coded/re-typed): `1110` Cash, `1120` Bank, `1200` Accounts Receivable, `1300`
-Inventory, 🆕 `1400` VAT Receivable (input VAT), `2100` Accounts Payable, 🆕 `2200`
+Inventory, 🆕 `1350` Work in Progress (manufacturing, only when WIP accounting is on),
+🆕 `1400` VAT Receivable (input VAT), `2100` Accounts Payable, 🆕 `2200`
 Salaries Payable, 🆕 `2210` Payroll Taxes & Insurance Payable, `2300` VAT
 Payable, 🆕 `3300` Opening Balance Equity, `4100` Sales Revenue, 🆕 `5100` Cost
-of Goods Sold, 🆕 `6100` Salaries Expense, `6300` Inventory Write-off Expense
+of Goods Sold, 🆕 `5200` Manufacturing Variance, 🆕 `6100` Salaries Expense, `6300` Inventory Write-off Expense
 ([Recap](./recap.md)) and `6400` Manufacturing Overhead Absorbed
 ([Manufacturing](./manufacturing.md)). Run `AccountSeeder` to create the new ones
 on an existing database.

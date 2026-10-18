@@ -42,6 +42,7 @@ class ProductionCostingService
         if ($bom->routing_id !== null) {
             foreach ($bom->routing()->first()->operations()->with('workCenter')->get() as $step) {
                 $minutes = $step->plannedMinutes($order->output_qty_cartons, (float) $step->workCenter->efficiency_pct);
+                $minutes = $minutes > 0 ? $minutes : $settings->default_operation_minutes;
                 $operation += $minutes / 60 * ((float) $step->workCenter->cost_per_hour + (float) $step->workCenter->labor_cost_per_hour);
             }
         }

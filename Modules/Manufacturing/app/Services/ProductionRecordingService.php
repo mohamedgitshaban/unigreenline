@@ -9,7 +9,6 @@ use Modules\Inventory\Models\Warehouse;
 use Modules\Manufacturing\Events\FinishedGoodsReceived;
 use Modules\Manufacturing\Events\MaterialsConsumed;
 use Modules\Manufacturing\Exceptions\BatchNumberTakenException;
-use Modules\Manufacturing\Exceptions\InvalidOrderTransitionException;
 use Modules\Manufacturing\Exceptions\ManufacturingRuleException;
 use Modules\Manufacturing\Models\ManufacturingSetting;
 use Modules\Manufacturing\Models\ProductionConsumption;
@@ -17,6 +16,7 @@ use Modules\Manufacturing\Models\ProductionOrder;
 use Modules\Manufacturing\Models\ProductionOrderComponent;
 use Modules\Manufacturing\Models\ProductionOutput;
 use Modules\Manufacturing\Models\ProductionScrap;
+use Modules\Manufacturing\Models\WorkOrder;
 
 /**
  * Everything that moves stock or cost on a manufacturing order: issuing
@@ -79,7 +79,7 @@ class ProductionRecordingService
             });
 
             return ['order' => $locked->refresh(), 'replayed' => $outcome['replayed']];
-        });
+        }, 3);
     }
 
     /**
@@ -106,7 +106,7 @@ class ProductionRecordingService
             });
 
             return ['order' => $locked->refresh(), 'replayed' => $outcome['replayed']];
-        });
+        }, 3);
     }
 
     /**
@@ -241,7 +241,7 @@ class ProductionRecordingService
             });
 
             return ['order' => $locked->refresh(), 'scrap' => ProductionScrap::query()->findOrFail($outcome['result']['scrap_id']), 'replayed' => $outcome['replayed']];
-        });
+        }, 3);
     }
 
     /**
@@ -520,7 +520,7 @@ class ProductionRecordingService
      *
      * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
      */
-    public function recordWorkOrderRejects(ProductionOrder $order, \Modules\Manufacturing\Models\WorkOrder $workOrder, int $cartons, string $reason, array $actor = []): ProductionScrap
+    public function recordWorkOrderRejects(ProductionOrder $order, WorkOrder $workOrder, int $cartons, string $reason, array $actor = []): ProductionScrap
     {
         $scrap = $this->createScrap($order, 'finished', $order->bom->product_id, $cartons, $reason, 0.0, $workOrder->id, 'approved', $actor);
         $order->update(['rejected_qty_cartons' => $order->rejected_qty_cartons + $cartons]);

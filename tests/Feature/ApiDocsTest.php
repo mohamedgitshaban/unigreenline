@@ -38,6 +38,8 @@ class ApiDocsTest extends TestCase
             'expenses' => ['expenses'],
             'analytics' => ['analytics'],
             'admin' => ['admin'],
+            'recap' => ['recap'],
+            'manufacturing' => ['manufacturing'],
         ];
     }
 

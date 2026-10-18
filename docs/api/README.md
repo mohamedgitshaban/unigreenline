@@ -21,7 +21,7 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **Edit & delete endpoints** across the API, gated by `{module}.edit` / `{module}.delete` → [Editing and deleting](#editing-and-deleting-records--new)
 > - 🆕 **Spreadsheet import** for customers, products, suppliers, warehouses and invoices → [Importing](#importing-from-a-spreadsheet--new)
 > - 🆕 **Recap** (stock write-off posting to the chart of accounts) → [recap.md](./recap.md)
-> - 🆕 **Manufacturing** (BOMs, production orders) → [manufacturing.md](./manufacturing.md)
+> - 🔄 **Manufacturing, now a full module** — recipes with revisions and approval, an order workflow (confirm → plan → start → produce → complete) with partial production and backorders, batch **reservations**, routing and work centers with capacity scheduling, shop-floor work orders, quality control, scrap and by-products, costing with optional work-in-progress accounting, **material requirements planning**, and reports → [manufacturing.md](./manufacturing.md); background in [docs/manufacturing](../manufacturing/architecture-analysis.md)
 > - 🆕 **Units / packaging ladder** (packet → package → carton) → [inventory.md](./inventory.md#units--product-packaging--new)
 > - 🆕 **Free gifts** on purchase receipts and gift lines on sales orders
 > - 🆕 **Minimum selling price** per product; 🔄 **product cost is Administrator-only**
@@ -29,7 +29,7 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **Product life cycle** timeline → [analytics.md](./analytics.md#get-apiv1productsidlifecycle--new)
 > - 🆕 Chart of accounts create/edit/delete; 🆕 invoice **void**
 > - 🆕 **Purchase orders pending pricing** — buyers no longer enter costs; an admin prices the order → [purchasing.md](./purchasing.md#pending-pricing-who-sets-the-cost--new)
-> - 🔄 **Permissions are now per endpoint** (`{resource}.{action}`, 207 of them) so a role can read `expenses` without reading `expense-categories` → [permissions.md](./permissions.md)
+> - 🔄 **Permissions are now per endpoint** (`{resource}.{action}`) so a role can read `expenses` without reading `expense-categories` → [permissions.md](./permissions.md)
 > - 🆕 **HR module** — employees, attendance (check-in/out), work schedules, global holidays, time permissions (late / early leave / partial), leave, and monthly payroll posted to the chart of accounts → [hr.md](./hr.md)
 > - 🔄 **Finance review** — cost of goods sold on delivery, input VAT on purchases, returns and manual goods receipts now post to the ledger; supplier payments, manual journal entries (with reversal), an account-connections map, and a balance sheet that balances → [accounting.md](./accounting.md#finance-review--what-was-missing-and-what-changed)
 > - 🆕 **Create + deliver in one call** — `POST /sales-orders/deliver` → [sales.md](./sales.md#post-apiv1sales-ordersdeliver--new)
@@ -288,7 +288,7 @@ The counts are on both the list and the show response of the parent.
 | Accounting (Chart of Accounts / Journal Entries / Balance Sheet / Income Statement) | Done | [accounting.md](./accounting.md) |
 | Expenses (Expense Categories / Expenses / Receipts / Approval) | Done | [expenses.md](./expenses.md) |
 | 🆕 Recap (stock write-offs posting to the chart of accounts) | New | [recap.md](./recap.md) |
-| 🆕 Manufacturing (BOMs / Production Orders) | New | [manufacturing.md](./manufacturing.md) |
+| 🔄 Manufacturing (BOMs / Production Orders / Work centers / Routings / Work orders / Quality / Planning / Reports) | Extended | [manufacturing.md](./manufacturing.md) |
 | 🆕 HR (Employees / Attendance / Holidays / Time permissions / Leave / Payroll) | New | [hr.md](./hr.md) |
 | 🔄 Permission reference (every permission, the endpoints it guards, the roles holding it) | Generated | [permissions.md](./permissions.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
@@ -302,7 +302,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all the endpoints below (291 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
+all the endpoints below (387 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —
@@ -334,7 +334,7 @@ After pulling this update, an existing install needs (in order):
 
 ```bash
 php artisan migrate
-php artisan db:seed --class="Modules\\Accounting\\Database\\Seeders\\AccountSeeder"     # accounts 1400, 2200, 2210, 3300, 5000, 5100, 6300, 6400
+php artisan db:seed --class="Modules\\Accounting\\Database\\Seeders\\AccountSeeder"     # accounts 1350, 1400, 2200, 2210, 3300, 5000, 5100, 5200, 6300, 6400
 php artisan db:seed --class="Modules\\Core\\Database\\Seeders\\RolePermissionSeeder"   # per-endpoint permissions + the HR Manager and Employee roles
 php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\UnitSeeder"        # Packet / Package / Carton
 php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\ProductUnitSeeder" # every product gets a Packet -> Carton ladder
@@ -352,6 +352,10 @@ php artisan db:seed --class="Modules\\HR\\Database\\Seeders\\HRDatabaseSeeder"  
   losing the entry.
 - Journal entries gained `type` (`system` / `manual` / `reversal`), `reversal_of`
   and `reversed_at`; existing entries become `system`.
+- **Manufacturing:** the migrations number existing BoMs (`BOM00001` …) and orders (`MO00001` …) and keep them working;
+  `inventory_batches` gains `reserved_cartons`. Stock that a confirmed manufacturing order has **reserved** can no longer be taken by
+  sales, transfers, write-offs or purchase returns. Set the default warehouse in `PUT /manufacturing/settings` before the nightly
+  `mrp:plan` run, and run `php artisan queue:work` if you plan with `async: true` → [operations guide](../manufacturing/installation-and-operations.md).
 - Re-run `php docs/postman/generate.php` and `php artisan permissions:docs`
   after changing endpoints (a test fails if the permission reference is stale).
 
