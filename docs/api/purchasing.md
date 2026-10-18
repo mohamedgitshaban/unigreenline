@@ -1,8 +1,8 @@
 # Purchasing
 
-`Purchasing` role has `purchasing.view/add/edit/approve/print`. Receiving a
-PO specifically requires `purchasing.approve` (spec §5.2/§6) — `add` alone
-is not enough.
+The `Purchasing` role holds the view / create / update permissions of suppliers and purchase orders plus
+`purchase-orders.receive` and `purchase-orders.upload-invoice`. Receiving a PO
+specifically requires `purchase-orders.receive` (spec §5.2/§6) — `purchase-orders.create` alone is not enough.
 
 **Note:** the spec's own endpoint table (§6) never actually lists a
 `/suppliers` endpoint, even though `purchase_orders.supplier_id` needs one
@@ -14,7 +14,7 @@ with the same `GET/POST` shape every other reference entity gets
 
 ## `GET /api/v1/suppliers`
 
-Requires `purchasing.view` or `accounting.view`.
+Requires `suppliers.view`.
 
 ## `GET /api/v1/suppliers/{id}`
 
@@ -22,7 +22,7 @@ Same permissions as the list. **404** — the supplier belongs to another accoun
 
 ## `POST /api/v1/suppliers/contracts`
 
-Requires `purchasing.add` or `purchasing.edit`. **Step 1 of attaching a
+Requires `suppliers.upload-contract`. **Step 1 of attaching a
 contract.** `multipart/form-data` with a single `contract` file — `pdf`,
 `jpg`, `jpeg`, `png`, `doc` or `docx`, max 10 MB.
 
@@ -44,7 +44,7 @@ already attached to another supplier — otherwise `422`.
 
 ## `POST /api/v1/suppliers`
 
-Requires `purchasing.add`. Only `name` is required.
+Requires `suppliers.create`. Only `name` is required.
 
 ```json
 {
@@ -65,7 +65,7 @@ a PO from this supplier is received.
 
 ## `PUT /api/v1/suppliers/{id}`
 
-Requires `purchasing.edit`, and the supplier must belong to your account
+Requires `suppliers.update`, and the supplier must belong to your account
 (**403** otherwise). Partial update — send only the fields you're changing;
 same fields and rules as `POST`. `name` stays unique per account, but keeping
 a supplier's own current name is fine.
@@ -84,14 +84,14 @@ PO moves it.
 
 ## `DELETE /api/v1/suppliers/{id}` 🆕 NEW
 
-Requires `purchasing.delete`. **204**, audit-logged as `DELETE`. **409** while
+Requires `suppliers.delete`. **204**, audit-logged as `DELETE`. **409** while
 the supplier has purchase orders or expenses — set `status: inactive` instead.
 The contract file on disk is not removed by this call. Another tenant's supplier
 is **404**.
 
 ## `POST /api/v1/suppliers/import` 🆕 NEW
 
-Requires `purchasing.add`. Multipart `file` (+ optional `update_existing`) — see
+Requires `suppliers.import`. Multipart `file` (+ optional `update_existing`) — see
 [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
 Matched by **name**. Columns: `Name`*, `Country`, `City`, `Address`, `Contact`,
 `Email`, `Phone`, `Pay Terms`, `Currency` (3 letters), `Rating` (1–5), `Status`.
@@ -100,11 +100,11 @@ Contract files cannot be imported — attach them afterwards with
 
 ## `GET /api/v1/suppliers/import-template` 🆕 NEW
 
-Requires `purchasing.add`. Downloads `suppliers-import-template.xlsx`.
+Requires `suppliers.import`. Downloads `suppliers-import-template.xlsx`.
 
 ## `GET /api/v1/suppliers/{id}/contract`
 
-Requires `purchasing.view` or `accounting.view`. Downloads the contract file
+Requires `suppliers.view`. Downloads the contract file
 (`contract-{id}.pdf` etc.) — this is what `contract_url` points at. Send the
 bearer token; it isn't a public link.
 
@@ -114,11 +114,11 @@ bearer token; it isn't a public link.
 
 ## `GET /api/v1/purchase-orders`, `GET /api/v1/purchase-orders/{id}`
 
-Requires `purchasing.view`. Includes `lines_count`.
+Requires `purchase-orders.view`. Includes `lines_count`.
 
 ## `GET /api/v1/purchase-orders/{id}/lines`
 
-Requires `purchasing.view`. The PO's lines (each with its `product`) as
+Requires `purchase-orders.view`. The PO's lines (each with its `product`) as
 their own list. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. A line's `id` is the `line_id` that receive
 expects.
 
@@ -132,12 +132,12 @@ expects.
 buyer creates (no costs) ──► pending_pricing ──► admin prices ──► draft ──► sent/pending ──► received
 ```
 
-- **Who may price:** the new permission **`purchasing.pricing`** — held by
+- **Who may price:** the permission **`purchase-orders.pricing`** — held by
   `Administrator` only. An admin can grant it to any role through
   [Roles](./admin.md#roles--permissions); it is not part of the usual
   view/add/edit/... grid. (Re-run `RolePermissionSeeder` to create it.)
 - **Creating:** `lines[].cost_per_carton` / `cost_per_unit` are now **optional**
-  and may only be sent by a user with `purchasing.pricing` — anyone else sending
+  and may only be sent by a user with `purchase-orders.pricing` — anyone else sending
   a cost gets **422** on `lines.N.cost_per_carton`. An order with any unpriced
   line is created with `status: "pending_pricing"`, `subtotal`/`tax_amount`/`total`
   `0.00` and line costs `0.00`. A pricer who sends a cost for every line gets a
@@ -152,14 +152,14 @@ buyer creates (no costs) ──► pending_pricing ──► admin prices ──
 
 ### `GET /api/v1/purchase-orders/pending-pricing` 🆕 NEW
 
-Requires `purchasing.pricing` (**403** otherwise). The admin's queue: the
+Requires `purchase-orders.pricing` (**403** otherwise). The admin's queue: the
 tenant's orders still in `pending_pricing`, newest first, same shape as
 `GET /purchase-orders` (with `lines_count`). Supports `search`
 (id, notes, supplier, warehouse), `sort_by` and pagination.
 
 ### `PUT /api/v1/purchase-orders/{id}/pricing` 🆕 NEW
 
-Requires `purchasing.pricing`. Sets the cost of **every** line in one call:
+Requires `purchase-orders.pricing`. Sets the cost of **every** line in one call:
 
 ```json
 {
@@ -185,7 +185,7 @@ Requires `purchasing.pricing`. Sets the cost of **every** line in one call:
 
 ## `POST /api/v1/purchase-orders` 🔄 CHANGED
 
-Requires `purchasing.add`. 🔄 Costs are now optional — see [Pending pricing](#pending-pricing-who-sets-the-cost--new). A line can now be ordered **in any packaging unit**
+Requires `purchase-orders.create`. 🔄 Costs are now optional — see [Pending pricing](#pending-pricing-who-sets-the-cost--new). A line can now be ordered **in any packaging unit**
 of its product, not only cartons (see
 [Units & product packaging](./inventory.md#units--product-packaging--new)).
 
@@ -228,7 +228,7 @@ line ids from `GET /purchase-orders/{id}/lines`.
 
 ## `PUT /api/v1/purchase-orders/{id}`
 
-Requires `purchasing.edit`. 🔄 `lines` accept the same unit form as create. **Only while not received** — same rule as delete.
+Requires `purchase-orders.update`. 🔄 `lines` accept the same unit form as create. **Only while not received** — same rule as delete.
 Partial update: send only the fields you're changing.
 
 ```json
@@ -253,7 +253,7 @@ Partial update: send only the fields you're changing.
 
 ## `DELETE /api/v1/purchase-orders/{id}`
 
-Requires `purchasing.delete` — by default only **Administrator** has it
+Requires `purchase-orders.delete` — by default only **Administrator** has it
 (`Purchasing` has view/add/edit/approve/print, not delete).
 
 **Only while not received.** Creating a PO has no stock, supplier-balance or
@@ -272,7 +272,7 @@ along with its lines.
 > supplier threw in. Send it as `free_gifts` (below); it goes into stock at zero
 > cost, flagged as a free gift.
 
-Requires `purchasing.approve`. Adds stock for every line — this is where
+Requires `purchase-orders.receive`. Adds stock for every line — this is where
 inventory actually increases, exactly like manual GRN (same
 product+warehouse+batch_no create-or-topup rule, and the same requirement
 for a real expiry date per line, never fabricated).
@@ -331,8 +331,10 @@ goods. When sent, `invoice_no` is required; `invoice_date`, `amount` and
 - `status` → `received`, `stock_added` → `true`, `received_date` set.
 - The supplier's `balance` decreases by the PO `total` (more negative — we
   owe more).
-- A balanced journal entry posts: Dr Inventory (1300), Cr Accounts Payable
-  (2100), both for the PO total.
+- 🔄 A balanced journal entry posts: **Dr Inventory (1300)** for the order's
+  subtotal, **Dr VAT Receivable (1400)** for its tax, **Cr Accounts Payable
+  (2100)** for the total. Stock is booked at cost excluding tax (matching the
+  batch costs); the tax is input VAT, to be offset against VAT Payable.
 
 **200** — the updated PO (with `lines_count` and `supplier_invoice`).
 
@@ -342,11 +344,11 @@ doesn't exactly cover every PO line, or the PO was already received (a
 second `receive` call is rejected, not silently ignored — if you need to
 know whether one already happened, check `stock_added` on the PO first).
 
-**403** — user has `purchasing.add` but not `purchasing.approve`.
+**403** — user has `purchase-orders.create` but not `purchase-orders.receive`.
 
 ## `POST /api/v1/purchase-orders/invoices`
 
-Requires `purchasing.approve`. **Step 1 of attaching the supplier's invoice
+Requires `purchase-orders.upload-invoice`. **Step 1 of attaching the supplier's invoice
 file.** `multipart/form-data` with a single `invoice` file — `jpg`, `jpeg`,
 `png` or `pdf`, max 5 MB.
 
@@ -364,7 +366,7 @@ Send `file_path` as `invoice_data.file_path` on receive.
 
 ## `GET /api/v1/purchase-orders/{id}/invoice`
 
-Requires `purchasing.view`. Downloads the supplier invoice file
+Requires `purchase-orders.view`. Downloads the supplier invoice file
 (`supplier-invoice-{id}.pdf` etc.) — what `supplier_invoice.file_url` points
 at. **404** — no file attached, or the PO belongs to another account.
 
@@ -372,7 +374,7 @@ at. **404** — no file attached, or the PO belongs to another account.
 
 ## `GET /api/v1/reports/ap-aging`
 
-Requires `purchasing.view` **or** `accounting.view`. Every supplier with a
+Requires `ap-aging.view`. Every supplier with a
 negative `balance` (i.e. money we owe them), sorted by amount owed —
 **not** a date-bucketed aging report like AR's; see
 [accounting.md](./accounting.md#get-apiv1reportsap-aging) for why.
@@ -394,7 +396,6 @@ negative `balance` (i.e. money we owe them), sorted by amount owed —
 - No separate cancel endpoint — set `status: "cancelled"` via `PUT`, or
   delete the PO, while it's unreceived.
 - No partial/split receiving — a PO is received all at once, all lines.
-- No supplier-payment flow (paying down what we owe) — the spec describes
-  collections (customer payments) in detail but nothing equivalent for
-  suppliers; `suppliers.balance` only ever moves via PO receipt right now.
-  This is also why AP aging above can't be a real date-bucketed report.
+- 🔄 Supplier payments now exist (below), but AP aging is still a balance
+  listing, not date-bucketed — payments are against the supplier, not against a
+  specific purchase order.

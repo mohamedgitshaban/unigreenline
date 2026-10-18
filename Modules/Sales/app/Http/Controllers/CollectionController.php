@@ -67,7 +67,7 @@ class CollectionController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, ['sales.export', 'accounting.export'], $query,
+            $request, $query,
             ['ID', 'Invoice', 'Amount', 'Method', 'Reference', 'Payment Date', 'Notes'],
             fn (Collection $c) => [$c->id, $c->invoice_id, $c->amount, $c->method, $c->reference, $c->payment_date->toDateString(), $c->notes],
             'collections',

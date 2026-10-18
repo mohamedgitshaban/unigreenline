@@ -4,7 +4,6 @@ namespace Modules\Purchasing\Http\Requests\Concerns;
 
 use Closure;
 use Illuminate\Validation\Validator;
-use Modules\Purchasing\Models\PurchaseOrder;
 
 /**
  * Line costs are an administrator matter: a buyer raises the order with
@@ -16,7 +15,7 @@ trait RestrictsCostsToPricers
     protected function costsOnlyFromPricers(): Closure
     {
         return function (Validator $validator) {
-            if ($this->user()->can('price', PurchaseOrder::class)) {
+            if ($this->user()->can('purchase-orders.pricing')) {
                 return;
             }
 

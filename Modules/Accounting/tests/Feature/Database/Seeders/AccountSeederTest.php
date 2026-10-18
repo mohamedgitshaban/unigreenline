@@ -28,9 +28,11 @@ class AccountSeederTest extends TestCase
             '1120' => 'Asset',   // Bank
             '1200' => 'Asset',   // Accounts Receivable
             '1300' => 'Asset',   // Inventory
+            '1350' => 'Asset',   // Work in Progress
             '2100' => 'Liability', // Accounts Payable
             '2300' => 'Liability', // VAT Payable
             '4100' => 'Revenue',   // Sales Revenue
+            '5200' => 'Expense',   // Manufacturing Variance
         ];
 
         foreach ($expected as $code => $type) {
@@ -46,6 +48,6 @@ class AccountSeederTest extends TestCase
         $this->seed(AccountSeeder::class);
         $this->seed(AccountSeeder::class);
 
-        $this->assertSame(23, Account::query()->count());
+        $this->assertSame(count(AccountSeeder::ACCOUNTS), Account::query()->count());
     }
 }

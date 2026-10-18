@@ -36,7 +36,7 @@ class LeadController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'crm.export', $query,
+            $request, $query,
             ['ID', 'Name', 'Type', 'Contact', 'Phone', 'Email', 'Source', 'Status', 'Value'],
             fn (Lead $l) => [$l->id, $l->name, $l->type, $l->contact, $l->phone, $l->email, $l->source, $l->status, $l->value],
             'leads',

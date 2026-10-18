@@ -45,7 +45,7 @@ class ComplaintController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'crm.export', $query,
+            $request, $query,
             ['ID', 'Customer', 'Product', 'Type', 'Description', 'Priority', 'Status', 'Complaint Date', 'Resolved Date'],
             fn (Complaint $c) => [$c->id, $c->customer_id, $c->product_id, $c->type, $c->description, $c->priority, $c->status, $c->complaint_date->toDateString(), $c->resolved_date?->toDateString()],
             'complaints',

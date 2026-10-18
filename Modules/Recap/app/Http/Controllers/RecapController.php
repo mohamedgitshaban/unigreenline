@@ -47,7 +47,7 @@ class RecapController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, ['recap.export', 'accounting.export'], $query,
+            $request, $query,
             ['ID', 'Date', 'Warehouse', 'Reason', 'Status', 'Total Value', 'Notes'],
             fn (Recap $r) => [$r->id, $r->recap_date->toDateString(), $r->warehouse?->name, $r->reason, $r->status, $r->total_value, $r->notes],
             'recaps',

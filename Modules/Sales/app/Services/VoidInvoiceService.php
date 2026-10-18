@@ -57,7 +57,7 @@ class VoidInvoiceService
             // imported invoices) give it back; collections floor at zero too.
             if ($locked->salesOrder === null || $locked->salesOrder->pay_type === 'credit') {
                 $customer = $locked->customer;
-                $customer->update(['balance' => max(0, (float) $customer->balance - (float) $locked->balance)]);
+                $customer->forceFill(['balance' => max(0, (float) $customer->balance - (float) $locked->balance)])->save();
             }
 
             $previousStatus = $locked->status;

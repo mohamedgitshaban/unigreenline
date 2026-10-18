@@ -73,7 +73,7 @@ class FefoStockService
                     ->where('product_id', $line['product_id'])
                     ->where('warehouse_id', $line['warehouse_id'])
                     ->where('is_free_gift', $line['gift'] ?? false)
-                    ->where('qty_cartons', '>', 0)
+                    ->whereColumn('qty_cartons', '>', 'reserved_cartons')
                     ->orderBy('exp_date')
                     ->orderBy('rcv_date')
                     ->lockForUpdate()
@@ -84,7 +84,8 @@ class FefoStockService
                         break;
                     }
 
-                    $take = min($remaining, $batch->qty_cartons);
+                    // Reserved cartons belong to the document that reserved them.
+                    $take = min($remaining, $batch->freeCartons());
                     $batch->decrement('qty_cartons', $take);
                     $remaining -= $take;
 
@@ -120,14 +121,17 @@ class FefoStockService
         });
     }
 
+    /**
+     * Cartons anyone may take: on hand, less what documents have reserved.
+     */
     private function availableCartons(string $productId, string $warehouseId, bool $gift = false): int
     {
         return (int) InventoryBatch::query()
             ->where('product_id', $productId)
             ->where('warehouse_id', $warehouseId)
             ->where('is_free_gift', $gift)
-            ->where('qty_cartons', '>', 0)
-            ->sum('qty_cartons');
+            ->whereColumn('qty_cartons', '>', 'reserved_cartons')
+            ->sum(DB::raw('qty_cartons - reserved_cartons'));
     }
 
     /**

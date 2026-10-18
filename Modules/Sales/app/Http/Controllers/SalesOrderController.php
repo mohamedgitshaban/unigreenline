@@ -63,7 +63,7 @@ class SalesOrderController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'sales.export', $query,
+            $request, $query,
             ['ID', 'Customer', 'Warehouse', 'Status', 'Pay Type', 'Subtotal', 'Tax', 'Total', 'Order Date'],
             fn (SalesOrder $o) => [$o->id, $o->customer_id, $o->warehouse_id, $o->status, $o->pay_type, $o->subtotal, $o->tax_amount, $o->total, $o->order_date->toDateString()],
             'sales-orders',

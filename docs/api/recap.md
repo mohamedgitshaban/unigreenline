@@ -21,11 +21,11 @@ anything else returns **422** `{"message": "Only draft recaps can be changed."}`
 
 | Role | Permissions |
 |---|---|
-| `Warehouse Manager` | `recap.view/add/edit/approve/print/export` |
-| `Accountant` | `recap.view` |
-| `Owner` | `recap.view/approve/print/export/audit` |
-| `Auditor` | `recap.view/export/audit` |
-| `Administrator` | everything, including `recap.delete` (an admin can grant it to any role via [Roles](./admin.md#roles--permissions)) |
+| `Warehouse Manager` | `recaps.view/create/update/generate/approve/reject/export` |
+| `Accountant` | `recaps.view`, `recaps.export` |
+| `Owner` | `recaps.view/approve/reject/export` |
+| `Auditor` | `recaps.view/export` |
+| `Administrator` | everything, including `recaps.delete` (an admin can grant it to any role via [Roles](./admin.md#roles--permissions)) |
 
 Every recap belongs to the caller's tenant (another tenant's is **404**). The
 warehouse must be visible to the caller (assigned warehouses, unless
@@ -59,16 +59,16 @@ snapshot the batch number, expiry and cost; the cost is **re-read at approval**.
 
 ### `GET /api/v1/recaps` 🆕 NEW
 
-Requires `recap.view`. Paginated. `search` matches id, notes and warehouse name.
-Export (`?export=csv|xlsx`) needs `recap.export` **or** `accounting.export`.
+Requires `recaps.view`. Paginated. `search` matches id, notes and warehouse name.
+Export (`?export=csv|xlsx`) needs `recaps.export`.
 
 ### `GET /api/v1/recaps/{id}` 🆕 NEW
 
-Requires `recap.view`. Returns the recap with its lines.
+Requires `recaps.view`. Returns the recap with its lines.
 
 ### `POST /api/v1/recaps` 🆕 NEW
 
-Requires `recap.add`.
+Requires `recaps.create`.
 
 ```json
 {
@@ -85,19 +85,19 @@ batch **of that warehouse** and may appear once. **201** — the draft recap.
 
 ### `PUT /api/v1/recaps/{id}` 🆕 NEW
 
-Requires `recap.edit`. Draft only. Partial update; `lines`, if sent, **replace
+Requires `recaps.update`. Draft only. Partial update; `lines`, if sent, **replace
 every line**. Changing `warehouse_id` requires re-sending `lines` (batches belong
 to a warehouse).
 
 ### `DELETE /api/v1/recaps/{id}` 🆕 NEW
 
-Requires `recap.delete`. Draft only (an approved recap already moved stock and
+Requires `recaps.delete`. Draft only (an approved recap already moved stock and
 posted a journal entry; a rejected one is kept as the record). **204**; lines
 cascade; audit-logged as `DELETE`.
 
 ### `POST /api/v1/recaps/{id}/approve` 🆕 NEW
 
-Requires `recap.approve`. One transaction: each batch is locked and its cartons
+Requires `recaps.approve`. One transaction: each batch is locked and its cartons
 removed, the lines are re-costed, the warehouse stock value is refreshed and
 `Dr 6300 / Cr 1300` is posted for the total (dated `recap_date`). Response is the
 recap with `status: approved`, `total_value` and `journal_entry_id`.
@@ -107,12 +107,12 @@ if a batch no longer holds enough — nothing is changed.
 
 ### `POST /api/v1/recaps/{id}/reject` 🆕 NEW
 
-Requires `recap.approve`. Body `{ "reason": "Counted wrong" }` (optional).
+Requires `recaps.reject`. Body `{ "reason": "Counted wrong" }` (optional).
 Draft → rejected; stock and ledger untouched.
 
 ### `GET /api/v1/recaps/expired-batches` 🆕 NEW
 
-Requires `recap.view`. Optional `?warehouse_id=`. Batches past their expiry date
+Requires `recaps.view`. Optional `?warehouse_id=`. Batches past their expiry date
 that still hold stock — what a write-off would pick up:
 
 ```json
@@ -123,7 +123,7 @@ that still hold stock — what a write-off would pick up:
 
 ### `POST /api/v1/recaps/from-expired` 🆕 NEW
 
-Requires `recap.add`. Body `{ "warehouse_id": null }` (optional). Creates **one
+Requires `recaps.generate`. Body `{ "warehouse_id": null }` (optional). Creates **one
 draft recap per warehouse** covering the full remaining quantity of every expired
 batch (reason `expired`). Batches already on a draft are skipped, so repeating
 the call never double-lists stock. **201** with the new drafts, or **200** with an

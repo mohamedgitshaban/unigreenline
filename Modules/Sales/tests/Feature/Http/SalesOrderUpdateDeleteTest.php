@@ -4,7 +4,6 @@ namespace Modules\Sales\Tests\Feature\Http;
 
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Sanctum\Sanctum;
-use Modules\Accounting\Models\Account;
 use Modules\Core\Database\Seeders\RolePermissionSeeder;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
@@ -13,11 +12,12 @@ use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Sales\Models\SalesOrder;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class SalesOrderUpdateDeleteTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -122,9 +122,7 @@ class SalesOrderUpdateDeleteTest extends TestCase
     public function test_lines_can_draw_from_different_warehouses_and_stock_leaves_each_one(): void
     {
         $this->actingAsRole('Sales Manager');
-        foreach (['1200' => 'Asset', '4100' => 'Revenue', '2300' => 'Liability'] as $code => $type) {
-            Account::factory()->recycle($this->tenant)->create(['code' => $code, 'type' => $type]);
-        }
+        $this->ensureLedgerAccounts($this->tenant);
         $second = Warehouse::factory()->recycle($this->tenant)->create();
         $secondBatch = InventoryBatch::factory()->recycle([$this->tenant, $this->product, $second])->withQtyCartons(5)->create();
         $firstBatch = InventoryBatch::query()->where('warehouse_id', $this->warehouse->id)->firstOrFail();

@@ -7,6 +7,7 @@ use Laravel\Sanctum\Sanctum;
 use Modules\Core\Database\Seeders\RolePermissionSeeder;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
+use Modules\Core\Support\PermissionCatalogue;
 use Spatie\Permission\Models\Role;
 use Tests\TestCase;
 
@@ -28,18 +29,18 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAsRole('Administrator');
 
-        $this->postJson('/api/v1/roles', ['name' => 'Shift Lead', 'permissions' => ['sales.view', 'sales.edit', 'sales.delete']])
+        $this->postJson('/api/v1/roles', ['name' => 'Shift Lead', 'permissions' => ['sales-orders.view', 'sales-orders.update', 'sales-orders.delete']])
             ->assertCreated()
             ->assertJsonPath('data.name', 'Shift Lead')
-            ->assertJsonPath('data.permissions', ['sales.delete', 'sales.edit', 'sales.view']);
+            ->assertJsonPath('data.permissions', ['sales-orders.delete', 'sales-orders.update', 'sales-orders.view']);
 
         $this->postJson('/api/v1/users', [
             'name' => 'Lead', 'email' => 'lead@example.com', 'password' => 'password123', 'role' => 'Shift Lead',
         ])->assertCreated();
 
         $lead = User::query()->where('email', 'lead@example.com')->firstOrFail();
-        $this->assertTrue($lead->can('sales.delete'));
-        $this->assertFalse($lead->can('sales.add'));
+        $this->assertTrue($lead->can('sales-orders.delete'));
+        $this->assertFalse($lead->can('sales-orders.create'));
         $this->assertDatabaseHas('audit_log', ['entity_type' => 'Role', 'operation' => 'INSERT']);
     }
 
@@ -47,14 +48,14 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAsRole('Administrator');
         $role = Role::findByName('Sales Rep', 'web');
-        $this->assertFalse($role->hasPermissionTo('sales.delete'));
+        $this->assertFalse($role->hasPermissionTo('sales-orders.delete'));
 
-        $this->putJson("/api/v1/roles/{$role->id}", ['permissions' => ['sales.view', 'sales.delete']])
+        $this->putJson("/api/v1/roles/{$role->id}", ['permissions' => ['sales-orders.view', 'sales-orders.delete']])
             ->assertOk()
-            ->assertJsonPath('data.permissions', ['sales.delete', 'sales.view']);
+            ->assertJsonPath('data.permissions', ['sales-orders.delete', 'sales-orders.view']);
 
-        $this->assertTrue($role->fresh()->hasPermissionTo('sales.delete'));
-        $this->assertFalse($role->fresh()->hasPermissionTo('sales.add'));
+        $this->assertTrue($role->fresh()->hasPermissionTo('sales-orders.delete'));
+        $this->assertFalse($role->fresh()->hasPermissionTo('sales-orders.create'));
     }
 
     public function test_unknown_permission_is_rejected(): void
@@ -73,7 +74,7 @@ class RoleManagementTest extends TestCase
 
         $this->putJson("/api/v1/roles/{$admin->id}", ['permissions' => []])->assertForbidden();
         $this->deleteJson("/api/v1/roles/{$admin->id}")->assertForbidden();
-        $this->assertSame(81, $admin->fresh()->permissions()->count());
+        $this->assertSame(count(PermissionCatalogue::names()), $admin->fresh()->permissions()->count());
     }
 
     public function test_a_role_with_users_cannot_be_deleted_but_an_unused_one_can(): void
@@ -94,7 +95,7 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAsRole('Administrator');
         $role = Role::create(['name' => 'Temp', 'guard_name' => 'web']);
-        $role->givePermissionTo('inventory.view');
+        $role->givePermissionTo('products.view');
         $user = User::factory()->recycle($this->tenant)->create();
         $user->assignRole('Sales Rep');
 
@@ -110,8 +111,10 @@ class RoleManagementTest extends TestCase
     {
         $this->actingAsRole('Auditor');
 
-        $this->getJson('/api/v1/roles')->assertOk()->assertJsonCount(10, 'data');
-        $this->getJson('/api/v1/permissions')->assertOk()->assertJsonPath('data.sales.0', 'sales.add');
+        $this->getJson('/api/v1/roles')->assertOk()->assertJsonCount(12, 'data');
+        $response = $this->getJson('/api/v1/permissions')->assertOk()->assertJsonPath('resources.sales.collections.0', 'collections.create');
+        $this->assertSame(['POST /api/v1/collections'], $response->json('endpoints')['collections.create']);
+        $this->assertContains('expenses.view', $response->json('data.expenses'));
     }
 
     public function test_non_admin_cannot_manage_roles(): void

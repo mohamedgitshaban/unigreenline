@@ -8,7 +8,7 @@ class AccountPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('accounting.view');
+        return true;
     }
 
     /**
@@ -16,21 +16,21 @@ class AccountPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('accounting.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('accounting.add');
+        return true;
     }
 
     public function update(User $user): bool
     {
-        return $user->can('accounting.edit');
+        return true;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('accounting.delete');
+        return true;
     }
 }

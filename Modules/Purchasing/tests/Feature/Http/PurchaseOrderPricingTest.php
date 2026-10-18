@@ -15,11 +15,12 @@ use Modules\Inventory\Services\ProductUnitService;
 use Modules\Purchasing\Models\PurchaseOrder;
 use Modules\Purchasing\Models\Supplier;
 use Spatie\Permission\Models\Role;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class PurchaseOrderPricingTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -40,6 +41,7 @@ class PurchaseOrderPricingTest extends TestCase
         $this->product = Product::factory()->recycle($this->tenant)->create(['tax_pct' => 10]);
         Account::factory()->recycle($this->tenant)->create(['code' => '1300', 'type' => 'Asset']);
         Account::factory()->recycle($this->tenant)->create(['code' => '2100', 'type' => 'Liability']);
+        $this->ensureLedgerAccounts($this->tenant);
     }
 
     public function test_a_buyers_order_goes_to_pending_pricing_with_no_cost(): void
@@ -133,7 +135,7 @@ class PurchaseOrderPricingTest extends TestCase
     {
         $order = $this->pendingOrder();
         $line = $order->lines()->firstOrFail();
-        Role::findByName('Accountant', 'web')->givePermissionTo('purchasing.pricing');
+        Role::findByName('Accountant', 'web')->givePermissionTo('purchase-orders.pricing');
 
         $this->actingAsRole('Accountant');
         $this->putJson("/api/v1/purchase-orders/{$order->id}/pricing", ['lines' => [['line_id' => $line->id, 'cost_per_carton' => 10]]])->assertOk();

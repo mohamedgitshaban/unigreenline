@@ -5,6 +5,7 @@ namespace Modules\Sales\Services;
 use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Services\JournalPostingService;
 use Modules\Core\Services\AuditLogService;
+use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Services\FefoStockService;
 use Modules\Sales\Exceptions\InvalidStatusTransitionException;
 use Modules\Sales\Models\Delivery;
@@ -79,6 +80,9 @@ class UpdateSalesOrderStatusService
         });
     }
 
+    /**
+     * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
+     */
     private function deductStockIfNeeded(SalesOrder $order, array $actor): void
     {
         if ($order->stock_deducted) {
@@ -94,9 +98,43 @@ class UpdateSalesOrderStatusService
             ),
         ])->all();
 
-        $this->fefoStock->deduct($lines);
+        $deductions = $this->fefoStock->deduct($lines);
 
         $order->update(['stock_deducted' => true]);
+
+        $this->postCostOfGoodsSold($order, $deductions, $actor);
+    }
+
+    /**
+     * The stock that just left was bought at some cost: take it off the
+     * Inventory asset and charge it to Cost of Goods Sold, so the income
+     * statement shows margin, not just revenue. Free-gift batches carry a cost
+     * of zero and so add nothing. Done in the same step as the deduction, so
+     * a repeated transition (stock_deducted) can never post it twice.
+     *
+     * @param  array<int, array{batch_id: string, cartons_taken: int}>  $deductions
+     * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
+     */
+    private function postCostOfGoodsSold(SalesOrder $order, array $deductions, array $actor): void
+    {
+        $costs = InventoryBatch::query()->whereIn('id', array_column($deductions, 'batch_id'))->pluck('cost_per_carton', 'id');
+
+        $cost = round(array_sum(array_map(fn (array $d) => $d['cartons_taken'] * (float) $costs[$d['batch_id']], $deductions)), 2);
+
+        if ($cost <= 0) {
+            return;
+        }
+
+        $this->journalPosting->post(
+            $order->tenant_id,
+            $order->id,
+            "Cost of goods sold for sales order {$order->id}",
+            [
+                ['account_code' => '5100', 'debit' => $cost],
+                ['account_code' => '1300', 'credit' => $cost],
+            ],
+            $actor['actor_id'] ?? null,
+        );
     }
 
     private function createInvoiceIfNeeded(SalesOrder $order, array $actor): void

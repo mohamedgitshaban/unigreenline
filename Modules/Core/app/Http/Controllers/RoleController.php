@@ -15,7 +15,7 @@ use Modules\Core\Http\Requests\StoreRoleRequest;
 use Modules\Core\Http\Requests\UpdateRoleRequest;
 use Modules\Core\Http\Resources\RoleResource;
 use Modules\Core\Models\User;
-use Spatie\Permission\Models\Permission;
+use Modules\Core\Support\PermissionCatalogue;
 use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
@@ -30,8 +30,6 @@ class RoleController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorize('viewAny', Role::class);
-
         $query = Role::query()->select('roles.*')->selectSub($this->usersCountSubquery(), 'users_count')->with('permissions');
 
         $this->applyFilters($request, $query, ['name']);
@@ -48,18 +46,22 @@ class RoleController extends Controller
     }
 
     /**
-     * Every assignable permission, grouped by module — drives the checkbox
-     * grid on the role form.
+     * Every assignable permission — one per endpoint action, named
+     * `{resource}.{action}` — grouped by module, with the endpoints each one
+     * guards. Drives the permission grid on the role form.
      */
     public function permissions(Request $request)
     {
-        $this->authorize('viewAny', Role::class);
+        $catalogue = PermissionCatalogue::all();
 
-        $grouped = Permission::query()->orderBy('name')->pluck('name')
-            ->groupBy(fn (string $name) => explode('.', $name, 2)[0])
-            ->map(fn ($names) => $names->values());
-
-        return response()->json(['data' => $grouped]);
+        return response()->json([
+            // module => [permission names]
+            'data' => $catalogue->groupBy('module')->map(fn ($entries) => $entries->pluck('permission')->values())->sortKeys(),
+            // module => resource => [permission names]
+            'resources' => PermissionCatalogue::grouped(),
+            // permission name => ["GET /api/v1/expenses", ...]
+            'endpoints' => $catalogue->map(fn (array $entry) => $entry['endpoints']),
+        ]);
     }
 
     public function store(StoreRoleRequest $request)

@@ -4,7 +4,6 @@ namespace Modules\Sales\Http\Requests;
 
 use Modules\Core\Rules\UploadedFilePath;
 use Modules\Sales\Models\Delivery;
-use Modules\Sales\Models\SalesOrder;
 
 /**
  * Everything POST /sales-orders takes (so the same lines, warehouse, gift,
@@ -15,8 +14,8 @@ class StoreAndDeliverSalesOrderRequest extends StoreSalesOrderRequest
 {
     public function authorize(): bool
     {
-        // Creating the order needs sales.add; delivering it is the sales.edit status transition.
-        return $this->user()->can('create', SalesOrder::class) && $this->user()->can('sales.edit');
+        // Guarded by the route's sales-orders.quick-deliver permission.
+        return true;
     }
 
     public function rules(): array

@@ -14,26 +14,26 @@ class RolePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('admin.view');
+        return true;
     }
 
     public function view(User $user, Role $role): bool
     {
-        return $user->can('admin.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('admin.add');
+        return true;
     }
 
     public function update(User $user, Role $role): bool
     {
-        return $user->can('admin.edit');
+        return true;
     }
 
     public function delete(User $user, Role $role): bool
     {
-        return $user->can('admin.delete');
+        return true;
     }
 }

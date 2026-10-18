@@ -9,26 +9,26 @@ class WarehousePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('inventory.view');
+        return true;
     }
 
     public function view(User $user, Warehouse $warehouse): bool
     {
-        return $user->can('inventory.view') && $warehouse->isVisibleTo($user);
+        return $warehouse->isVisibleTo($user);
     }
 
     public function create(User $user): bool
     {
-        return $user->can('inventory.add');
+        return true;
     }
 
     public function update(User $user, Warehouse $warehouse): bool
     {
-        return $user->can('inventory.edit') && $warehouse->isVisibleTo($user);
+        return $warehouse->isVisibleTo($user);
     }
 
     public function delete(User $user, Warehouse $warehouse): bool
     {
-        return $user->can('inventory.delete') && $warehouse->isVisibleTo($user);
+        return $warehouse->isVisibleTo($user);
     }
 }

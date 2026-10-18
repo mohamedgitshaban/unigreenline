@@ -32,7 +32,7 @@ class SupplierController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, ['purchasing.export', 'accounting.export'], $query,
+            $request, $query,
             ['ID', 'Name', 'Country', 'City', 'Pay Terms', 'Currency', 'Balance', 'Status'],
             fn (Supplier $s) => [$s->id, $s->name, $s->country, $s->city, $s->pay_terms, $s->currency, $s->balance, $s->status],
             'suppliers',

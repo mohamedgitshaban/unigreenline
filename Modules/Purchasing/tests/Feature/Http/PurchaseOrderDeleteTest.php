@@ -91,7 +91,7 @@ class PurchaseOrderDeleteTest extends TestCase
     {
         $user = User::factory()->recycle($this->tenant)->create();
         $user->assignRole('Purchasing');
-        $user->givePermissionTo('purchasing.delete');
+        $user->givePermissionTo('purchase-orders.delete');
         Sanctum::actingAs($user);
     }
 

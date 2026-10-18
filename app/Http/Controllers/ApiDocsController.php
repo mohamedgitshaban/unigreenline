@@ -29,8 +29,10 @@ class ApiDocsController extends Controller
         'expenses' => 'expenses',
         'recap' => 'recap',
         'manufacturing' => 'manufacturing',
+        'hr' => 'hr',
         'analytics' => 'analytics',
         'admin' => 'admin',
+        'permissions' => 'permissions',
     ];
 
     public function index(): Response

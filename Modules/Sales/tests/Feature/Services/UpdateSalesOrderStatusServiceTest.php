@@ -15,11 +15,12 @@ use Modules\Sales\Exceptions\InvalidStatusTransitionException;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
 use Modules\Sales\Services\UpdateSalesOrderStatusService;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class UpdateSalesOrderStatusServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_rejects_an_invalid_transition(): void
     {
@@ -208,6 +209,7 @@ class UpdateSalesOrderStatusServiceTest extends TestCase
         ] as $account) {
             Account::factory()->recycle($tenant)->create($account);
         }
+        $this->ensureLedgerAccounts($tenant);
     }
 
     private function service(): UpdateSalesOrderStatusService

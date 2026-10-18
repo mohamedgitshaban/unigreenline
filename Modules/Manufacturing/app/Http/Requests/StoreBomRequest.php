@@ -25,10 +25,7 @@ class StoreBomRequest extends FormRequest
             'conversion_cost' => ['sometimes', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'active' => ['sometimes', 'boolean'],
-
-            'lines' => ['required', 'array', 'min:1'],
-            'lines.*.component_product_id' => ['required', 'string', 'distinct', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
-            'lines.*.qty_cartons' => ['required', 'integer', 'min:1'],
+            ...BomRules::extras($tenantId, required: true),
         ];
     }
 

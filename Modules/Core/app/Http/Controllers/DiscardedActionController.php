@@ -23,8 +23,6 @@ class DiscardedActionController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorize('admin.view');
-
         $query = DiscardedAction::query()
             ->where('tenant_id', $request->user()->tenant_id);
 
@@ -35,7 +33,7 @@ class DiscardedActionController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'admin.export', $query,
+            $request, $query,
             ['ID', 'User', 'Type', 'Label', 'Payload', 'Created At'],
             fn (DiscardedAction $d) => [$d->id, $d->user_name, $d->type, $d->label, json_encode($d->payload), $d->created_at->toDateTimeString()],
             'discarded-actions',
@@ -50,8 +48,6 @@ class DiscardedActionController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $this->authorize('admin.view');
-
         $discardedAction = DiscardedAction::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->with(self::RELATIONS)

@@ -38,7 +38,8 @@ class TransferStockService
                 ->lockForUpdate()
                 ->first();
 
-            $available = $sourceBatch->qty_cartons ?? 0;
+            // Cartons reserved for a manufacturing order (or any other document) cannot be moved away.
+            $available = $sourceBatch?->freeCartons() ?? 0;
 
             if (! $sourceBatch || $available < $data['qty_cartons']) {
                 throw new InsufficientStockException([[

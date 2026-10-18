@@ -50,7 +50,7 @@ class CustomerController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'crm.export', $query,
+            $request, $query,
             ['ID', 'Name', 'Type', 'Classification', 'Phone', 'Email', 'City', 'Credit Limit', 'Balance', 'Status'],
             fn (Customer $c) => [$c->id, $c->name, $c->type, $c->classification, $c->phone, $c->email, $c->city, $c->credit_limit, $c->balance, $c->status],
             'customers',

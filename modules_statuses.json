@@ -8,5 +8,6 @@
     "Analytics": true,
     "Expenses": true,
     "Recap": true,
-    "Manufacturing": true
+    "Manufacturing": true,
+    "HR": true
 }

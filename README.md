@@ -2,25 +2,37 @@
 
 A modular Laravel API (nwidart modules) for a veterinary-pharmaceutical
 distributor: inventory with FEFO stock, sales, purchasing, CRM, accounting,
-expenses, analytics — and, in the latest update, **recap** (stock write-offs)
-and **manufacturing**.
+expenses, analytics, **recap** (stock write-offs), **manufacturing** and, in
+the latest update, **HR** (employees, attendance, payroll posted to the books)
+with a **permission on every endpoint**.
 
 | Module | What it covers |
 |---|---|
-| Core | auth, users, 🆕 roles & permissions, audit log, notifications |
+| Core | auth, users, 🔄 roles & per-endpoint permissions, audit log, notifications |
 | Inventory | warehouses, products, categories, 🆕 packaging units, batches (FEFO), transfers, 🆕 free-gift stock |
 | Sales | sales orders (🔄 multi-warehouse, 🆕 gift lines, 🆕 minimum price), invoices (🆕 void / import), deliveries, collections, returns |
-| Purchasing | suppliers, purchase orders (🔄 lines in any unit), receiving (🔄 free gifts) |
+| Purchasing | suppliers, purchase orders (🔄 lines in any unit), receiving (🔄 free gifts, 🔄 input VAT), 🆕 supplier payments |
 | CRM | customers, leads, visits, complaints, campaigns |
-| Accounting | 🔄 chart of accounts (now editable), journal entries, statements |
+| Accounting | 🔄 chart of accounts (editable, 🆕 connections map), journal entries (🆕 manual + reversal), 🔄 statements (balance sheet now balances) |
 | Expenses | categories, expenses, approval |
 | 🆕 Recap | stock write-offs for expired / damaged / lost stock, posted to the chart of accounts |
 | 🆕 Manufacturing | bills of materials and production orders |
+| 🆕 HR | employees, work schedules, global holidays, attendance, time permissions (late / early leave / partial), leave, monthly payroll connected to the chart of accounts |
 | Analytics | dashboard, reports, 🆕 product life cycle |
 
 > **Flags used in the docs and the Postman collection:** 🆕 **NEW** = a new
 > endpoint / module, 🔄 **CHANGED** = an existing endpoint that now accepts or
 > returns more.
+
+### Permissions
+
+Every API endpoint is guarded by its own permission, named `{resource}.{action}`
+(`expenses.view`, `payroll-runs.approve`...), so a role can be given `GET`
+on expenses and nothing else. The list is derived from the routes —
+`GET /api/v1/permissions` returns it grouped for a role editor, and
+[`docs/api/permissions.md`](docs/api/permissions.md) lists every permission, the
+endpoints it guards and which seeded roles hold it (regenerate with
+`php artisan permissions:docs`). `Administrator` holds all of them.
 
 ### Documentation
 

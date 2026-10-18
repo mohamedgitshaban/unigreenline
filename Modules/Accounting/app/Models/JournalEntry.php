@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 
-#[Fillable(['tenant_id', 'created_by', 'ref', 'description', 'entry_date', 'posted'])]
+#[Fillable(['tenant_id', 'created_by', 'ref', 'type', 'reversal_of', 'description', 'entry_date', 'posted', 'reversed_at'])]
 class JournalEntry extends Model
 {
     use HasUlids;
@@ -22,6 +22,7 @@ class JournalEntry extends Model
         return [
             'entry_date' => 'date',
             'posted' => 'boolean',
+            'reversed_at' => 'datetime',
         ];
     }
 

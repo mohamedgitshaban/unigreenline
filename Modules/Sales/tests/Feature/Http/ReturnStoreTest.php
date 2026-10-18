@@ -11,16 +11,18 @@ use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Purchasing\Models\Supplier;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class ReturnStoreTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_sales_manager_records_a_sales_return(): void
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Sales Manager');
         Sanctum::actingAs($user);
@@ -40,6 +42,7 @@ class ReturnStoreTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Purchasing'); // has purchasing.* only, no sales.*
         Sanctum::actingAs($user);
@@ -68,6 +71,7 @@ class ReturnStoreTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Purchasing');
         Sanctum::actingAs($user);
@@ -87,6 +91,7 @@ class ReturnStoreTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Customer Service');
         Sanctum::actingAs($user);

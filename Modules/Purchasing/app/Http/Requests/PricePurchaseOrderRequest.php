@@ -12,7 +12,7 @@ class PricePurchaseOrderRequest extends FormRequest
     {
         abort_unless($this->route('purchaseOrder')->tenant_id === $this->user()->tenant_id, 404);
 
-        return $this->user()->can('price', PurchaseOrder::class);
+        return true;
     }
 
     public function rules(): array

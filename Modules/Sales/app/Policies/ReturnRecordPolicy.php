@@ -14,7 +14,7 @@ class ReturnRecordPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('sales.view') || $user->can('purchasing.view');
+        return true;
     }
 
     /**
@@ -22,11 +22,11 @@ class ReturnRecordPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('sales.view') || $user->can('purchasing.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('sales.add') || $user->can('purchasing.add');
+        return true;
     }
 }

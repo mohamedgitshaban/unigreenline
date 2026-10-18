@@ -8,7 +8,7 @@ class TransferPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('inventory.view');
+        return true;
     }
 
     /**
@@ -16,11 +16,11 @@ class TransferPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('inventory.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('inventory.add');
+        return true;
     }
 }

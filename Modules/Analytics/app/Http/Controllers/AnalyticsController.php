@@ -27,19 +27,15 @@ class AnalyticsController extends Controller
 
     public function dashboard(Request $request)
     {
-        $this->authorize('analytics.view');
-
         return response()->json(['data' => $this->dashboard->generate($request->user()->tenant_id)]);
     }
 
     public function expiry(Request $request)
     {
-        $this->authorize('analytics.view');
-
         $query = $this->expiryAnalytics->query($request->user()->tenant_id);
 
         if ($export = $this->exportIfRequested(
-            $request, 'analytics.export', $query,
+            $request, $query,
             ['Batch ID', 'Product', 'Warehouse', 'Batch No', 'Exp Date', 'Qty Cartons', 'Days Left'],
             fn (InventoryBatch $b) => [
                 $b->id, $b->product?->name, $b->warehouse?->name, $b->batch_no, $b->exp_date->toDateString(), $b->qty_cartons,
@@ -57,8 +53,6 @@ class AnalyticsController extends Controller
 
     public function stock(Request $request)
     {
-        $this->authorize('analytics.view');
-
         if ($export = $this->exportStockIfRequested($request)) {
             return $export;
         }
@@ -82,7 +76,8 @@ class AnalyticsController extends Controller
             return null;
         }
 
-        abort_unless($request->user()->can('analytics.export'), 403);
+        $permission = $request->route()?->getAction('export_permission');
+        abort_unless($permission !== null && $request->user()->can($permission), 403);
 
         $rows = collect($this->stockAnalytics->rows($request->user()->tenant_id))
             ->map(fn ($row) => [$row->product_id, $row->product_name, $row->sku, $row->warehouse_id, $row->warehouse_name, (int) $row->qty_cartons, (float) $row->stock_value]);
@@ -103,8 +98,6 @@ class AnalyticsController extends Controller
      */
     public function productLifecycle(Request $request, string $id, ProductLifecycleService $lifecycle)
     {
-        abort_unless($request->user()->canAny(['analytics.view', 'inventory.view']), 403);
-
         $range = $request->validate(['from' => ['sometimes', 'date'], 'to' => ['sometimes', 'date', 'after_or_equal:from']]);
 
         $product = Product::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);

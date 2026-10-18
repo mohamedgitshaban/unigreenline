@@ -15,11 +15,12 @@ use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Unit;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Services\ProductUnitService;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class SalesOrderPricingAndGiftsTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -54,6 +55,7 @@ class SalesOrderPricingAndGiftsTest extends TestCase
         foreach (['1200' => 'Asset', '4100' => 'Revenue', '2300' => 'Liability'] as $code => $type) {
             Account::factory()->recycle($this->tenant)->create(['code' => $code, 'type' => $type]);
         }
+        $this->ensureLedgerAccounts($this->tenant);
         $this->actingAsRole('Sales Rep');
     }
 

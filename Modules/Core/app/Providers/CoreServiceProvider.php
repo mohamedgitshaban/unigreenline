@@ -6,9 +6,11 @@ use Illuminate\Auth\Middleware\Authenticate;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Modules\Core\Console\Commands\DocumentPermissions;
 use Modules\Core\Console\Commands\VerifyAuditChain;
 use Modules\Core\Models\User;
 use Modules\Core\Policies\RolePolicy;
@@ -37,6 +39,7 @@ class CoreServiceProvider extends ModuleServiceProvider
      */
     protected array $commands = [
         VerifyAuditChain::class,
+        DocumentPermissions::class,
     ];
 
     /**
@@ -62,6 +65,15 @@ class CoreServiceProvider extends ModuleServiceProvider
     public function register(): void
     {
         parent::register();
+
+        // `->exportable('expenses.export')` on a list route: the permission that
+        // `?export=csv|xlsx` needs, kept on the route so the catalogue can list it.
+        RoutingRoute::macro('exportable', function (string $permission) {
+            /** @var RoutingRoute $this */
+            $this->action['export_permission'] = $permission;
+
+            return $this;
+        });
 
         $this->app->singleton(AuditLogService::class, function () {
             $hmacKey = config('audit.hmac_key');

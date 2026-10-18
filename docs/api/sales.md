@@ -7,8 +7,8 @@
 
 **Ownership scoping**: a `Sales Rep` only sees/creates their own orders
 (`sales_rep_id`), and only sees invoices/deliveries/collections tied back to
-one of their own orders. Any other role with `sales.view`/`sales.add` (or,
-for invoices/collections, `accounting.view`/`accounting.add` — see below)
+one of their own orders. Any other role with the sales permissions (`sales-orders.view`/`create`... or,
+for invoices/collections, the `invoices.*` / `collections.*` ones the `Accountant` role holds — see below)
 sees/acts on everything. Warehouse assignment (`user_warehouses`) is
 unrelated to any of this — a Sales Rep or Manager is never assigned to a
 warehouse, so `warehouse_id` on an order can be any real warehouse.
@@ -22,7 +22,7 @@ a payment is their job. They cannot see or touch sales orders themselves.
 
 ## `GET /api/v1/sales-orders`
 
-Requires `sales.view`. Paginated, newest `order_date` first.
+Requires `sales-orders.view`. Paginated, newest `order_date` first.
 
 ## `GET /api/v1/sales-orders/{id}`
 
@@ -41,7 +41,7 @@ list. Same access as the order show. Paginated like every list (**10 per page by
 > **packaging unit**, and a **minimum selling price** check. Details right after
 > the request example below.
 
-Requires `sales.add`. Validates stock availability (FEFO, no deduction yet)
+Requires `sales-orders.create`. Validates stock availability (FEFO, no deduction yet)
 and, for `pay_type: "credit"`, that the order wouldn't push the customer
 over their `credit_limit` — **before writing anything**.
 
@@ -139,7 +139,7 @@ once the notifications endpoint ships).
 **422 — validation** (missing fields, unknown `customer_id`/`product_id`,
 a Sales Rep naming another rep as `sales_rep_id`).
 
-**403** — user lacks `sales.add`, e.g. `Customer Service`.
+**403** — user lacks `sales-orders.create`, e.g. `Customer Service`.
 
 ## `POST /api/v1/sales-orders/deliver` 🆕 NEW
 
@@ -148,7 +148,7 @@ the goods leave with the customer, so there is no separate "create" then
 "deliver" round trip. It is exactly `POST /sales-orders` followed by
 `PUT /sales-orders/{id}/status` → `delivered`, done atomically.
 
-Requires **`sales.add` and `sales.edit`** (**403** otherwise, e.g. Customer
+Requires **`sales-orders.quick-deliver`** (**403** otherwise, e.g. Customer
 Service). A Sales Rep creates it under their own name.
 
 **Request** — everything `POST /sales-orders` takes (same lines, per-line
@@ -191,7 +191,7 @@ object (`status: "delivered"`, `driver`, `delivery_date`, ...). Use
 
 ## `PUT /api/v1/sales-orders/{id}` 🆕 NEW
 
-Requires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** — once an
+Requires `sales-orders.update` (+ ownership if Sales Rep). **Draft orders only** — once an
 order is picking/invoiced/delivered/cancelled its stock, invoice and journal
 entry were created from the old values: **422**
 `{"message": "Only draft sales orders can be changed or deleted."}`.
@@ -206,7 +206,7 @@ tenant's order is **404**.
 
 ## `DELETE /api/v1/sales-orders/{id}` 🆕 NEW
 
-Requires `sales.delete` (+ ownership if Sales Rep). **Draft orders only** (same
+Requires `sales-orders.delete` (+ ownership if Sales Rep). **Draft orders only** (same
 **422**) — a draft has no stock, invoice or journal side effects, so the order
 and its lines (cascade) simply go. Anything further along: set the status to
 `cancelled`. **204**; audit-logged as `DELETE`.
@@ -215,7 +215,7 @@ and its lines (cascade) simply go. Anything further along: set the status to
 
 ## `PUT /api/v1/sales-orders/{id}/status`
 
-Requires `sales.edit` (+ ownership if Sales Rep). Drives the whole
+Requires `sales-orders.change-status` (+ ownership if Sales Rep). Drives the whole
 lifecycle — this is where stock actually leaves the warehouse.
 
 **Request**
@@ -252,6 +252,10 @@ repeats these):
    omitted rather than posted as a $0 line).
 4. For `pay_type: "credit"` orders, the customer's AR `balance` increases by
    the invoice total.
+5. 🔄 A second balanced entry books the **cost of goods sold**: Dr Cost of
+   Goods Sold (5100) / Cr Inventory (1300) for the cost of the batches the
+   FEFO deduction actually took (free-gift stock costs nothing, so adds
+   nothing). Posted once per order, together with the stock deduction.
 
 **Additionally, on transition to `delivered`**: the order's one delivery
 record is created (or updated) with `status: "delivered"` and a real
@@ -264,7 +268,7 @@ actually reaches `delivered`). This is the only sales-order endpoint that
 includes `delivery`.
 **422** — invalid transition, or insufficient stock (same shortfall shape
 as order creation).
-**403** — Sales Rep on someone else's order, or missing `sales.edit`.
+**403** — Sales Rep on someone else's order, or missing `sales-orders.change-status`.
 
 ---
 
@@ -272,7 +276,7 @@ as order creation).
 
 ### `GET /api/v1/invoices`, `GET /api/v1/invoices/{id}`
 
-Requires `sales.view` or `accounting.view`. Includes `lines_count` (lines
+Requires `invoices.view`. Includes `lines_count` (lines
 are mirrored from the originating sales order — there's no separate
 invoice-lines table) and `collections_count`.
 
@@ -304,7 +308,7 @@ endpoint above (or [import](#post-apiv1invoicesimport--new)).
 
 ### `POST /api/v1/invoices/{id}/void` 🆕 NEW
 
-Invoices are never hard-deleted; this is their "delete". Requires `sales.delete`
+Invoices are never hard-deleted; this is their "delete". Requires `invoices.void`
 (+ ownership if Sales Rep).
 
 - sets `status: void` and `balance: 0`;
@@ -319,7 +323,7 @@ Another tenant's invoice is **404**.
 
 ### `POST /api/v1/invoices/import` 🆕 NEW
 
-Requires `sales.add`. Brings in historical / opening invoices. Multipart `file` —
+Requires `invoices.import`. Brings in historical / opening invoices. Multipart `file` —
 see [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
 **Invoices have no natural key, so re-importing the same file creates
 duplicates** (`update_existing` has no effect here).
@@ -340,7 +344,7 @@ exceed the total.
 
 ### `GET /api/v1/invoices/import-template` 🆕 NEW
 
-Requires `sales.add`. Downloads `invoices-import-template.xlsx`.
+Requires `invoices.import`. Downloads `invoices-import-template.xlsx`.
 
 ---
 
@@ -348,11 +352,11 @@ Requires `sales.add`. Downloads `invoices-import-template.xlsx`.
 
 ### `GET /api/v1/deliveries`, `GET /api/v1/deliveries/{id}`
 
-Requires `sales.view` (+ ownership if Sales Rep).
+Requires `deliveries.view` (+ ownership if Sales Rep).
 
 ### `PUT /api/v1/deliveries/{id}/deliver`
 
-Requires `sales.edit` (+ ownership if Sales Rep). Marks a delivery
+Requires `deliveries.deliver` (+ ownership if Sales Rep). Marks a delivery
 delivered directly — for one not already completed by its order's own
 status transition to `delivered`.
 
@@ -380,7 +384,7 @@ one. A path not from the upload endpoint is `422`.
 
 ### `POST /api/v1/deliveries/invoices`
 
-Requires `sales.edit`. **Step 1 of attaching the delivered invoice.**
+Requires `deliveries.upload-invoice`. **Step 1 of attaching the delivered invoice.**
 `multipart/form-data` with a single `invoice` file — `jpg`, `jpeg`, `png` or
 `pdf`, max 5 MB.
 
@@ -396,7 +400,7 @@ Requires `sales.edit`. **Step 1 of attaching the delivered invoice.**
 
 ### `GET /api/v1/deliveries/{id}/invoice`
 
-Requires `sales.view` (+ ownership if Sales Rep). Downloads the delivered
+Requires `deliveries.view` (+ ownership if Sales Rep). Downloads the delivered
 invoice file (`delivery-invoice-{id}.jpg` etc.) — what `invoice_url` points
 at. **404** — no file attached, or the delivery belongs to another account.
 
@@ -406,7 +410,7 @@ at. **404** — no file attached, or the delivery belongs to another account.
 
 ### `GET /api/v1/collections`
 
-Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep, via
+Requires `collections.view` (+ ownership if Sales Rep, via
 the invoice's originating order).
 
 ### `GET /api/v1/collections/{id}`
@@ -417,7 +421,7 @@ another rep's order. **404** — the collection belongs to another account.
 
 ### `POST /api/v1/collections`
 
-Requires `sales.add` or `accounting.add`. Records a payment against an
+Requires `collections.create`. Records a payment against an
 invoice.
 
 **Request**
@@ -441,21 +445,25 @@ or the invoice is already `paid`.
 ## Returns
 
 `Purchasing` role can use this endpoint too (no `sales.*` needed) — a
-Purchase Return is squarely their job. Requires `sales.add` **or**
-`purchasing.add` to create, `sales.view` **or** `purchasing.view` to list.
+Purchase Return is squarely their job. Creating needs `returns.create`, listing
+`returns.view` — both held by the sales roles and by `Purchasing`.
 
 ### `GET /api/v1/returns`
 
 ### `GET /api/v1/returns/{id}`
 
-Requires `sales.view` or `purchasing.view`. Includes the nested `invoice`,
+Requires `returns.view`. Includes the nested `invoice`,
 `customer`, `supplier`, `product` and `warehouse`. **404** — the return belongs to another account.
 
 ### `POST /api/v1/returns`
 
-**No financial side effect** — this only ever moves stock (or doesn't). It
-never touches an invoice's `paid`/`balance` or a customer's AR balance;
-the spec describes only the stock-movement rule for returns.
+🔄 **Posts to the ledger.** `amount` is the credit-note value, net of tax.
+
+- **Customer returns** (Sales Return / Damaged / Expired Return / Wrong Item): **Dr Sales Revenue (4100) / Cr Accounts Receivable (1200)** for `amount`, and the customer's `balance` drops by `amount` (floored at zero). If `restocked` is true and the goods go back into stock, also **Dr Inventory (1300) / Cr Cost of Goods Sold (5100)** for what that stock cost, reversing the cost charged at delivery.
+- **Purchase Return**: **Dr Accounts Payable (2100) / Cr Inventory (1300)** for `amount`, and what is owed the supplier drops by `amount`.
+- The credit applies to the customer's / supplier's balance, **not to a specific invoice** — an invoice's own `paid`/`balance` are untouched.
+
+Stock rules are unchanged: only a Purchase Return, or a restocked customer return, moves stock.
 
 **Request**
 ```json
@@ -489,14 +497,13 @@ genuinely differ, so read it carefully:
 **422** — the required fields for the type's stock movement are missing,
 the source batch doesn't have enough stock (Purchase Return), or no
 matching batch exists to restock into.
-**403** — e.g. `Customer Service`, which has neither `sales.add` nor
-`purchasing.add`.
+**403** — e.g. `Customer Service`, which lacks `returns.create`.
 
 ---
 
 ## `GET /api/v1/reports/ar-aging`
 
-Requires `sales.view` **or** `accounting.view`. Every customer with an
+Requires `ar-aging.view`. Every customer with an
 outstanding/partial/overdue invoice balance, bucketed by days overdue
 (`current`, `days_1_30`, `days_31_60`, `days_61_90`, `days_90_plus`) —
 `current` covers not-yet-due and undated invoices.

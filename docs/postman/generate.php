@@ -151,6 +151,123 @@ function chg(array $item, string $what): array
 }
 
 /**
+ * Every endpoint is guarded by its own `{resource}.{action}` permission (see
+ * docs/api/permissions.md). Rather than hand-copy those names into ~300
+ * descriptions, read them from the application's own routes: each request's
+ * "Requires `...`" sentence is rewritten to the permission its route really
+ * enforces, and a request with no such sentence gets one.
+ *
+ * @return array<string, list<string>> "METHOD /normalised/path" => permissions
+ */
+function routePermissions(): array
+{
+    $artisan = dirname(__DIR__, 2).'/artisan';
+    $json = shell_exec('php '.escapeshellarg($artisan).' route:list --json --path=api/v1 2>/dev/null');
+    $routes = json_decode((string) $json, true);
+
+    if (! is_array($routes)) {
+        fwrite(STDERR, "Could not read route:list — permission names in descriptions were left as written.\n");
+
+        return [];
+    }
+
+    $map = [];
+    foreach ($routes as $route) {
+        $permissions = [];
+        foreach ($route['middleware'] as $middleware) {
+            if (str_starts_with($middleware, 'Illuminate\\Auth\\Middleware\\Authorize:')) {
+                $permissions[] = substr($middleware, strlen('Illuminate\\Auth\\Middleware\\Authorize:'));
+            }
+        }
+
+        if ($permissions === []) {
+            continue;
+        }
+
+        $path = preg_replace('#\{[^}]+\}#', '{x}', substr($route['uri'], strlen('api/v1')));
+        foreach (explode('|', $route['method']) as $method) {
+            if ($method !== 'HEAD') {
+                $map[$method.' '.$path] = $permissions;
+            }
+        }
+    }
+
+    return $map;
+}
+
+/**
+ * @param  array<int, array<string, mixed>>  $items
+ * @param  array<string, list<string>>  $map
+ * @return array<int, array<string, mixed>>
+ */
+function applyPermissions(array $items, array $map): array
+{
+    foreach ($items as &$item) {
+        if (isset($item['item'])) {
+            $item['item'] = applyPermissions($item['item'], $map);
+
+            continue;
+        }
+
+        if (! isset($item['request']['url']['path'])) {
+            continue;
+        }
+
+        $path = '/'.implode('/', $item['request']['url']['path']);
+        $key = $item['request']['method'].' '.preg_replace('#/\{\{[^}]+\}\}#', '/{x}', $path);
+        // A multipart PUT is sent as POST with `_method`; match the real verb.
+        foreach (($item['request']['body']['formdata'] ?? []) as $field) {
+            if (($field['key'] ?? '') === '_method') {
+                $key = $field['value'].' '.preg_replace('#/\{\{[^}]+\}\}#', '/{x}', $path);
+            }
+        }
+
+        $permissions = $map[$key] ?? null;
+        if ($permissions === null) {
+            continue;
+        }
+
+        $label = implode('` + `', $permissions);
+        $description = $item['request']['description'] ?? '';
+        $banner = '';
+        if (str_starts_with($description, '**')) {
+            $cut = strpos($description, "\n\n");
+            $banner = $cut === false ? $description."\n\n" : substr($description, 0, $cut + 2);
+            $description = $cut === false ? '' : substr($description, $cut + 2);
+        }
+
+        $pattern = '/Requires `[a-z.\-]+`(?:(?:\s*,\s*|\s+(?:\*\*and\*\*|and|or|\+)\s+)(?:or\s+)?`[a-z.\-]+`)*/';
+        $description = preg_match($pattern, $description)
+            ? preg_replace($pattern, "Requires `{$label}`", $description, 1)
+            : "Requires `{$label}`.".($description === '' ? '' : ' '.$description);
+
+        $item['request']['description'] = $banner.$description;
+    }
+
+    return $items;
+}
+
+/**
+ * Flag existing requests by name as 🔄 CHANGED.
+ *
+ * @param  array<int, array<string, mixed>>  $items
+ * @param  array<string, string>  $changes
+ * @return array<int, array<string, mixed>>
+ */
+function markChanged(array $items, array $changes): array
+{
+    foreach ($items as &$item) {
+        if (isset($item['item'])) {
+            $item['item'] = markChanged($item['item'], $changes);
+        } elseif (isset($changes[$item['name']])) {
+            $item = chg($item, $changes[$item['name']]);
+        }
+    }
+
+    return $items;
+}
+
+/**
  * "Create a throwaway record, then delete it" — so a DELETE request never
  * destroys the id later requests in a full run still depend on. The create
  * step is the existing endpoint (unflagged); the delete is the new one.
@@ -566,7 +683,7 @@ $purchasing = folder('Purchasing', [
     folder('Suppliers', [
         req('GET', 'List suppliers', '/suppliers', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-            'description' => 'Requires `purchasing.view` (also reachable with `accounting.view`).',
+            'description' => 'Lists the suppliers of the company.',
         ]),
         req('POST', 'Upload supplier contract', '/suppliers/contracts', [
             'description' => 'Requires `purchasing.add` or `purchasing.edit`. **Step 1 of attaching a contract** — pdf/jpg/png/doc/docx, max 10 MB. Returns `contract_data` (the stored path), saved into `{{supplier_contract_data}}`, which you then send as `contract_data` on Create/Update supplier. Attach a file to the `contract` field before sending — in an unattended collection run this returns 422 and the request below simply sends no file.',
@@ -634,17 +751,17 @@ $purchasing = folder('Purchasing', [
             'description' => 'Requires `purchasing.add`. **Costs are optional and only an administrator may send them.** A buyer sends quantities only (`qty_cartons`, or `unit_id` + `qty`); the order is created with `status: pending_pricing` and zero totals, and cannot be sent or received until an administrator prices it (next requests). A non-admin who sends `cost_per_carton` / `cost_per_unit` gets 422. An Administrator who omits costs gets the same pending order; one who sends them for every line gets a normal `draft`. Saves the id into `{{pending_pricing_po_id}}`.',
             'body' => ['supplier_id' => '{{supplier_id}}', 'warehouse_id' => '{{warehouse_id}}', 'notes' => 'Waiting for pricing', 'lines' => [['product_id' => '{{product_id}}', 'qty_cartons' => 5]]],
             'tests' => saveId('pending_pricing_po_id'),
-        ]), 'line costs are now optional; an order with any unpriced line starts as `pending_pricing`, and only users with `purchasing.pricing` (Administrator by default) may send costs.'),
+        ]), 'line costs are now optional; an order with any unpriced line starts as `pending_pricing`, and only users with `purchase-orders.pricing` (Administrator by default) may send costs.'),
         nw(req('GET', 'List purchase orders pending pricing', '/purchase-orders/pending-pricing', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
-            'description' => 'Requires `purchasing.pricing` (Administrator by default; 403 otherwise). The admin work queue: every purchase order of the tenant still in `pending_pricing`, newest first. Supports `search` and `sort_by`.',
+            'description' => 'Requires `purchase-orders.pricing` (Administrator by default; 403 otherwise). The admin work queue: every purchase order of the tenant still in `pending_pricing`, newest first. Supports `search` and `sort_by`.',
         ])),
         req('GET', 'List lines of the pending purchase order', '/purchase-orders/{{pending_pricing_po_id}}/lines', [
             'description' => 'Existing endpoint — saves the first line id into `{{pending_po_line_id}}` for the pricing request below.',
             'tests' => saveId('pending_po_line_id', 'data.0.id'),
         ]),
         nw(req('PUT', 'Price purchase order', '/purchase-orders/{{pending_pricing_po_id}}/pricing', [
-            'description' => 'Requires `purchasing.pricing` (Administrator by default). Sets the cost of **every** line — each entry needs its `line_id` and exactly one of `cost_per_carton` or `cost_per_unit` (the latter only for lines ordered in a packaging unit). Recomputes subtotal / tax / total and releases the order `pending_pricing` → `draft`, so it can be sent and received. An unreceived, non-cancelled order that is already priced can be re-priced the same way. 422 if a line is missing, repeated, or priced twice; 422 for a received or cancelled order; 404 for another tenant.',
+            'description' => 'Requires `purchase-orders.pricing` (Administrator by default). Sets the cost of **every** line — each entry needs its `line_id` and exactly one of `cost_per_carton` or `cost_per_unit` (the latter only for lines ordered in a packaging unit). Recomputes subtotal / tax / total and releases the order `pending_pricing` → `draft`, so it can be sent and received. An unreceived, non-cancelled order that is already priced can be re-priced the same way. 422 if a line is missing, repeated, or priced twice; 422 for a received or cancelled order; 404 for another tenant.',
             'body' => ['lines' => [['line_id' => '{{pending_po_line_id}}', 'cost_per_carton' => 40]]],
         ])),
         chg(req('POST', 'Create purchase order (ordered in packages)', '/purchase-orders', [
@@ -664,6 +781,20 @@ $purchasing = folder('Purchasing', [
             'description' => "Requires `purchasing.delete` (only Administrator has it by default). **Only if not received** — a received PO (`stock_added: true`) returns 422, since its stock, supplier balance and journal entry can't be undone by a delete. Returns 204 and removes the PO with its lines; audit-logged as DELETE. A PO from another tenant is 404.",
         ]),
     ]),
+    nw(folder('Supplier payments', [
+        nw(req('POST', 'Pay supplier', '/supplier-payments', [
+            'description' => 'Pays down what we owe a supplier: **Dr Accounts Payable (2100) / Cr Cash (1110) or Bank (1120)** and the supplier\'s balance moves toward zero. `method` is `cash` or `bank`; `purchase_order_id` is optional and informational (must be a received order of that supplier). 422 if nothing is owed or the amount exceeds what is owed — run after Receive purchase order so the supplier has a balance. Saves the id into `{{supplier_payment_id}}`.',
+            'body' => ['supplier_id' => '{{supplier_id}}', 'amount' => 10, 'method' => 'bank', 'payment_date' => '2026-10-18', 'reference' => 'TRF-POSTMAN', 'purchase_order_id' => null],
+            'tests' => saveId('supplier_payment_id'),
+        ])),
+        nw(req('GET', 'List supplier payments', '/supplier-payments', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches id, reference, notes and supplier name. Export needs `supplier-payments.export`.',
+        ])),
+        nw(req('GET', 'Get supplier payment', '/supplier-payments/{{supplier_payment_id}}', [
+            'description' => "404 for another tenant's payment. Payments are append-only — there is no edit or delete; correct a wrong one with a manual journal entry.",
+        ])),
+    ], 'Paying suppliers: posts Dr 2100 Accounts Payable / Cr Cash or Bank. See docs/api/purchasing.md.')),
     req('GET', 'AP aging report', '/reports/ap-aging', [
         'description' => "Requires `purchasing.view` or `accounting.view`. **Not date-bucketed** (unlike AR) — `purchase_orders` has no due-date/payment tracking, so this is every supplier's current outstanding balance sorted by amount owed.",
     ]),
@@ -805,11 +936,14 @@ $crm = folder('CRM', [
 $accounting = folder('Accounting', [
     req('GET', 'Chart of accounts', '/chart-of-accounts', [
         'query' => ['page' => 1, 'per_page' => 100, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => "Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.\n\nSaves the id of account `6200` (General & Administrative Expense) into `{{expense_account_id}}` for Expenses > Create expense category.",
+        'description' => "Requires `accounting.view`. Flat list ordered by code — `parent_id`/`level` let the frontend build a tree.\n\nSaves the id of account `6200` (General & Administrative Expense) into `{{expense_account_id}}` for Expenses > Create expense category, and the ids of `1110` Cash and `3100` Owner's Capital into `{{cash_account_id}}` / `{{capital_account_id}}` for Create manual journal entry.",
         'tests' => [
             'if (pm.response.code === 200) {',
-            "    const account = (pm.response.json().data || []).find(a => a.code === '6200');",
-            "    if (account) { pm.collectionVariables.set('expense_account_id', account.id); }",
+            '    const accounts = pm.response.json().data || [];',
+            '    const byCode = code => accounts.find(a => a.code === code);',
+            "    if (byCode('6200')) { pm.collectionVariables.set('expense_account_id', byCode('6200').id); }",
+            "    if (byCode('1110')) { pm.collectionVariables.set('cash_account_id', byCode('1110').id); }",
+            "    if (byCode('3100')) { pm.collectionVariables.set('capital_account_id', byCode('3100').id); }",
             '}',
         ],
     ]),
@@ -822,15 +956,27 @@ $accounting = folder('Accounting', [
         'tests' => saveId('new_account_id'),
     ])),
     nw(req('PUT', 'Update account', '/chart-of-accounts/{{new_account_id}}', [
-        'description' => 'Requires `accounting.edit`. Rename, re-parent or deactivate. `code` and `type` are frozen (422) for system accounts (1110, 1120, 1200, 1300, 2100, 2300, 4100, 6300, 6400) and for any account that already has journal lines.',
+        'description' => 'Requires `accounting.edit`. Rename, re-parent or deactivate. `code` and `type` are frozen (422) for system accounts (1110, 1120, 1200, 1300, 1400, 2100, 2200, 2210, 2300, 3300, 4100, 5100, 6100, 6300, 6400) and for any account that already has journal lines.',
         'body' => ['name' => 'Postman Demo Account (renamed)', 'active' => true],
     ])),
     nw(req('DELETE', 'Delete account', '/chart-of-accounts/{{new_account_id}}', [
         'description' => 'Requires `accounting.delete`. 204. **409** for system accounts, accounts with child accounts, or accounts with journal lines.',
     ])),
+    nw(req('GET', 'Chart of accounts connections', '/chart-of-accounts/connections', [
+        'description' => 'Which business flow feeds each account and how many journal lines it has actually received — the answer to "is this account connected to anything?". `kind`: header / posted (fed automatically) / manual (use a manual journal entry) / custom. `attention` flags an account that should have postings but has none.',
+    ])),
+    nw(req('POST', 'Create manual journal entry', '/journal-entries', [
+        'description' => 'The way to book anything no business flow posts (capital, opening balances, fixed assets, other income, depreciation, tax paid to the authorities, corrections). At least two lines, each a `debit` **or** a `credit`; the entry must balance exactly and every account must be an active leaf account (422 otherwise). Posted at once. Saves the id into `{{manual_journal_entry_id}}`. Uses the cash and capital ids captured by Chart of accounts.',
+        'body' => ['entry_date' => '2026-10-01', 'description' => 'Capital introduced (Postman)', 'ref' => 'CAP-POSTMAN', 'lines' => [['account_id' => '{{cash_account_id}}', 'debit' => 5000], ['account_id' => '{{capital_account_id}}', 'credit' => 5000]]],
+        'tests' => saveId('manual_journal_entry_id'),
+    ])),
+    nw(req('POST', 'Reverse manual journal entry', '/journal-entries/{{manual_journal_entry_id}}/reverse', [
+        'description' => 'Cancels a **manual** entry by posting its mirror image (debits and credits swapped), dated `entry_date` (optional, default today), and marks the original reversed. 422 if the entry came from a business flow or was already reversed — undo those by undoing the document (void the invoice, reject the write-off...).',
+        'body' => ['entry_date' => '2026-10-02'],
+    ])),
     req('GET', 'Journal entries', '/journal-entries', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'export' => 'csv'],
-        'description' => "Requires `accounting.view`. Includes `lines_count` (lines are paged per entry by List journal entry lines). No POST — entries only come from business events auto-posting. Exported rows still summarize every line into one column.\n\nSaves the first entry's id into `{{journal_entry_id}}` for Get journal entry.",
+        'description' => "Requires `accounting.view`. Includes `lines_count` (lines are paged per entry by List journal entry lines). Entries come from business events auto-posting, or from Create manual journal entry. Each has `type` (system / manual / reversal), `reversal_of` and `reversed_at`. Exported rows still summarize every line into one column.\n\nSaves the first entry's id into `{{journal_entry_id}}` for Get journal entry.",
         'tests' => saveId('journal_entry_id', 'data.0.id'),
     ]),
     req('GET', 'Get journal entry', '/journal-entries/{{journal_entry_id}}', [
@@ -841,7 +987,7 @@ $accounting = folder('Accounting', [
         'description' => 'Requires `accounting.view`. Each line includes its `account`. Paginated (10 per page by default) — follow `links.next`.',
     ]),
     req('GET', 'Balance sheet', '/reports/balance-sheet', [
-        'description' => 'Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. `balanced: false` is expected in this build (no period-close process sweeps net income into Retained Earnings).',
+        'description' => 'Requires `accounting.view`. Current snapshot only, no `as_of` param — Account.balance is a running total. Equity includes `current_period_earnings` (revenue − expenses to date, since there is no period close), so `balanced` is true when the books are sound — `false` now means a real problem.',
     ]),
     req('GET', 'Income statement', '/reports/income-statement', [
         'query' => ['start_date' => '2026-09-01', 'end_date' => '2026-09-30'],
@@ -866,7 +1012,7 @@ $expenses = folder('Expenses', [
             'tests' => saveId('expense_category_id'),
         ]),
         req('PUT', 'Update expense category', '/expense-categories/{{expense_category_id}}', [
-            'description' => 'Requires `expenses.edit`. Partial update. `DELETE` (needs `expenses.delete`) only works while no expense uses the category — otherwise set `active: false` to retire it; inactive categories can\'t take new expenses.',
+            'description' => 'Requires `expenses.edit`. Partial update. `DELETE` (needs `expense-categories.delete`) only works while no expense uses the category — otherwise set `active: false` to retire it; inactive categories can\'t take new expenses.',
             'body' => ['description' => 'Updated from Postman'],
         ]),
         ...deleteFlow('expense category', '/expense-categories', ['name' => 'Postman Delete Me Expense Category', 'account_id' => '{{expense_account_id}}'], 'deletable_expense_category_id', '/expense-categories/{id}', 'Requires `expenses.delete`. 204. **409** while any expense uses the category — set `active: false` instead.'),
@@ -884,7 +1030,7 @@ $expenses = folder('Expenses', [
         ]),
         req('GET', 'List expenses', '/expenses', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'search' => '', 'filter[status]' => 'draft', 'export' => 'csv'],
-            'description' => 'Requires `expenses.view`. `search` matches id/payee/reference/description/category/supplier/warehouse names. Export needs `expenses.export` or `accounting.export`.',
+            'description' => 'Requires `expenses.view`. `search` matches id/payee/reference/description/category/supplier/warehouse names. Export needs `expenses.export`.',
         ]),
         req('GET', 'Get expense', '/expenses/{{expense_id}}', [
             'description' => 'Requires `expenses.view`. `receipt_url` (when a receipt is attached) points at Download receipt.',
@@ -936,7 +1082,7 @@ $recap = nw(folder('Recap', [
     ])),
     nw(req('GET', 'List recaps', '/recaps', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => 'Requires `recap.view`. `search` matches id, notes, warehouse name. Export needs `recap.export` or `accounting.export`.',
+        'description' => 'Requires `recap.view`. `search` matches id, notes, warehouse name. Export needs `recaps.export`.',
     ])),
     nw(req('GET', 'Get recap', '/recaps/{{recap_id}}', [
         'description' => 'Requires `recap.view`. Includes the lines (batch, product, qty, cost, value). 404 for another tenant.',
@@ -1005,7 +1151,7 @@ $manufacturing = nw(folder('Manufacturing', [
     ])),
     nw(req('GET', 'List production orders', '/production-orders', [
         'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
-        'description' => 'Requires `manufacturing.view`. Export needs `manufacturing.export` or `accounting.export`.',
+        'description' => 'Requires `manufacturing.view`. Export needs `production-orders.export`.',
     ])),
     nw(req('GET', 'Get production order', '/production-orders/{{production_order_id}}', [
         'description' => 'Requires `manufacturing.view`. After completion includes `consumptions` (which batches were used, at what cost).',
@@ -1037,6 +1183,237 @@ $manufacturing = nw(folder('Manufacturing', [
         'description' => 'Requires `manufacturing.delete`. 204; lines cascade. **409** when production orders were raised from it — set `active: false` instead.',
     ])),
 ], 'Bills of materials and production orders. Completing an order consumes components FEFO, creates the finished batch and posts the cost. See docs/api/manufacturing.md.'));
+
+$hr = nw(folder('HR', [
+    folder('Departments', [
+        nw(req('POST', 'Create department', '/departments', [
+            'description' => 'A grouping for employees. `name` is unique per company. Saves the id into `{{department_id}}`.',
+            'body' => ['name' => 'Postman Sales Department', 'active' => true],
+            'tests' => saveId('department_id'),
+        ])),
+        nw(req('GET', 'List departments', '/departments', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => '`search` matches the name. Each row has `employees_count`.',
+        ])),
+        nw(req('GET', 'Get department', '/departments/{{department_id}}', [
+            'description' => "404 for another company's department.",
+        ])),
+        nw(req('PUT', 'Update department', '/departments/{{department_id}}', [
+            'description' => 'Rename it or set `active: false`.',
+            'body' => ['name' => 'Postman Sales Department (renamed)'],
+        ])),
+        ...deleteFlow('department', '/departments', ['name' => 'Postman Delete Me Department'], 'deletable_department_id', '/departments/{id}', '204. The department\'s employees simply end up with no department.'),
+    ]),
+    folder('Work schedules', [
+        nw(req('POST', 'Create work schedule', '/work-schedules', [
+            'description' => 'The working day an employee is measured against: `start_time`/`end_time`, `break_minutes`, `grace_minutes` (forgiven each day before a shortfall is deducted) and `weekend_days` (0 = Sunday ... 6 = Saturday). `is_default: true` makes it the company default and demotes the previous one. Saves the id into `{{work_schedule_id}}`.',
+            'body' => ['name' => 'Postman Shift A', 'start_time' => '08:00', 'end_time' => '16:00', 'break_minutes' => 30, 'grace_minutes' => 10, 'weekend_days' => [5, 6], 'is_default' => false],
+            'tests' => saveId('work_schedule_id'),
+        ])),
+        nw(req('GET', 'List work schedules', '/work-schedules', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Each row has `scheduled_minutes` (end − start − break).',
+        ])),
+        nw(req('GET', 'Get work schedule', '/work-schedules/{{work_schedule_id}}', [
+            'description' => "404 for another company's schedule.",
+        ])),
+        nw(req('PUT', 'Update work schedule', '/work-schedules/{{work_schedule_id}}', [
+            'description' => 'Partial update.',
+            'body' => ['grace_minutes' => 15],
+        ])),
+        ...deleteFlow('work schedule', '/work-schedules', ['name' => 'Postman Delete Me Schedule', 'start_time' => '09:00', 'end_time' => '17:00', 'weekend_days' => [5, 6]], 'deletable_work_schedule_id', '/work-schedules/{id}', '204. Employees who used it fall back to the company default schedule.'),
+    ]),
+    folder('Global holidays', [
+        nw(req('POST', 'Create holiday', '/holidays', [
+            'description' => 'A company-wide day (or range) off. Paid, never counts as absence, and is skipped when counting leave days. Saves the id into `{{holiday_id}}`.',
+            'body' => ['name' => 'Postman Holiday', 'start_date' => '2026-09-10', 'end_date' => '2026-09-10'],
+            'tests' => saveId('holiday_id'),
+        ])),
+        nw(req('GET', 'List holidays', '/holidays', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'start_date', 'sort_dir' => 'asc'],
+            'description' => 'Employees can read the holiday calendar.',
+        ])),
+        nw(req('GET', 'Get holiday', '/holidays/{{holiday_id}}', [
+            'description' => "404 for another company's holiday.",
+        ])),
+        nw(req('PUT', 'Update holiday', '/holidays/{{holiday_id}}', [
+            'description' => 'Partial update; `end_date` stays on or after `start_date`.',
+            'body' => ['name' => 'Postman Holiday (renamed)'],
+        ])),
+        ...deleteFlow('holiday', '/holidays', ['name' => 'Postman Delete Me Holiday', 'start_date' => '2026-12-31', 'end_date' => '2026-12-31'], 'deletable_holiday_id', '/holidays/{id}', '204.'),
+    ]),
+    folder('Employees', [
+        nw(req('POST', 'Create employee', '/employees', [
+            'description' => 'Pay is a fixed monthly `basic_salary` + `allowances`; `insurance_pct` is taken from the basic salary and `tax_pct` from what remains. `overtime_eligible: true` makes overtime payable. `user_id` links the employee to a login so they can check in and see their own data (here: the logged-in user, so the self-service requests below work). Salary fields are only returned to users who can view payroll. Saves the id into `{{employee_id}}`. Re-running needs a new `code` and the login not already linked.',
+            'body' => ['code' => 'PM-001', 'name' => 'Postman Employee', 'email' => 'postman.employee@example.com', 'job_title' => 'Sales Executive', 'department_id' => '{{department_id}}', 'work_schedule_id' => null, 'user_id' => '{{user_id}}', 'hire_date' => '2026-01-01', 'basic_salary' => 9000, 'allowances' => 1000, 'insurance_pct' => 11, 'tax_pct' => 10, 'overtime_eligible' => true, 'annual_leave_days' => 21],
+            'tests' => saveId('employee_id'),
+        ])),
+        nw(req('GET', 'List employees', '/employees', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches code, name, email, phone, job title and department. Export needs `employees.export`.',
+        ])),
+        nw(req('GET', 'Get employee', '/employees/{{employee_id}}', [
+            'description' => "404 for another company's employee.",
+        ])),
+        nw(req('GET', 'Employee leave balance', '/employees/{{employee_id}}/leave-balance', [
+            'query' => ['year' => 2026],
+            'description' => 'Annual leave only: `entitlement`, `taken` (approved), `pending`, `remaining`.',
+        ])),
+        nw(req('PUT', 'Update employee', '/employees/{{employee_id}}', [
+            'description' => 'Partial update. Pay changes apply from the next payroll run that is calculated.',
+            'body' => ['job_title' => 'Senior Sales Executive', 'allowances' => 1200],
+        ])),
+        ...deleteFlow('employee', '/employees', ['code' => 'PM-DEL-001', 'name' => 'Postman Delete Me Employee', 'hire_date' => '2026-01-01', 'basic_salary' => 1000], 'deletable_employee_id', '/employees/{id}', '204. **409** once the employee has attendance, leave or payslips — set a `termination_date` and `status: "inactive"` instead.'),
+    ]),
+    folder('Attendance', [
+        nw(req('POST', 'Check in', '/attendances/check-in', [
+            'description' => 'Self-service, no body: the signed-in user\'s linked employee starts their day now. 422 if already checked in today or if the login isn\'t linked to an employee (Employees > Create employee links the logged-in user).',
+        ])),
+        nw(req('POST', 'Check out', '/attendances/check-out', [
+            'description' => 'Self-service, no body: ends today\'s day and calculates worked / late / early-leave / overtime minutes against the schedule. 422 if not checked in or already checked out.',
+        ])),
+        nw(req('POST', 'Add attendance manually', '/attendances', [
+            'description' => 'HR keys a day in by hand (a forgotten check-in). `work_date` can\'t be in the future; `check_out` needs `check_in` and must be after it; 422 if that employee already has a record for the date. Saves the id into `{{attendance_id}}`.',
+            'body' => ['employee_id' => '{{employee_id}}', 'work_date' => '2026-09-02', 'check_in' => '09:20', 'check_out' => '16:30', 'notes' => 'Keyed in from Postman'],
+            'tests' => saveId('attendance_id'),
+        ])),
+        nw(req('GET', 'List attendance', '/attendances', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'work_date', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => '`search` matches employee name/code and notes. A user without `employees.view` sees only their own days. Export needs `attendances.export`.',
+        ])),
+        nw(req('GET', 'Attendance summary', '/attendances/summary', [
+            'query' => ['month' => '2026-09'],
+            'description' => 'Per employee for a month: days present, incomplete days, worked / late / early-leave / overtime minutes. Optional `employee_id`.',
+        ])),
+        nw(req('GET', 'Get attendance', '/attendances/{{attendance_id}}', [
+            'description' => '404 for another company\'s record (or, for a self-service user, someone else\'s).',
+        ])),
+        nw(req('PUT', 'Update attendance', '/attendances/{{attendance_id}}', [
+            'description' => 'Recalculates the minutes. Correct attendance before the month\'s payroll is approved.',
+            'body' => ['check_out' => '17:30'],
+        ])),
+    ]),
+    folder('Time permissions', [
+        nw(req('POST', 'Create time permission', '/time-permissions', [
+            'description' => 'Ask to come late (`late_arrival`), leave early (`early_leave`) or be away part of the day (`partial_absence`). Once **approved**, the covered minutes are excused in payroll. `employee_id` is required for HR and ignored for a self-service user. Saves the id into `{{time_permission_id}}`.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'late_arrival', 'permission_date' => '2026-09-02', 'from_time' => '09:00', 'to_time' => '10:00', 'reason' => 'Doctor appointment'],
+            'tests' => saveId('time_permission_id'),
+        ])),
+        nw(req('GET', 'List time permissions', '/time-permissions', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'A user without `employees.view` sees only their own.',
+        ])),
+        nw(req('GET', 'Get time permission', '/time-permissions/{{time_permission_id}}', [
+            'description' => '404 for another company\'s (or, self-service, someone else\'s).',
+        ])),
+        nw(req('PUT', 'Update time permission', '/time-permissions/{{time_permission_id}}', [
+            'description' => '**Pending only** — 422 otherwise.',
+            'body' => ['to_time' => '10:30'],
+        ])),
+        nw(req('POST', 'Approve time permission', '/time-permissions/{{time_permission_id}}/approve', [
+            'description' => 'Pending → approved. The minutes are excused when payroll is calculated.',
+        ])),
+        req('POST', 'Create time permission (to reject)', '/time-permissions', [
+            'description' => 'A throwaway pending permission for the Reject request below.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'early_leave', 'permission_date' => '2026-09-03', 'from_time' => '15:00', 'to_time' => '17:00', 'reason' => 'Personal'],
+            'tests' => saveId('rejectable_time_permission_id'),
+        ]),
+        nw(req('POST', 'Reject time permission', '/time-permissions/{{rejectable_time_permission_id}}/reject', [
+            'description' => 'Pending → rejected, with an optional `reason`. The time is not excused.',
+            'body' => ['reason' => 'Needed on site'],
+        ])),
+        req('POST', 'Create time permission (to delete)', '/time-permissions', [
+            'description' => 'A throwaway pending permission for the Delete request below.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'partial_absence', 'permission_date' => '2026-09-04', 'from_time' => '12:00', 'to_time' => '13:00'],
+            'tests' => saveId('deletable_time_permission_id'),
+        ]),
+        nw(req('DELETE', 'Delete time permission', '/time-permissions/{{deletable_time_permission_id}}', [
+            'description' => '204. **Pending only** — 422 once decided.',
+        ])),
+    ]),
+    folder('Leave', [
+        nw(req('POST', 'Create leave request', '/leave-requests', [
+            'description' => '`type`: `annual` (uses the entitlement), `sick`, `other` (all paid) or `unpaid` (costs a day\'s salary per working day). `days` counts working days only — weekend and company holidays inside the range don\'t count. 422 if the range has no working days, overlaps other leave, or annual leave exceeds the balance. Saves the id into `{{leave_request_id}}`.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'annual', 'start_date' => '2026-11-01', 'end_date' => '2026-11-05', 'reason' => 'Family trip'],
+            'tests' => saveId('leave_request_id'),
+        ])),
+        nw(req('GET', 'List leave requests', '/leave-requests', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
+            'description' => 'A user without `employees.view` sees only their own.',
+        ])),
+        nw(req('GET', 'Get leave request', '/leave-requests/{{leave_request_id}}', [
+            'description' => '404 for another company\'s (or, self-service, someone else\'s).',
+        ])),
+        nw(req('PUT', 'Update leave request', '/leave-requests/{{leave_request_id}}', [
+            'description' => '**Pending only**; re-validated like a create.',
+            'body' => ['end_date' => '2026-11-04'],
+        ])),
+        nw(req('POST', 'Approve leave request', '/leave-requests/{{leave_request_id}}/approve', [
+            'description' => 'Pending → approved. Approved paid leave stops the days counting as absence; approved unpaid leave deducts a day each.',
+        ])),
+        req('POST', 'Create leave request (to reject)', '/leave-requests', [
+            'description' => 'A throwaway pending request for the Reject request below.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'unpaid', 'start_date' => '2026-12-06', 'end_date' => '2026-12-06', 'reason' => 'Personal'],
+            'tests' => saveId('rejectable_leave_request_id'),
+        ]),
+        nw(req('POST', 'Reject leave request', '/leave-requests/{{rejectable_leave_request_id}}/reject', [
+            'description' => 'Pending → rejected, with an optional `reason`.',
+            'body' => ['reason' => 'Busy period'],
+        ])),
+        req('POST', 'Create leave request (to delete)', '/leave-requests', [
+            'description' => 'A throwaway pending request for the Delete request below.',
+            'body' => ['employee_id' => '{{employee_id}}', 'type' => 'sick', 'start_date' => '2026-12-13', 'end_date' => '2026-12-13'],
+            'tests' => saveId('deletable_leave_request_id'),
+        ]),
+        nw(req('DELETE', 'Delete leave request', '/leave-requests/{{deletable_leave_request_id}}', [
+            'description' => '204. **Pending only** — 422 once decided.',
+        ])),
+    ]),
+    folder('Payroll', [
+        nw(req('POST', 'Generate payroll (draft)', '/payroll-runs', [
+            'description' => 'Calculates a month as a **draft** — nothing reaches the ledger yet. Only once the month has ended (422 otherwise), one run per month (422 on `period` if it exists). Fixed salary (basic + allowances), a day = 1/30, deductions for absence / unpaid leave / unexcused lateness and early leave (approved time permissions and the schedule\'s grace minutes are forgiven), overtime x1.5 for eligible employees, then insurance and tax. Also runs by itself on the last day of each month (`php artisan hr:generate-payroll`). Saves the id into `{{payroll_run_id}}`. Re-running needs an unused month.',
+            'body' => ['period' => '2026-09', 'notes' => 'September payroll'],
+            'tests' => saveId('payroll_run_id'),
+        ])),
+        nw(req('GET', 'List payroll runs', '/payroll-runs', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => 'Export needs `payroll-runs.export`.',
+        ])),
+        nw(req('GET', 'Get payroll run', '/payroll-runs/{{payroll_run_id}}', [
+            'description' => 'Totals (`total_earned`, `total_withheld`, `total_net`), status (`draft` → `approved` → `paid`) and the journal entry ids once posted.',
+        ])),
+        nw(req('GET', 'List payroll run payslips', '/payroll-runs/{{payroll_run_id}}/payslips', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'One payslip per employee. Saves the first id into `{{payslip_id}}`.',
+            'tests' => saveId('payslip_id', 'data.0.id'),
+        ])),
+        nw(req('PUT', 'Recalculate payroll run', '/payroll-runs/{{payroll_run_id}}/recalculate', [
+            'description' => '**Draft only.** Recomputes from attendance, leave and permissions as they are now (after fixing an incomplete day, say).',
+        ])),
+        nw(req('POST', 'Approve payroll run', '/payroll-runs/{{payroll_run_id}}/approve', [
+            'description' => 'Locks the run and **posts to the chart of accounts**: Dr 6100 Salaries Expense / Cr 2210 Payroll Taxes & Insurance Payable / Cr 2200 Salaries Payable, dated the last day of the period. Draft only (422). Needs accounts 6100, 2200 and 2210 (run AccountSeeder).',
+        ])),
+        nw(req('POST', 'Pay payroll run', '/payroll-runs/{{payroll_run_id}}/pay', [
+            'description' => 'Posts Dr 2200 Salaries Payable / Cr 1110 Cash (`payment_method: cash`) or 1120 Bank (`bank`) for the net pay. Approved runs only (422 otherwise, or if already paid). Tax and insurance in 2210 are paid to the authorities with a manual journal entry.',
+            'body' => ['payment_method' => 'bank', 'payment_date' => '2026-10-18'],
+        ])),
+        req('POST', 'Generate payroll (to delete)', '/payroll-runs', [
+            'description' => 'A throwaway draft for the Delete request below (August).',
+            'body' => ['period' => '2026-08'],
+            'tests' => saveId('deletable_payroll_run_id'),
+        ]),
+        nw(req('DELETE', 'Delete payroll run', '/payroll-runs/{{deletable_payroll_run_id}}', [
+            'description' => '204. **Draft only** — an approved run has already posted to the ledger (422).',
+        ])),
+        nw(req('GET', 'List payslips', '/payslips', [
+            'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
+            'description' => 'Payroll staff (`payroll-runs.view`) see every payslip, drafts included; anyone else sees only their own, and only once the run is approved or paid. Export needs `payslips.export`.',
+        ])),
+        nw(req('GET', 'Get payslip', '/payslips/{{payslip_id}}', [
+            'description' => 'The full breakdown: days (working / weekend / holiday / present / absent / leave), minutes (late / early leave / shortfall / excused / overtime), earnings, each deduction, insurance, tax and `net_pay`. A snapshot — later changes don\'t alter it.',
+        ])),
+    ]),
+], 'Employees, work schedules, global holidays, attendance (check-in/out), time permissions (late / early leave / partial), leave and monthly payroll connected to the chart of accounts. Run top to bottom: payroll needs the employee and a finished month. See docs/api/hr.md.'));
 
 $analytics = folder('Analytics', [
     nw(req('GET', 'Product life cycle', '/products/{{product_id}}/lifecycle', [
@@ -1073,7 +1450,7 @@ $admin = folder('Admin', [
     folder('Users', [
         req('GET', 'List users', '/users', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'role' => '', 'status' => '', 'export' => 'csv'],
-            'description' => 'Requires `admin.audit` to view, `admin.export` to export (see the collection description\'s export note — same distinction as everywhere else).',
+            'description' => 'Requires `users.view` to view, `users.export` to export (see the collection description\'s export note — same distinction as everywhere else).',
         ]),
         req('GET', 'Get user', '/users/{{demo_user_id}}', [
             'description' => "Requires `admin.audit`. Includes `warehouse_ids`. Targets `{{demo_user_id}}` (captured by Create user below), **not** `{{user_id}}` — `user_id` is whoever Login authenticated as, and this folder deliberately never reads or writes that id, so running it can't lock you out of your own session.",
@@ -1098,15 +1475,15 @@ $admin = folder('Admin', [
     ]),
     nw(folder('Roles & Permissions', [
         nw(req('GET', 'List permissions', '/permissions', [
-            'description' => 'Requires `admin.view`. Every assignable permission grouped by module (`sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`, `recap`, `manufacturing`, `analytics`, `admin`) — drives the checkbox grid on a role form. Capabilities: view, add, edit, delete, approve, print, export, audit.',
+            'description' => 'Every assignable permission, three ways: `data` (module → permission names), `resources` (module → resource → names — group the checkbox grid by resource) and `endpoints` (permission → the endpoints it guards — a tooltip so the admin knows what ticking a box allows). There is one permission per endpoint, named `{resource}.{action}` (`expenses.view`, `payroll-runs.approve`...). Modules: `sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`, `recap`, `manufacturing`, `hr`, `analytics`, `admin`.',
         ])),
         nw(req('GET', 'List roles', '/roles', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc'],
             'description' => 'Requires `admin.view`. Each role with its `permissions` and `users_count`. Roles are global, not per tenant.',
         ])),
         nw(req('POST', 'Create role', '/roles', [
-            'description' => 'Requires `admin.add`. An admin builds a role by choosing permissions — e.g. give a role `sales.edit` and `sales.delete` to let those users edit and delete sales records. `name` unique; every permission must exist (422 otherwise). Saves the id into `{{role_id}}`.',
-            'body' => ['name' => 'Postman Shift Lead', 'permissions' => ['sales.view', 'sales.edit', 'sales.delete', 'crm.view']],
+            'description' => 'Requires `admin.add`. An admin builds a role by choosing permissions — e.g. give a role `expenses.view` but not `expenses.create`, so those users can read expenses and nothing else. `name` unique; every permission must exist (422 otherwise). Saves the id into `{{role_id}}`.',
+            'body' => ['name' => 'Postman Shift Lead', 'permissions' => ['sales-orders.view', 'sales-orders.update', 'sales-orders.delete', 'customers.view', 'expenses.view']],
             'tests' => saveId('role_id'),
         ])),
         nw(req('GET', 'Get role', '/roles/{{role_id}}', [
@@ -1114,7 +1491,7 @@ $admin = folder('Admin', [
         ])),
         nw(req('PUT', 'Update role', '/roles/{{role_id}}', [
             'description' => 'Requires `admin.edit`. Rename and/or replace the full permission set (`permissions` is a sync, not a merge). The **Administrator** role is protected (403). Takes effect on the role users next request.',
-            'body' => ['permissions' => ['sales.view', 'sales.edit', 'sales.delete', 'inventory.view']],
+            'body' => ['permissions' => ['sales-orders.view', 'sales-orders.update', 'sales-orders.delete', 'products.view']],
         ])),
         nw(req('PUT', 'Assign users to role', '/roles/{{role_id}}/users', [
             'description' => 'Requires `admin.edit`. Puts the listed same-tenant users on this role, **replacing** whichever role they had. (A user can also be given a role through Create/Update user.) Targets the demo user, never your own login.',
@@ -1127,11 +1504,11 @@ $admin = folder('Admin', [
         nw(req('DELETE', 'Delete role', '/roles/{{role_id}}', [
             'description' => 'Requires `admin.delete`. 204. **409** while any user still has the role; the Administrator role cannot be deleted (403).',
         ])),
-    ], 'Admin-managed roles: create a role, pick its permissions (including delete/edit per module), connect users to it.')),
+    ], 'Admin-managed roles: create a role, pick its permissions (one per endpoint — view/create/update/delete/approve/export...), connect users to it.')),
     folder('Audit Log', [
         req('GET', 'List audit log', '/audit-log', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'module' => '', 'entity_type' => '', 'export' => 'csv'],
-            'description' => "Requires `admin.audit` to view, `admin.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.\n\nSaves the first entry's id into `{{audit_log_id}}`.",
+            'description' => "Requires `audit-log.view` to view, `audit-log.export` to export. Most-recent-first. Includes `prev_hash`/`entry_hash` for the tamper-evident chain (spec §5.7) in both the JSON and exported shapes.\n\nSaves the first entry's id into `{{audit_log_id}}`.",
             'tests' => saveId('audit_log_id', 'data.0.id'),
         ]),
         req('GET', 'Get audit log entry', '/audit-log/{{audit_log_id}}', [
@@ -1178,11 +1555,25 @@ $admin = folder('Admin', [
 // account a category needs (and reuses the warehouse/supplier). Logout
 // runs dead last for the same reason — it revokes {{token}}, so nothing
 // after it in a full collection run could authenticate.
-$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $recap, $manufacturing, $analytics, $admin, folder('Session end', [
+$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $recap, $manufacturing, $hr, $analytics, $admin, folder('Session end', [
     req('POST', 'Logout', '/auth/logout', [
         'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid.',
     ]),
 ])];
+
+// 🔄 Existing requests whose behaviour changed in the latest update.
+$items = markChanged($items, [
+    'Update sales order status' => 'on the first `invoiced`/`delivered` transition it now also books cost of goods sold (Dr 5100 / Cr 1300) for the batches that left.',
+    'Create sales order and deliver it (one call)' => 'also books cost of goods sold (Dr 5100 / Cr 1300) alongside the invoice entry.',
+    'Create return' => 'now posts to the ledger: customer returns Dr 4100 / Cr 1200 (and lower the customer balance; restocked goods Dr 1300 / Cr 5100), purchase returns Dr 2100 / Cr 1300.',
+    'Goods receipt (manual GRN)' => 'now posts Dr 1300 Inventory / Cr 3300 Opening Balance Equity for qty x cost.',
+    'Balance sheet' => 'equity now includes `current_period_earnings`, so the sheet balances.',
+    'Void invoice' => 'now really gives the balance back to the customer (a mass-assignment slip used to drop it).',
+    'Roles and permissions' => 'permissions are now one per endpoint (`expenses.view`, `payroll-runs.approve`...).',
+]);
+
+// Permission names in every description come from the real routes.
+$items = applyPermissions($items, routePermissions());
 
 $requestCount = 0;
 array_walk_recursive($items, function ($v, $k) use (&$requestCount) {
@@ -1194,7 +1585,7 @@ array_walk_recursive($items, function ($v, $k) use (&$requestCount) {
 $collection = [
     'info' => [
         'name' => 'VetPharma ERP API',
-        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has {$requestCount} requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{module}.export` specifically, not just `{module}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (Recap, Manufacturing, Units, Roles & Permissions, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit). The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `RolePermissionSeeder`, `AccountSeeder`, `UnitSeeder`, `ProductUnitSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        'description' => "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has {$requestCount} requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{resource}.export` specifically (`expenses.export`, `invoices.export`...), not just `{resource}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (HR, Recap, Manufacturing, Units, Roles & Permissions, supplier payments, manual journal entries, chart-of-accounts connections, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit, and the finance fixes: cost of goods sold on delivery, purchase VAT, manual goods receipts, returns and the balance sheet now post to the ledger). Permissions are now **one per endpoint** — every description says which one it needs. The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `AccountSeeder`, `RolePermissionSeeder`, `UnitSeeder`, `ProductUnitSeeder`, `HRDatabaseSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         'schema' => 'https://schema.getpostman.com/json/collection/v2.1.0/collection.json',
     ],
     'auth' => [
@@ -1275,6 +1666,28 @@ $collection = [
             'cancellable_production_order_id' => '',
             'deletable_user_id' => '',
             'role_id' => '',
+            'cash_account_id' => '',
+            'capital_account_id' => '',
+            'manual_journal_entry_id' => '',
+            'supplier_payment_id' => '',
+            'department_id' => '',
+            'deletable_department_id' => '',
+            'work_schedule_id' => '',
+            'deletable_work_schedule_id' => '',
+            'holiday_id' => '',
+            'deletable_holiday_id' => '',
+            'employee_id' => '',
+            'deletable_employee_id' => '',
+            'attendance_id' => '',
+            'time_permission_id' => '',
+            'rejectable_time_permission_id' => '',
+            'deletable_time_permission_id' => '',
+            'leave_request_id' => '',
+            'rejectable_leave_request_id' => '',
+            'deletable_leave_request_id' => '',
+            'payroll_run_id' => '',
+            'deletable_payroll_run_id' => '',
+            'payslip_id' => '',
         ]),
         $vars
     ),

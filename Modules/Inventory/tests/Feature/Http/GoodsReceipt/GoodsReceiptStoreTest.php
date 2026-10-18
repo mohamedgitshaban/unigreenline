@@ -9,11 +9,12 @@ use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class GoodsReceiptStoreTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_receives_a_new_batch_with_a_real_expiry_date(): void
     {
@@ -56,6 +57,7 @@ class GoodsReceiptStoreTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
 
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Warehouse Employee');
@@ -83,6 +85,7 @@ class GoodsReceiptStoreTest extends TestCase
     {
         $this->seed(RolePermissionSeeder::class);
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
 
         $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Warehouse Employee');

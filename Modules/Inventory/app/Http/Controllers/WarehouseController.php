@@ -45,7 +45,7 @@ class WarehouseController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'inventory.export', $query,
+            $request, $query,
             ['ID', 'Name', 'City', 'Governorate', 'Temperature', 'Capacity', 'Status', 'Stock Value'],
             fn (Warehouse $w) => [$w->id, $w->name, $w->city, $w->governorate, $w->temperature, $w->capacity, $w->status, $w->stock_value],
             'warehouses',

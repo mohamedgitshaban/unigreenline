@@ -8,17 +8,17 @@ class PurchaseOrderPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('purchasing.view');
+        return true;
     }
 
     public function view(User $user): bool
     {
-        return $user->can('purchasing.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('purchasing.add');
+        return true;
     }
 
     /**
@@ -26,7 +26,7 @@ class PurchaseOrderPolicy
      */
     public function receive(User $user): bool
     {
-        return $user->can('purchasing.approve');
+        return true;
     }
 
     /**
@@ -35,7 +35,7 @@ class PurchaseOrderPolicy
      */
     public function price(User $user): bool
     {
-        return $user->can('purchasing.pricing');
+        return true;
     }
 
     /**
@@ -43,7 +43,7 @@ class PurchaseOrderPolicy
      */
     public function update(User $user): bool
     {
-        return $user->can('purchasing.edit');
+        return true;
     }
 
     /**
@@ -52,6 +52,6 @@ class PurchaseOrderPolicy
      */
     public function delete(User $user): bool
     {
-        return $user->can('purchasing.delete');
+        return true;
     }
 }

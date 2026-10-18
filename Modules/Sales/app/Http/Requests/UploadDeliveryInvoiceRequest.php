@@ -11,7 +11,7 @@ class UploadDeliveryInvoiceRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('sales.edit');
+        return true;
     }
 
     public function rules(): array

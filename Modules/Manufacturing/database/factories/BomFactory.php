@@ -19,6 +19,7 @@ class BomFactory extends Factory
         return [
             'tenant_id' => Tenant::factory(),
             'product_id' => Product::factory(),
+            'code' => 'BOM'.fake()->unique()->numerify('######'),
             'name' => fake()->unique()->words(3, true),
             'output_qty_cartons' => 1,
             'conversion_cost' => 0,

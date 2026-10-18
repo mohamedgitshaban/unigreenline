@@ -37,7 +37,7 @@ class UserController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'admin.export', $query,
+            $request, $query,
             ['ID', 'Name', 'Email', 'Role', 'Status', 'Last Login', 'Created At'],
             // Password is never touched here — resolved from getRoleNames(),
             // never a raw column, so there's no risk of it leaking into a

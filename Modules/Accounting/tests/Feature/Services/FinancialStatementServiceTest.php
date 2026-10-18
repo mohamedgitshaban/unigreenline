@@ -35,26 +35,41 @@ class FinancialStatementServiceTest extends TestCase
         $this->assertTrue($sheet['balanced']);
     }
 
-    public function test_balance_sheet_flags_unbalanced_when_debits_and_credits_diverge_across_periods(): void
+    public function test_current_period_earnings_close_the_gap_so_the_sheet_balances(): void
     {
-        // Post two independently-balanced entries whose *type totals* still
-        // legitimately differ (e.g. undistributed net income) — balanced
-        // here means assets == liabilities + equity, not "every entry summed".
+        // A sale: assets up 100, revenue 100. Revenue is never closed into equity,
+        // so the sheet balances only because earnings to date are shown as an equity line.
         $tenant = Tenant::factory()->create();
         Account::factory()->recycle($tenant)->create(['code' => '1200', 'type' => 'Asset', 'balance' => 0]);
         Account::factory()->recycle($tenant)->create(['code' => '4100', 'type' => 'Revenue', 'balance' => 0]);
+        Account::factory()->recycle($tenant)->create(['code' => '6200', 'type' => 'Expense', 'balance' => 0]);
+        Account::factory()->recycle($tenant)->create(['code' => '1110', 'type' => 'Asset', 'balance' => 0]);
 
-        $this->journalPosting()->post($tenant->id, 'REF-1', 'test', [
+        $this->journalPosting()->post($tenant->id, 'REF-1', 'sale', [
             ['account_code' => '1200', 'debit' => 100],
             ['account_code' => '4100', 'credit' => 100],
+        ]);
+        $this->journalPosting()->post($tenant->id, 'REF-2', 'rent paid', [
+            ['account_code' => '6200', 'debit' => 30],
+            ['account_code' => '1110', 'credit' => 30],
         ]);
 
         $sheet = $this->service()->balanceSheet($tenant->id);
 
-        // Assets (100) vs Liabilities+Equity (0) — Revenue isn't part of
-        // either, so this correctly reports unbalanced without an equity
-        // close-out entry, which this build doesn't implement.
-        $this->assertFalse($sheet['balanced']);
+        $this->assertSame('70.00', $sheet['equity']['current_period_earnings']);
+        $this->assertSame('70.00', $sheet['equity']['total']);
+        $this->assertSame('70.00', $sheet['assets']['total']);
+        $this->assertTrue($sheet['balanced']);
+    }
+
+    public function test_balance_sheet_still_flags_a_real_imbalance(): void
+    {
+        // An asset that was never matched by anything on the other side (a balance
+        // written straight to the table) is what "unbalanced" is for.
+        $tenant = Tenant::factory()->create();
+        Account::factory()->recycle($tenant)->create(['code' => '1200', 'type' => 'Asset', 'balance' => 100]);
+
+        $this->assertFalse($this->service()->balanceSheet($tenant->id)['balanced']);
     }
 
     public function test_income_statement_only_includes_entries_within_the_date_range(): void

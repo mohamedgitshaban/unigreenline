@@ -28,7 +28,7 @@ class ProductCategoryController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'inventory.export', $query,
+            $request, $query,
             ['ID', 'Name', 'Code', 'Description', 'Active'],
             fn (ProductCategory $c) => [$c->id, $c->name, $c->code, $c->description, $c->active ? 'Yes' : 'No'],
             'categories',

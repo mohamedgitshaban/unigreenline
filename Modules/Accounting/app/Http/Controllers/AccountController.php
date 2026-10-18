@@ -4,6 +4,7 @@ namespace Modules\Accounting\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Modules\Accounting\Http\Requests\StoreAccountRequest;
 use Modules\Accounting\Http\Requests\UpdateAccountRequest;
 use Modules\Accounting\Http\Resources\AccountResource;
@@ -40,7 +41,7 @@ class AccountController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'accounting.export', $query,
+            $request, $query,
             ['ID', 'Code', 'Name', 'Type', 'Level', 'Balance', 'Active'],
             fn (Account $a) => [$a->id, $a->code, $a->name, $a->type, $a->level, $a->balance, $a->active ? 'Yes' : 'No'],
             'chart-of-accounts',
@@ -107,5 +108,47 @@ class AccountController extends Controller
     private function levelFor(?string $parentId): int
     {
         return $parentId === null ? 1 : Account::query()->whereKey($parentId)->value('level') + 1;
+    }
+
+    /**
+     * Which business flow feeds each account (see config/config.php), and how
+     * many journal lines each has actually received — so an account that is
+     * meant to be fed automatically but has never been posted to, or a
+     * custom account no flow knows about, stands out.
+     */
+    public function connections(Request $request)
+    {
+        $map = config('accounting.connections', []);
+
+        $postings = DB::table('journal_lines')
+            ->join('journal_entries', 'journal_entries.id', '=', 'journal_lines.journal_entry_id')
+            ->where('journal_entries.tenant_id', $request->user()->tenant_id)
+            ->groupBy('journal_lines.account_id')
+            ->selectRaw('journal_lines.account_id, COUNT(*) as line_count')
+            ->pluck('line_count', 'account_id');
+
+        $accounts = Account::query()->where('tenant_id', $request->user()->tenant_id)->orderBy('code')->get();
+
+        return response()->json(['data' => $accounts->map(function (Account $account) use ($map, $postings) {
+            $connection = $map[$account->code] ?? ['kind' => 'custom', 'used_by' => []];
+            $lines = (int) ($postings[$account->id] ?? 0);
+
+            return [
+                'id' => $account->id,
+                'code' => $account->code,
+                'name' => $account->name,
+                'type' => $account->type,
+                'kind' => $connection['kind'],
+                'used_by' => $connection['used_by'],
+                'posting_lines' => $lines,
+                'balance' => $account->balance,
+                // posted: wired but never used yet; custom: no automatic flow, only manual entries.
+                'attention' => match (true) {
+                    $connection['kind'] === 'posted' && $lines === 0 => 'wired but never posted to',
+                    $connection['kind'] === 'custom' && $lines === 0 => 'custom account with no postings',
+                    default => null,
+                },
+            ];
+        })->values()]);
     }
 }

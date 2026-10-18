@@ -93,7 +93,7 @@ class InvoiceVoidImportTest extends TestCase
     public function test_voiding_reverses_the_journal_and_returns_the_balance_to_the_customer(): void
     {
         $this->actingAsRole('Administrator');
-        $this->customer->update(['balance' => 1140]);
+        $this->customer->forceFill(['balance' => 1140])->save();
         $invoice = Invoice::factory()->recycle($this->tenant)->create(['customer_id' => $this->customer->id, 'subtotal' => 1000, 'tax_amount' => 140, 'total' => 1140, 'balance' => 1140]);
         Account::query()->where('code', '1200')->update(['balance' => 1140]);
         Account::query()->where('code', '4100')->update(['balance' => 1000]);
@@ -107,6 +107,7 @@ class InvoiceVoidImportTest extends TestCase
         $this->assertSame('0.00', Account::query()->where('code', '4100')->first()->balance);
         $this->assertSame('0.00', Account::query()->where('code', '2300')->first()->balance);
         $this->assertSame('0.00', $this->customer->fresh()->balance);
+        $this->assertSame('void', $invoice->fresh()->status);
         $this->postJson("/api/v1/invoices/{$invoice->id}/void")->assertUnprocessable();
     }
 

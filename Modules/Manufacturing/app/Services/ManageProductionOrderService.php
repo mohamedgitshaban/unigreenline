@@ -4,45 +4,62 @@ namespace Modules\Manufacturing\Services;
 
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Modules\Core\Services\AuditLogService;
+use Modules\Manufacturing\Exceptions\ManufacturingRuleException;
 use Modules\Manufacturing\Exceptions\ProductionOrderNotDraftException;
 use Modules\Manufacturing\Models\Bom;
+use Modules\Manufacturing\Models\ManufacturingSetting;
 use Modules\Manufacturing\Models\ProductionOrder;
 
 /**
- * Create / edit / cancel / delete for production orders that haven't been
- * completed. Drafts touch no stock and post nothing, so they can change
- * freely; once completed an order's stock movements and journal entry exist
- * and it is left alone.
+ * Create / edit / delete for production orders. While an order is a draft anything about it may
+ * change; once confirmed only the planning details (priority, operator, dates, notes) may, since
+ * its components and costs are then fixed. Moving an order through its life is the lifecycle
+ * service's job.
  */
 class ManageProductionOrderService
 {
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    /** What may still be edited after the order is confirmed. */
+    private const SOFT_FIELDS = ['priority', 'assigned_to', 'notes', 'planned_start', 'planned_finish'];
+
+    public function __construct(
+        private readonly OrderHistoryService $history,
+        private readonly NumberSequenceService $numbers,
+    ) {}
 
     /**
-     * @param  array{tenant_id: string, bom_id: string, warehouse_id: string, runs?: int, production_date?: string, batch_no?: ?string, mfg_date?: ?string, exp_date: string, conversion_cost?: ?float, notes?: ?string, created_by?: ?string}  $data
+     * `qty_cartons` is the quantity to make; `runs` (the older way) multiplies the recipe's yield. Give either.
+     *
+     * @param  array<string, mixed>  $data
      * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
      */
     public function create(array $data, array $actor = []): ProductionOrder
     {
         $bom = Bom::query()->findOrFail($data['bom_id']);
-        $runs = $data['runs'] ?? 1;
-        $productionDate = $data['production_date'] ?? now()->toDateString();
 
-        return DB::transaction(function () use ($data, $bom, $runs, $productionDate, $actor) {
+        if (! $bom->isUsableOn()) {
+            throw new ManufacturingRuleException("BoM {$bom->code} is not approved and active, so no order can be raised from it.");
+        }
+
+        return DB::transaction(function () use ($data, $bom, $actor) {
+            $settings = ManufacturingSetting::forTenant($data['tenant_id']);
+            $output = $this->outputQty($bom, $data);
+            $productionDate = $data['production_date'] ?? now()->toDateString();
+
             $order = ProductionOrder::create([
                 ...$data,
-                'runs' => $runs,
-                'output_qty_cartons' => $bom->output_qty_cartons * $runs,
+                'number' => $this->numbers->next($data['tenant_id'], 'mo', $settings->mo_prefix, $settings->number_padding),
+                'runs' => $this->runs($bom, $output),
+                'output_qty_cartons' => $output,
                 'production_date' => $productionDate,
                 'mfg_date' => $data['mfg_date'] ?? $productionDate,
                 'batch_no' => $data['batch_no'] ?? 'MO-'.now()->format('ymd').'-'.Str::upper(Str::random(4)),
-                'conversion_cost' => $data['conversion_cost'] ?? round((float) $bom->conversion_cost * $runs, 2),
+                'conversion_cost' => $data['conversion_cost'] ?? round((float) $bom->conversion_cost * $output / max(1, $bom->output_qty_cartons), 2),
+                'warehouse_id' => $data['warehouse_id'] ?? $settings->default_warehouse_id ?? throw new ManufacturingRuleException('Choose a warehouse, or set a default one in the manufacturing settings.'),
             ]);
 
-            $this->record($order, 'INSERT', null, [
-                'bom_id' => $order->bom_id, 'runs' => (string) $order->runs, 'output_qty_cartons' => (string) $order->output_qty_cartons,
-            ], $actor);
+            $this->history->record($order, 'create', null, 'draft', $actor, [
+                'bom' => (string) $bom->code, 'qty_cartons' => (string) $output, 'source' => (string) ($order->source_type ?? 'manual'),
+            ], 'INSERT');
 
             return $order;
         });
@@ -55,17 +72,40 @@ class ManageProductionOrderService
     public function update(ProductionOrder $order, array $data, array $actor = []): ProductionOrder
     {
         return DB::transaction(function () use ($order, $data, $actor) {
-            $locked = $this->lockDraft($order);
+            $locked = ProductionOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
 
-            $bom = Bom::query()->findOrFail($data['bom_id'] ?? $locked->bom_id);
-            $runs = $data['runs'] ?? $locked->runs;
+            if (! $locked->isDraft()) {
+                if (! in_array($locked->status, ['confirmed', 'planned', 'in_progress', 'paused'], true)) {
+                    throw new ProductionOrderNotDraftException;
+                }
 
-            // Re-derive the yield, and the default conversion cost when the
-            // recipe or run count changed without an explicit cost.
-            $data['output_qty_cartons'] = $bom->output_qty_cartons * $runs;
+                if (array_diff(array_keys($data), self::SOFT_FIELDS) !== []) {
+                    throw new ProductionOrderNotDraftException('Once an order is confirmed only its priority, operator, planned dates and notes can change. Cancel it to change anything else.');
+                }
+            }
 
-            if (! array_key_exists('conversion_cost', $data) && (isset($data['runs']) || isset($data['bom_id']))) {
-                $data['conversion_cost'] = round((float) $bom->conversion_cost * $runs, 2);
+            if ($locked->isDraft()) {
+                $bom = Bom::query()->findOrFail($data['bom_id'] ?? $locked->bom_id);
+
+                if (isset($data['bom_id']) && ! $bom->isUsableOn()) {
+                    throw new ManufacturingRuleException("BoM {$bom->code} is not approved and active, so no order can be raised from it.");
+                }
+
+                $quantityChanged = isset($data['qty_cartons']) || isset($data['runs']) || isset($data['bom_id']);
+
+                if ($quantityChanged) {
+                    // Changing the recipe alone keeps the quantity being made.
+                    $data['output_qty_cartons'] = isset($data['qty_cartons']) || isset($data['runs'])
+                        ? $this->outputQty($bom, $data)
+                        : $locked->output_qty_cartons;
+                    $data['runs'] = $this->runs($bom, $data['output_qty_cartons']);
+
+                    if (! array_key_exists('conversion_cost', $data)) {
+                        $data['conversion_cost'] = round((float) $bom->conversion_cost * $data['output_qty_cartons'] / max(1, $bom->output_qty_cartons), 2);
+                    }
+                }
+
+                unset($data['qty_cartons']);
             }
 
             $locked->fill($data);
@@ -73,30 +113,16 @@ class ManageProductionOrderService
             $previous = array_intersect_key($locked->getOriginal(), $dirty);
             $locked->save();
 
-            $this->record($locked, 'UPDATE', array_map('strval', $previous), array_map('strval', $dirty), $actor);
+            if ($dirty !== []) {
+                $this->history->record($locked, 'update', $locked->status, $locked->status, $actor, array_map(fn ($v) => (string) $v, $dirty) + ['was' => json_encode(array_map(fn ($v) => (string) $v, $previous))]);
+            }
 
             return $locked;
         });
     }
 
     /**
-     * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
-     */
-    public function cancel(ProductionOrder $order, array $actor = []): ProductionOrder
-    {
-        return DB::transaction(function () use ($order, $actor) {
-            $locked = $this->lockDraft($order, 'Only draft production orders can be cancelled.');
-
-            $locked->update(['status' => 'cancelled']);
-
-            $this->record($locked, 'UPDATE', ['status' => 'draft'], ['status' => 'cancelled'], $actor);
-
-            return $locked;
-        });
-    }
-
-    /**
-     * Drafts and cancelled orders can be removed; completed ones cannot.
+     * Drafts and cancelled orders can be removed; an order that is under way or finished cannot.
      *
      * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
      */
@@ -109,42 +135,29 @@ class ManageProductionOrderService
                 throw new ProductionOrderNotDraftException('A completed production order cannot be deleted.');
             }
 
-            $locked->delete();
+            if (! in_array($locked->status, ['draft', 'cancelled'], true)) {
+                throw new ProductionOrderNotDraftException('Cancel the order before deleting it.');
+            }
 
-            $this->record($locked, 'DELETE', ['status' => $locked->status, 'bom_id' => $locked->bom_id, 'runs' => (string) $locked->runs], null, $actor);
+            $this->history->record($locked, 'delete', $locked->status, null, $actor, ['bom_id' => $locked->bom_id, 'runs' => (string) $locked->runs], 'DELETE');
+            $locked->delete();
         });
     }
 
-    private function lockDraft(ProductionOrder $order, ?string $message = null): ProductionOrder
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function outputQty(Bom $bom, array $data): int
     {
-        $locked = ProductionOrder::query()->whereKey($order->id)->lockForUpdate()->firstOrFail();
-
-        if (! $locked->isDraft()) {
-            throw $message ? new ProductionOrderNotDraftException($message) : new ProductionOrderNotDraftException;
+        if (isset($data['qty_cartons'])) {
+            return (int) $data['qty_cartons'];
         }
 
-        return $locked;
+        return $bom->output_qty_cartons * (int) ($data['runs'] ?? 1);
     }
 
-    /**
-     * @param  array<string, mixed>|null  $previous
-     * @param  array<string, mixed>|null  $new
-     * @param  array{actor_id?: ?string, actor_name?: ?string, ip_address?: ?string}  $actor
-     */
-    private function record(ProductionOrder $order, string $operation, ?array $previous, ?array $new, array $actor): void
+    private function runs(Bom $bom, int $output): int
     {
-        $this->auditLog->record([
-            'module' => 'manufacturing',
-            'entity_type' => 'ProductionOrder',
-            'entity_id' => $order->id,
-            'operation' => $operation,
-            'user_id' => $actor['actor_id'] ?? null,
-            'user_name' => $actor['actor_name'] ?? null,
-            'tenant_id' => $order->tenant_id,
-            'warehouse_id' => $order->warehouse_id,
-            'prev_values' => $previous,
-            'new_values' => $new,
-            'ip_address' => $actor['ip_address'] ?? null,
-        ]);
+        return max(1, (int) ceil($output / max(1, $bom->output_qty_cartons)));
     }
 }

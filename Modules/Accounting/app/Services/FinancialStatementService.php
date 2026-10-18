@@ -14,6 +14,8 @@ use Modules\Accounting\Models\Account;
 class FinancialStatementService
 {
     /**
+     * Equity includes `current_period_earnings` (revenue less expenses to date).
+     *
      * A current snapshot only — Account::$balance is a running total, not
      * a point-in-time figure, so there's no historical "as of" date here.
      */
@@ -31,13 +33,25 @@ class FinancialStatementService
 
         $totalAssets = $accounts->where('type', 'Asset')->sum(fn ($a) => (float) $a->balance);
         $totalLiabilities = $accounts->where('type', 'Liability')->sum(fn ($a) => (float) $a->balance);
-        $totalEquity = $accounts->where('type', 'Equity')->sum(fn ($a) => (float) $a->balance);
+        $capitalAndReserves = $accounts->where('type', 'Equity')->sum(fn ($a) => (float) $a->balance);
+
+        // Revenue and expense accounts are never closed into equity, so what the business
+        // has earned so far has to be shown as its own equity line — without it, assets
+        // exceed liabilities + equity by exactly the profit and the sheet never balances.
+        $currentEarnings = $accounts->where('type', 'Revenue')->sum(fn ($a) => (float) $a->balance)
+            - $accounts->where('type', 'Expense')->sum(fn ($a) => (float) $a->balance);
+
+        $totalEquity = $capitalAndReserves + $currentEarnings;
 
         return [
             'as_of' => now()->toDateString(),
             'assets' => ['accounts' => $assets, 'total' => $this->money($totalAssets)],
             'liabilities' => ['accounts' => $liabilities, 'total' => $this->money($totalLiabilities)],
-            'equity' => ['accounts' => $equity, 'total' => $this->money($totalEquity)],
+            'equity' => [
+                'accounts' => $equity,
+                'current_period_earnings' => $this->money($currentEarnings),
+                'total' => $this->money($totalEquity),
+            ],
             'total_liabilities_and_equity' => $this->money($totalLiabilities + $totalEquity),
             'balanced' => abs($totalAssets - ($totalLiabilities + $totalEquity)) < 0.01,
         ];

@@ -11,11 +11,12 @@ use Modules\Inventory\Models\Warehouse;
 use Modules\Purchasing\Models\Supplier;
 use Modules\Sales\Exceptions\ReturnBatchNotFoundException;
 use Modules\Sales\Services\ProcessReturnService;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class ProcessReturnServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_sales_return_with_restocked_true_adds_stock_back(): void
     {
@@ -116,6 +117,7 @@ class ProcessReturnServiceTest extends TestCase
     private function arrange(): array
     {
         $tenant = Tenant::factory()->create();
+        $this->ensureLedgerAccounts($tenant);
         $product = Product::factory()->recycle($tenant)->create();
         $warehouse = Warehouse::factory()->recycle($tenant)->create();
 

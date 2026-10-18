@@ -14,11 +14,12 @@ use Modules\CRM\Models\Customer;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class SalesOrderStoreAndDeliverTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -43,6 +44,7 @@ class SalesOrderStoreAndDeliverTest extends TestCase
         foreach (['1200' => 'Asset', '4100' => 'Revenue', '2300' => 'Liability'] as $code => $type) {
             Account::factory()->recycle($this->tenant)->create(['code' => $code, 'type' => $type, 'balance' => 0]);
         }
+        $this->ensureLedgerAccounts($this->tenant);
     }
 
     public function test_creates_the_order_and_delivers_it_in_one_call(): void

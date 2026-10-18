@@ -37,7 +37,7 @@ class CampaignController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'crm.export', $query,
+            $request, $query,
             ['ID', 'Name', 'Type', 'Target', 'Discount', 'Start Date', 'End Date', 'Status', 'Reach', 'Revenue'],
             fn (Campaign $c) => [$c->id, $c->name, $c->type, $c->target, $c->discount, $c->start_date->toDateString(), $c->end_date?->toDateString(), $c->status, $c->reach, $c->revenue],
             'campaigns',

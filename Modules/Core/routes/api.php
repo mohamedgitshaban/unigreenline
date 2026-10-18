@@ -20,31 +20,31 @@ Route::prefix('v1/auth')->group(function () {
 });
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
-    Route::get('users', [UserController::class, 'index']);
-    Route::post('users', [UserController::class, 'store']);
-    Route::get('users/{user}', [UserController::class, 'show']);
-    Route::put('users/{user}', [UserController::class, 'update']);
-    Route::delete('users/{user}', [UserController::class, 'destroy']);
+    Route::get('users', [UserController::class, 'index'])->can('users.view')->exportable('users.export');
+    Route::post('users', [UserController::class, 'store'])->can('users.create');
+    Route::get('users/{user}', [UserController::class, 'show'])->can('users.view');
+    Route::put('users/{user}', [UserController::class, 'update'])->can('users.update');
+    Route::delete('users/{user}', [UserController::class, 'destroy'])->can('users.delete');
 
-    Route::get('permissions', [RoleController::class, 'permissions']);
-    Route::get('roles', [RoleController::class, 'index']);
-    Route::post('roles', [RoleController::class, 'store']);
-    Route::get('roles/{role}', [RoleController::class, 'show']);
-    Route::put('roles/{role}', [RoleController::class, 'update']);
-    Route::delete('roles/{role}', [RoleController::class, 'destroy']);
-    Route::put('roles/{role}/users', [RoleController::class, 'assignUsers']);
+    Route::get('permissions', [RoleController::class, 'permissions'])->can('permissions.view');
+    Route::get('roles', [RoleController::class, 'index'])->can('roles.view');
+    Route::post('roles', [RoleController::class, 'store'])->can('roles.create');
+    Route::get('roles/{role}', [RoleController::class, 'show'])->can('roles.view');
+    Route::put('roles/{role}', [RoleController::class, 'update'])->can('roles.update');
+    Route::delete('roles/{role}', [RoleController::class, 'destroy'])->can('roles.delete');
+    Route::put('roles/{role}/users', [RoleController::class, 'assignUsers'])->can('roles.assign-users');
 
-    Route::get('audit-log', [AuditLogController::class, 'index']);
-    Route::post('audit-log/verify-integrity', [AuditLogController::class, 'verifyIntegrity']);
-    Route::get('audit-log/{id}', [AuditLogController::class, 'show']);
+    Route::get('audit-log', [AuditLogController::class, 'index'])->can('audit-log.view')->exportable('audit-log.export');
+    Route::post('audit-log/verify-integrity', [AuditLogController::class, 'verifyIntegrity'])->can('audit-log.verify');
+    Route::get('audit-log/{id}', [AuditLogController::class, 'show'])->can('audit-log.view');
 
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::put('notifications/read-all', [NotificationController::class, 'readAll']);
     Route::get('notifications/{id}', [NotificationController::class, 'show']);
 
-    Route::get('discarded-actions', [DiscardedActionController::class, 'index']);
+    Route::get('discarded-actions', [DiscardedActionController::class, 'index'])->can('discarded-actions.view')->exportable('discarded-actions.export');
     Route::post('discarded-actions', [DiscardedActionController::class, 'store']);
-    Route::get('discarded-actions/{id}', [DiscardedActionController::class, 'show']);
+    Route::get('discarded-actions/{id}', [DiscardedActionController::class, 'show'])->can('discarded-actions.view');
 
     Route::get('governorates', [CityController::class, 'governorates']);
     Route::get('governorates/{governorate}/cities', [CityController::class, 'cities']);

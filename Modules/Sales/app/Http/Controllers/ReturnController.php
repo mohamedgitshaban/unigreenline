@@ -64,7 +64,7 @@ class ReturnController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, ['sales.export', 'purchasing.export'], $query,
+            $request, $query,
             ['ID', 'Type', 'Product', 'Warehouse', 'Batch No', 'Qty', 'Unit', 'Amount', 'Restocked', 'Return Date'],
             fn (ReturnRecord $r) => [$r->id, $r->type, $r->product_id, $r->warehouse_id, $r->batch_no, $r->qty, $r->unit, $r->amount, $r->restocked ? 'Yes' : 'No', $r->return_date->toDateString()],
             'returns',

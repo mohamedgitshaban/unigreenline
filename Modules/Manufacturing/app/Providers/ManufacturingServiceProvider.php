@@ -2,8 +2,16 @@
 
 namespace Modules\Manufacturing\Providers;
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Gate;
+use Modules\Core\Policies\RoutePermissionPolicy;
+use Modules\Manufacturing\Console\Commands\RunMrpPlanning;
 use Modules\Manufacturing\Models\Bom;
+use Modules\Manufacturing\Models\MrpDemand;
+use Modules\Manufacturing\Models\ProductPlanning;
+use Modules\Manufacturing\Models\QualityCheckDefinition;
+use Modules\Manufacturing\Models\Routing;
+use Modules\Manufacturing\Models\WorkCenter;
 use Modules\Manufacturing\Models\ProductionOrder;
 use Modules\Manufacturing\Policies\BomPolicy;
 use Modules\Manufacturing\Policies\ProductionOrderPolicy;
@@ -22,6 +30,15 @@ class ManufacturingServiceProvider extends ModuleServiceProvider
     protected string $nameLower = 'manufacturing';
 
     /**
+     * Command classes to register.
+     *
+     * @var string[]
+     */
+    protected array $commands = [
+        RunMrpPlanning::class,
+    ];
+
+    /**
      * Provider classes to register.
      *
      * @var string[]
@@ -37,5 +54,18 @@ class ManufacturingServiceProvider extends ModuleServiceProvider
 
         Gate::policy(Bom::class, BomPolicy::class);
         Gate::policy(ProductionOrder::class, ProductionOrderPolicy::class);
+
+        // Access to these is the route's permission; the policy exists so the shared update/delete helpers have something to ask.
+        foreach ([WorkCenter::class, Routing::class, QualityCheckDefinition::class, ProductPlanning::class, MrpDemand::class] as $model) {
+            Gate::policy($model, RoutePermissionPolicy::class);
+        }
+    }
+
+    /**
+     * Planning runs every night, for the default warehouse of each company, and only proposes.
+     */
+    protected function configureSchedules(Schedule $schedule): void
+    {
+        $schedule->command(RunMrpPlanning::class)->dailyAt('02:00');
     }
 }

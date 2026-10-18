@@ -14,14 +14,11 @@ class CollectionPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('sales.view') || $user->can('accounting.view');
+        return true;
     }
 
     public function view(User $user, Collection $collection): bool
     {
-        if (! $this->viewAny($user)) {
-            return false;
-        }
 
         if ($user->hasRole('Sales Rep')) {
             return $collection->invoice->salesOrder?->sales_rep_id === $user->id;
@@ -32,6 +29,6 @@ class CollectionPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('sales.add') || $user->can('accounting.add');
+        return true;
     }
 }

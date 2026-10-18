@@ -8,7 +8,7 @@ class LeadPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('crm.view');
+        return true;
     }
 
     /**
@@ -16,21 +16,21 @@ class LeadPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('crm.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('crm.add');
+        return true;
     }
 
     public function update(User $user): bool
     {
-        return $user->can('crm.edit');
+        return true;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('crm.delete');
+        return true;
     }
 }

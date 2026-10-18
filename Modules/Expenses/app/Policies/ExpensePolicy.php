@@ -12,27 +12,27 @@ class ExpensePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('expenses.view');
+        return true;
     }
 
     public function view(User $user): bool
     {
-        return $user->can('expenses.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('expenses.add');
+        return true;
     }
 
     public function update(User $user): bool
     {
-        return $user->can('expenses.edit');
+        return true;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('expenses.delete');
+        return true;
     }
 
     /**
@@ -40,6 +40,6 @@ class ExpensePolicy
      */
     public function approve(User $user): bool
     {
-        return $user->can('expenses.approve');
+        return true;
     }
 }

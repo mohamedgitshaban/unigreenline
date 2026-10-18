@@ -29,7 +29,7 @@ class Account extends Model
      *
      * @var array<int, string>
      */
-    public const SYSTEM_CODES = ['1110', '1120', '1200', '1300', '2100', '2300', '4100', '6300', '6400'];
+    public const SYSTEM_CODES = ['1110', '1120', '1200', '1300', '1350', '1400', '2100', '2200', '2210', '2300', '3300', '4100', '5100', '5200', '6100', '6300', '6400'];
 
     protected $table = 'chart_of_accounts';
 

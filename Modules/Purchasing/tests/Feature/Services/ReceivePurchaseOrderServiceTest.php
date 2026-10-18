@@ -14,11 +14,12 @@ use Modules\Purchasing\Models\PurchaseOrder;
 use Modules\Purchasing\Models\PurchaseOrderLine;
 use Modules\Purchasing\Models\Supplier;
 use Modules\Purchasing\Services\ReceivePurchaseOrderService;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class ReceivePurchaseOrderServiceTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_creates_a_new_batch_for_the_line(): void
     {
@@ -85,7 +86,11 @@ class ReceivePurchaseOrderServiceTest extends TestCase
         $inventory = Account::query()->where('tenant_id', $tenant->id)->where('code', '1300')->first();
         $ap = Account::query()->where('tenant_id', $tenant->id)->where('code', '2100')->first();
 
-        $this->assertSame((string) $po->total, $inventory->fresh()->balance);
+        $inputVat = Account::query()->where('tenant_id', $tenant->id)->where('code', '1400')->first();
+
+        // Stock is booked net of tax, the tax goes to input VAT, and the payable is the full amount.
+        $this->assertSame(number_format((float) $po->total - (float) $po->tax_amount, 2, '.', ''), $inventory->fresh()->balance);
+        $this->assertSame((string) $po->tax_amount, $inputVat->fresh()->balance);
         $this->assertSame((string) $po->total, $ap->fresh()->balance);
     }
 
@@ -153,6 +158,7 @@ class ReceivePurchaseOrderServiceTest extends TestCase
         // Every successful receive posts a journal entry.
         Account::factory()->recycle($tenant)->create(['code' => '1300', 'type' => 'Asset', 'balance' => 0]);
         Account::factory()->recycle($tenant)->create(['code' => '2100', 'type' => 'Liability', 'balance' => 0]);
+        $this->ensureLedgerAccounts($tenant);
 
         return [$tenant, $po, $line, $product, $warehouse, $supplier];
     }

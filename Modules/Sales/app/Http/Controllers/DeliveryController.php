@@ -75,7 +75,7 @@ class DeliveryController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'sales.export', $query,
+            $request, $query,
             ['ID', 'Sales Order', 'Invoice', 'Customer', 'Driver', 'Delivery Date', 'Status', 'Delivered At'],
             fn (Delivery $d) => [$d->id, $d->so_id, $d->invoice_id, $d->customer_id, $d->driver, $d->delivery_date?->toDateString(), $d->status, $d->delivered_at?->toDateTimeString()],
             'deliveries',

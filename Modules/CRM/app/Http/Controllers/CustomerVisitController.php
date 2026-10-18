@@ -42,7 +42,7 @@ class CustomerVisitController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'crm.export', $query,
+            $request, $query,
             ['ID', 'Customer', 'Rep', 'Visit Date', 'Type', 'Outcome', 'Next Visit'],
             fn (CustomerVisit $v) => [$v->id, $v->customer_id, $v->rep_id, $v->visit_date->toDateString(), $v->type, $v->outcome, $v->next_visit?->toDateString()],
             'visits',

@@ -9,14 +9,11 @@ class SalesOrderPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('sales.view');
+        return true;
     }
 
     public function view(User $user, SalesOrder $salesOrder): bool
     {
-        if (! $user->can('sales.view')) {
-            return false;
-        }
 
         if ($user->hasRole('Sales Rep')) {
             return $salesOrder->sales_rep_id === $user->id;
@@ -27,14 +24,11 @@ class SalesOrderPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('sales.add');
+        return true;
     }
 
     public function updateStatus(User $user, SalesOrder $salesOrder): bool
     {
-        if (! $user->can('sales.edit')) {
-            return false;
-        }
 
         if ($user->hasRole('Sales Rep')) {
             return $salesOrder->sales_rep_id === $user->id;
@@ -50,6 +44,6 @@ class SalesOrderPolicy
 
     public function delete(User $user, SalesOrder $salesOrder): bool
     {
-        return $user->can('sales.delete') && (! $user->hasRole('Sales Rep') || $salesOrder->sales_rep_id === $user->id);
+        return ! $user->hasRole('Sales Rep') || $salesOrder->sales_rep_id === $user->id;
     }
 }

@@ -14,14 +14,11 @@ class InvoicePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('sales.view') || $user->can('accounting.view');
+        return true;
     }
 
     public function view(User $user, Invoice $invoice): bool
     {
-        if (! $this->viewAny($user)) {
-            return false;
-        }
 
         if ($user->hasRole('Sales Rep')) {
             return $invoice->salesOrder?->sales_rep_id === $user->id;
@@ -32,14 +29,11 @@ class InvoicePolicy
 
     public function create(User $user): bool
     {
-        return $user->can('sales.add');
+        return true;
     }
 
     public function void(User $user, Invoice $invoice): bool
     {
-        if (! $user->can('sales.delete')) {
-            return false;
-        }
 
         if ($user->hasRole('Sales Rep')) {
             return $invoice->salesOrder?->sales_rep_id === $user->id;

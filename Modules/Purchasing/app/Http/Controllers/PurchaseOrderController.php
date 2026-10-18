@@ -61,7 +61,7 @@ class PurchaseOrderController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'purchasing.export', $query,
+            $request, $query,
             ['ID', 'Supplier', 'Warehouse', 'Status', 'Subtotal', 'Tax', 'Total', 'Order Date', 'Expected Date', 'Received Date'],
             fn (PurchaseOrder $po) => [$po->id, $po->supplier_id, $po->warehouse_id, $po->status, $po->subtotal, $po->tax_amount, $po->total, $po->order_date->toDateString(), $po->expected_date?->toDateString(), $po->received_date?->toDateString()],
             'purchase-orders',
@@ -205,8 +205,6 @@ class PurchaseOrderController extends Controller
      */
     public function pendingPricing(Request $request)
     {
-        $this->authorize('price', PurchaseOrder::class);
-
         $query = PurchaseOrder::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->where('status', 'pending_pricing')

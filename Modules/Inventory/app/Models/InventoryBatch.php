@@ -26,9 +26,18 @@ class InventoryBatch extends Model
             'rcv_date' => 'date',
             'qty_cartons' => 'integer',
             'qty_packs' => 'integer',
+            'reserved_cartons' => 'integer',
             'cost_per_carton' => 'decimal:2',
             'is_free_gift' => 'boolean',
         ];
+    }
+
+    /**
+     * Cartons that can be taken by anyone: on hand and not reserved.
+     */
+    public function freeCartons(): int
+    {
+        return max(0, $this->qty_cartons - $this->reserved_cartons);
     }
 
     public function tenant(): BelongsTo

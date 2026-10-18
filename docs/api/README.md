@@ -29,6 +29,9 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **Product life cycle** timeline → [analytics.md](./analytics.md#get-apiv1productsidlifecycle--new)
 > - 🆕 Chart of accounts create/edit/delete; 🆕 invoice **void**
 > - 🆕 **Purchase orders pending pricing** — buyers no longer enter costs; an admin prices the order → [purchasing.md](./purchasing.md#pending-pricing-who-sets-the-cost--new)
+> - 🔄 **Permissions are now per endpoint** (`{resource}.{action}`, 207 of them) so a role can read `expenses` without reading `expense-categories` → [permissions.md](./permissions.md)
+> - 🆕 **HR module** — employees, attendance (check-in/out), work schedules, global holidays, time permissions (late / early leave / partial), leave, and monthly payroll posted to the chart of accounts → [hr.md](./hr.md)
+> - 🔄 **Finance review** — cost of goods sold on delivery, input VAT on purchases, returns and manual goods receipts now post to the ledger; supplier payments, manual journal entries (with reversal), an account-connections map, and a balance sheet that balances → [accounting.md](./accounting.md#finance-review--what-was-missing-and-what-changed)
 > - 🆕 **Create + deliver in one call** — `POST /sales-orders/deliver` → [sales.md](./sales.md#post-apiv1sales-ordersdeliver--new)
 
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
@@ -63,25 +66,28 @@ Unauthenticated requests return `401`:
 ## Editing and deleting records 🆕 NEW
 
 Every master-data resource now has `PUT /{resource}/{id}` (permission
-`{module}.edit`) and `DELETE /{resource}/{id}` (permission `{module}.delete`).
+`{resource}.update`) and `DELETE /{resource}/{id}` (permission `{resource}.delete`).
 An admin decides who may edit or delete by giving a role those permissions
 ([Roles & permissions](./admin.md#roles--permissions)) — by default only
 `Administrator` holds any `*.delete`.
 
 | Resource | Edit | Delete |
 |---|---|---|
-| Users | `PUT /users/{id}` | 🆕 `DELETE /users/{id}` (`admin.delete`) |
+| Users | `PUT /users/{id}` | 🆕 `DELETE /users/{id}` (`users.delete`) |
 | Roles | 🆕 `PUT /roles/{id}` | 🆕 `DELETE /roles/{id}` |
-| Customers, leads, visits, complaints, campaigns | 🆕 `PUT` (customers existed) | 🆕 `DELETE` (`crm.delete`) |
-| Warehouses, products, categories | existed | 🆕 `DELETE` (`inventory.delete`) |
+| Customers, leads, visits, complaints, campaigns | 🆕 `PUT` (customers existed) | 🆕 `DELETE` (`customers.delete`, `leads.delete`, ...) |
+| Warehouses, products, categories | existed | 🆕 `DELETE` (`warehouses.delete`, `products.delete`, `categories.delete`) |
 | Units | 🆕 `PUT /units/{id}` | 🆕 `DELETE` |
-| Suppliers | existed | 🆕 `DELETE` (`purchasing.delete`) |
+| Suppliers | existed | 🆕 `DELETE` (`suppliers.delete`) |
 | Purchase orders | existed | existed (unreceived only) |
-| Sales orders | 🆕 `PUT /sales-orders/{id}` (draft only) | 🆕 `DELETE` (draft only, `sales.delete`) |
+| Sales orders | 🆕 `PUT /sales-orders/{id}` (draft only) | 🆕 `DELETE` (draft only, `sales-orders.delete`) |
 | Invoices | — | 🆕 `POST /invoices/{id}/void` (invoices are never hard-deleted) |
-| Expense categories | existed | 🆕 `DELETE` (`expenses.delete`) |
-| Chart of accounts | 🆕 `PUT` | 🆕 `DELETE` (`accounting.delete`) |
+| Expense categories | existed | 🆕 `DELETE` (`expense-categories.delete`) |
+| Chart of accounts | 🆕 `PUT` | 🆕 `DELETE` (`chart-of-accounts.delete`) |
 | Recaps, BOMs, production orders | 🆕 (draft only) | 🆕 (draft only / unused only) |
+| HR: departments, schedules, holidays, employees, attendance | 🆕 | 🆕 |
+| HR: time permissions, leave requests | 🆕 (pending only) | 🆕 (pending only) |
+| HR: payroll runs | 🆕 recalculate (draft only) | 🆕 (draft only) |
 
 Common behaviour:
 
@@ -106,11 +112,11 @@ Bulk-load data from an Excel/CSV file:
 
 | Resource | Import | Template | Needs | Matched by |
 |---|---|---|---|---|
-| Customers | `POST /customers/import` | `GET /customers/import-template` | `crm.add` | name |
-| Products | `POST /products/import` | `GET /products/import-template` | `inventory.add` | SKU |
-| Suppliers | `POST /suppliers/import` | `GET /suppliers/import-template` | `purchasing.add` | name |
-| Warehouses | `POST /warehouses/import` | `GET /warehouses/import-template` | `inventory.add` | name |
-| Invoices | `POST /invoices/import` | `GET /invoices/import-template` | `sales.add` | — (no natural key) |
+| Customers | `POST /customers/import` | `GET /customers/import-template` | `customers.import` | name |
+| Products | `POST /products/import` | `GET /products/import-template` | `products.import` | SKU |
+| Suppliers | `POST /suppliers/import` | `GET /suppliers/import-template` | `suppliers.import` | name |
+| Warehouses | `POST /warehouses/import` | `GET /warehouses/import-template` | `warehouses.import` | name |
+| Invoices | `POST /invoices/import` | `GET /invoices/import-template` | `invoices.import` | — (no natural key) |
 
 - **Request:** `multipart/form-data` with `file` (`.xlsx`, `.xls` or `.csv`, max
   5 MB, max 5000 rows) and optional `update_existing` (boolean). The first row
@@ -283,6 +289,8 @@ The counts are on both the list and the show response of the parent.
 | Expenses (Expense Categories / Expenses / Receipts / Approval) | Done | [expenses.md](./expenses.md) |
 | 🆕 Recap (stock write-offs posting to the chart of accounts) | New | [recap.md](./recap.md) |
 | 🆕 Manufacturing (BOMs / Production Orders) | New | [manufacturing.md](./manufacturing.md) |
+| 🆕 HR (Employees / Attendance / Holidays / Time permissions / Leave / Payroll) | New | [hr.md](./hr.md) |
+| 🔄 Permission reference (every permission, the endpoints it guards, the roles holding it) | Generated | [permissions.md](./permissions.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
 | Admin (users, 🆕 roles & permissions, audit log, notifications, discarded actions, governorates/cities) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
 
@@ -294,7 +302,7 @@ This file is updated as each module ships.
 [VetPharma-ERP-Local.postman_environment.json](../postman/VetPharma-ERP-Local.postman_environment.json) —
 import both into Postman (or run with `newman`), select the environment, run
 **Auth > Login**, and every other request authenticates automatically. Covers
-all the endpoints below (224 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
+all the endpoints below (291 requests; 🆕/🔄 flagged where added or changed), organized to match this doc's module split, with
 "create" requests auto-saving the id they create for the next request to
 reuse. See the collection's own top-level description (visible in Postman)
 for the couple of things worth knowing before a full top-to-bottom run —
@@ -304,36 +312,48 @@ don't hand-edit the JSON.
 
 ## Roles & permissions
 
-> 🆕 Roles are no longer fixed: an admin can create roles, choose their
-> permissions and connect users to them — see [admin.md](./admin.md#roles--permissions).
-> 🆕 Two new permission modules exist: `recap.*` and `manufacturing.*` (each
-> with the same eight capabilities). Re-run `RolePermissionSeeder` to create them.
+> 🔄 Roles are not fixed: an admin can create roles, choose their permissions
+> and connect users to them — see [admin.md](./admin.md#roles--permissions).
+> 🔄 **Permissions are per endpoint.** Each endpoint needs exactly one permission,
+> named `{resource}.{action}` — e.g. `expenses.view`, `expense-categories.view`,
+> `sales-orders.change-status`, `payroll-runs.approve`. Reading `expenses` does not
+> imply reading `expense-categories`. The full list, with the endpoints each guards
+> and the seeded roles that hold it, is [permissions.md](./permissions.md).
 
-10 roles are seeded (`Administrator`, `Owner`, `Sales Manager`, `Sales Rep`,
+12 roles are seeded (`Administrator`, `Owner`, `Sales Manager`, `Sales Rep`,
 `Warehouse Manager`, `Warehouse Employee`, `Accountant`, `Customer Service`,
-`Purchasing`, `Auditor`). Permissions are named `{module}.{capability}`, e.g.
-`sales.approve`, `inventory.export`. The `permissions` array returned on login
-and `GET /auth/me` is the frontend's source of truth for what to show/hide —
-don't hardcode role-based UI logic, check permission strings instead.
+`Purchasing`, `HR Manager`, `Employee`, `Auditor`). The `permissions` array
+returned on login and `GET /auth/me` is the frontend's source of truth for what
+to show/hide — don't hardcode role-based UI logic, check permission strings
+instead (`GET /permissions` lists every one with the endpoints it guards, handy
+for hiding a button whose endpoint the user cannot call).
 
 ## Upgrading an existing database 🆕 NEW
 
 After pulling this update, an existing install needs (in order):
 
 ```bash
-php artisan migrate                                    # units, product_units, min price, gift batches, PO/SO line columns, recap + manufacturing tables
-php artisan db:seed --class="Modules\\Core\\Database\\Seeders\\RolePermissionSeeder"   # recap.* and manufacturing.* permissions
-php artisan db:seed --class="Modules\\Accounting\\Database\\Seeders\\AccountSeeder"     # accounts 6300 and 6400
+php artisan migrate
+php artisan db:seed --class="Modules\\Accounting\\Database\\Seeders\\AccountSeeder"     # accounts 1400, 2200, 2210, 3300, 5000, 5100, 6300, 6400
+php artisan db:seed --class="Modules\\Core\\Database\\Seeders\\RolePermissionSeeder"   # per-endpoint permissions + the HR Manager and Employee roles
 php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\UnitSeeder"        # Packet / Package / Carton
 php artisan db:seed --class="Modules\\Inventory\\Database\\Seeders\\ProductUnitSeeder" # every product gets a Packet -> Carton ladder
+php artisan db:seed --class="Modules\\HR\\Database\\Seeders\\HRDatabaseSeeder"          # a default work schedule per company
 ```
 
-All five seeders are idempotent. Which roles got the new permissions:
-`Warehouse Manager` → `recap.*` and `manufacturing.*` (view/add/edit/approve/print/export),
-`Warehouse Employee` → `manufacturing.view/add/edit`, `Accountant` → `recap.view`;
-`Owner`/`Auditor` get the new modules through their module-wide grants;
-`Administrator` gets everything (including the new `purchasing.pricing`, the right to price purchase orders). Nobody but `Administrator` gets any `*.delete`
-until an admin grants it.
+- **`migrate` converts the permissions for you.** The old coarse permissions
+  (`expenses.view` meaning "everything view-like in Expenses") are replaced by the
+  per-endpoint ones: every role, including roles an admin created, is given the
+  per-endpoint permissions equivalent to what it held, so **nobody gains or loses
+  access** in the switch; then the old permission rows are deleted. Narrow a role
+  afterwards with `PUT /roles/{id}`. The conversion is one-way.
+- All seeders are idempotent. `AccountSeeder` is needed because flows now post to
+  the new accounts — a missing one stops the flow with a clear error rather than
+  losing the entry.
+- Journal entries gained `type` (`system` / `manual` / `reversal`), `reversal_of`
+  and `reversed_at`; existing entries become `system`.
+- Re-run `php docs/postman/generate.php` and `php artisan permissions:docs`
+  after changing endpoints (a test fails if the permission reference is stale).
 
 ## Seed accounts (local/dev only)
 

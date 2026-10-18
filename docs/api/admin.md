@@ -1,10 +1,10 @@
 # Admin
 
 Covers user management, roles & permissions, the audit log viewer, notifications, discarded
-actions, and the governorate/city reference lists. All endpoints require authentication; most additionally require an
-`admin.*` permission — **only `Administrator`, `Owner`, and `Auditor` hold
-any `admin.*` permission** (spec §2's own role table never grants it to an
-operational role), and only `Administrator` holds `admin.add`/`admin.edit`
+actions, and the governorate/city reference lists. All endpoints require authentication; most additionally need their
+own permission (`users.view|create|update|delete|export`, `roles.view|create|update|delete|assign-users`, `permissions.view`,
+`audit-log.view|verify|export`, `discarded-actions.view|export`) — **only `Administrator`, `Owner`, and `Auditor` hold
+the viewing ones by default**, and only `Administrator` holds create/update/delete
 (Owner/Auditor are oversight roles — view/export/audit only, no data entry).
 
 ---
@@ -13,17 +13,17 @@ operational role), and only `Administrator` holds `admin.add`/`admin.edit`
 
 ### `GET /api/v1/users`
 
-Requires `admin.audit`. Paginated, scoped to the caller's tenant.
+Requires `users.view`. Paginated, scoped to the caller's tenant.
 
 `?role=&status=&per_page=` — `role` filters by role name (e.g. `Sales Rep`).
 
 ### `GET /api/v1/users/{id}`
 
-Requires `admin.audit`. Includes `warehouse_ids` (see below).
+Requires `users.view`. Includes `warehouse_ids` (see below).
 
 ### `POST /api/v1/users`
 
-Requires `admin.add`.
+Requires `users.create`.
 
 ```json
 {
@@ -49,7 +49,7 @@ Requires `admin.add`.
 
 ### `PUT /api/v1/users/{id}`
 
-Requires `admin.edit`. Same body shape as create, all fields optional
+Requires `users.update`. Same body shape as create, all fields optional
 (`sometimes`), **except `password` — not accepted here**. There is no
 admin-initiated password reset in this build; a user changes their own
 password via `POST /auth/change-password` (requires their current
@@ -61,7 +61,7 @@ password). Sending `warehouse_ids` replaces the full set, not a merge.
 
 ### `DELETE /api/v1/users/{id}` 🆕 NEW
 
-Requires `admin.delete`. **204**; the user's API tokens are revoked and the
+Requires `users.delete`. **204**; the user's API tokens are revoked and the
 deletion is audit-logged. Another tenant's user is **404**.
 
 - You cannot delete your own account — **422**.
@@ -74,33 +74,44 @@ deletion is audit-logged. Another tenant's user is **404**.
 ## Roles & Permissions 🆕 NEW
 
 > 🆕 **NEW.** An admin can create roles, choose each role's permissions —
-> including `*.edit` and `*.delete` for every module — and connect users to
-> them. The 10 seeded roles are editable the same way (except `Administrator`).
+> endpoint by endpoint, including every edit and delete — and connect users to
+> them. The seeded roles are editable the same way (except `Administrator`).
 
-Roles are **global** (not per tenant). Permissions are named
-`{module}.{capability}`:
+Roles are **global** (not per tenant). 🔄 **Permissions are per endpoint**: every
+endpoint is guarded by exactly one permission named `{resource}.{action}`, so a
+role can be given `expenses.view` without `expense-categories.view`, or
+`sales-orders.update` without `sales-orders.delete`.
 
-- modules: `sales`, `inventory`, `purchasing`, `crm`, `accounting`, `expenses`,
-  `recap`, `manufacturing`, `analytics`, `admin`
-- capabilities: `view`, `add`, `edit`, `delete`, `approve`, `print`, `export`, `audit`
-- 🆕 one special permission outside that grid: **`purchasing.pricing`** — the right to set what a purchase order costs ([Pending pricing](./purchasing.md#pending-pricing-who-sets-the-cost--new)). Only `Administrator` has it until an admin grants it to a role.
+- `{resource}` is the API resource (`expenses`, `expense-categories`, `sales-orders`, `invoices`, `employees`, ...);
+- `{action}` is `view` (every read of it), `create`, `update`, `delete`, `export` (the `?export=` download) or an
+  action of its own (`approve`, `reject`, `receive`, `void`, `pay`, `check-in`, ...).
 
-Access: `admin.view` to read, `admin.add` to create, `admin.edit` to update or
-assign users, `admin.delete` to delete — by default only `Administrator` holds
-the write ones. Changes apply on the affected users' next request.
+The complete list — **207 permissions**, the endpoints each one guards, and which
+seeded role holds it — is [permissions.md](./permissions.md), generated from the
+code; `GET /permissions` returns the same catalogue live (below).
 
-How "edit" and "delete" are enforced everywhere: every update endpoint checks
-`{module}.edit` and every delete endpoint `{module}.delete`, so giving a role
-those permissions is all it takes to let its users edit or delete that module's
-records. Business rules still apply on top (e.g. only draft sales orders can be
-deleted, invoices are voided rather than deleted).
+Access to the roles API itself: `roles.view` to read, `roles.create`,
+`roles.update` (also `roles.assign-users`) and `roles.delete` to change — by
+default only `Administrator`. Changes apply on the affected users' next request.
+
+Enforcement is the same everywhere: the route checks its permission before the
+controller runs (**403** if missing), then record-level rules apply on top —
+tenant isolation (404), a Sales Rep's own orders, a self-service employee's own
+records, only draft documents being editable, invoices being voided rather than
+deleted.
+
+Two seeded roles were added with the HR module: **HR Manager** (everything in
+HR, including approving and paying payroll) and **Employee** (self-service:
+check in/out, own leave and permission requests, own payslips). The other ten
+seeded roles keep exactly the access they had — upgrading converts them to the
+per-endpoint permissions automatically.
 
 ### Role object
 
 ```json
 {
   "id": 11, "name": "Shift Lead",
-  "permissions": ["crm.view", "sales.delete", "sales.edit", "sales.view"],
+  "permissions": ["customers.view", "sales-orders.delete", "sales-orders.update", "sales-orders.view"],
   "users_count": 3,
   "created_at": "2026-10-11T09:00:00.000000Z", "updated_at": "2026-10-11T09:00:00.000000Z"
 }
@@ -108,28 +119,36 @@ deleted, invoices are voided rather than deleted).
 
 ### `GET /api/v1/permissions` 🆕 NEW
 
-Requires `admin.view`. Every assignable permission grouped by module — drives
-the checkbox grid on a role form:
+Requires `permissions.view`. Every assignable permission, three ways — drives
+the permission grid on a role form:
 
 ```json
-{ "data": { "sales": ["sales.add", "sales.approve", "sales.audit", "sales.delete", "..."], "inventory": ["..."] } }
+{
+  "data": { "expenses": ["expense-categories.create", "expense-categories.update", "expense-categories.view", "expenses.approve", "..."], "sales": ["..."] },
+  "resources": { "expenses": { "expense-categories": ["expense-categories.create", "..."], "expenses": ["expenses.approve", "..."] } },
+  "endpoints": { "expenses.view": ["GET /api/v1/expenses", "GET /api/v1/expenses/{expense}", "GET /api/v1/expenses/{expense}/receipt"] }
+}
 ```
+
+- `data`: module → permission names;
+- `resources`: module → resource → permission names (group a checkbox grid by resource);
+- `endpoints`: permission → the endpoints it guards (show a tooltip so the admin knows what ticking a box allows).
 
 ### `GET /api/v1/roles` 🆕 NEW
 
-Requires `admin.view`. Paginated; `search` matches the name. Each role has its
+Requires `roles.view`. Paginated; `search` matches the name. Each role has its
 `permissions` and `users_count`.
 
 ### `GET /api/v1/roles/{id}` 🆕 NEW
 
-Requires `admin.view`.
+Requires `roles.view`.
 
 ### `POST /api/v1/roles` 🆕 NEW
 
-Requires `admin.add`.
+Requires `roles.create`.
 
 ```json
-{ "name": "Shift Lead", "permissions": ["sales.view", "sales.edit", "sales.delete", "crm.view"] }
+{ "name": "Shift Lead", "permissions": ["sales-orders.view", "sales-orders.update", "customers.view", "expenses.view"] }
 ```
 
 `name` is required and unique; every entry in `permissions` must exist (**422**
@@ -137,18 +156,18 @@ on `permissions.N` otherwise). **201** — the role.
 
 ### `PUT /api/v1/roles/{id}` 🆕 NEW
 
-Requires `admin.edit`. Rename and/or replace the permission set — `permissions`
+Requires `roles.update`. Rename and/or replace the permission set — `permissions`
 is a **sync**, not a merge (send the full list). The `Administrator` role is
 protected: **403** `The Administrator role cannot be modified.`
 
 ### `DELETE /api/v1/roles/{id}` 🆕 NEW
 
-Requires `admin.delete`. **204**. **409** while any user still has the role
+Requires `roles.delete`. **204**. **409** while any user still has the role
 (reassign them first); the `Administrator` role cannot be deleted (**403**).
 
 ### `PUT /api/v1/roles/{id}/users` 🆕 NEW
 
-Requires `admin.edit`. Connects existing users to the role:
+Requires `roles.assign-users`. Connects existing users to the role:
 
 ```json
 { "user_ids": ["01m...", "01m..."] }
@@ -165,7 +184,7 @@ its new `users_count`. (A user can also be given a role through
 
 ### `GET /api/v1/audit-log`
 
-Requires `admin.audit`. Paginated, most-recent-first, scoped to tenant.
+Requires `audit-log.view`. Paginated, most-recent-first, scoped to tenant.
 
 `?module=&entity_type=&per_page=` — both filters optional.
 
@@ -175,12 +194,12 @@ fields.
 
 ### `GET /api/v1/audit-log/{id}`
 
-Requires `admin.audit`. A single entry, including `prev_values`/`new_values`.
+Requires `audit-log.view`. A single entry, including `prev_values`/`new_values`.
 **404** — the entry belongs to another account.
 
 ### `POST /api/v1/audit-log/verify-integrity`
 
-Requires `admin.audit`. Re-walks the entire chain and reports the first row
+Requires `audit-log.verify`. Re-walks the entire chain and reports the first row
 where it broke, if any:
 
 ```json
@@ -249,12 +268,12 @@ Any authenticated user — saves their own abandoned form.
 
 ### `GET /api/v1/discarded-actions`
 
-Requires `admin.view`. Tenant-wide list (not scoped to the caller) — the
+Requires `discarded-actions.view`. Tenant-wide list (not scoped to the caller) — the
 admin screen for reviewing everyone's discarded drafts.
 
 ### `GET /api/v1/discarded-actions/{id}`
 
-Requires `admin.view`. A single discarded action, including its full
+Requires `discarded-actions.view`. A single discarded action, including its full
 `payload`. **404** — the action belongs to another account.
 
 ---

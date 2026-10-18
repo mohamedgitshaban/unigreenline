@@ -9,7 +9,7 @@ class ReportFilterRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('analytics.export');
+        return true;
     }
 
     public function rules(): array

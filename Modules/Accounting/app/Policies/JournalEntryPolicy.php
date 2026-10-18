@@ -8,7 +8,7 @@ class JournalEntryPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('accounting.view');
+        return true;
     }
 
     /**
@@ -16,6 +16,6 @@ class JournalEntryPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('accounting.view');
+        return true;
     }
 }

@@ -21,12 +21,17 @@ class UpdateProductionOrderRequest extends FormRequest
         return [
             'bom_id' => ['sometimes', 'string', Rule::exists('boms', 'id')->where('tenant_id', $tenantId)->where('active', true)],
             'warehouse_id' => ['sometimes', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
+            'qty_cartons' => ['sometimes', 'integer', 'min:1', 'max:10000000', 'prohibits:runs'],
             'runs' => ['sometimes', 'integer', 'min:1', 'max:100000'],
             'production_date' => ['sometimes', 'date'],
             'batch_no' => ['sometimes', 'string', 'max:255'],
             'mfg_date' => ['nullable', 'date'],
-            'exp_date' => ['sometimes', 'date', 'after:production_date'],
+            'exp_date' => ['sometimes', 'nullable', 'date', 'after:production_date'],
             'conversion_cost' => ['sometimes', 'numeric', 'min:0'],
+            'priority' => ['sometimes', 'integer', 'between:0,3'],
+            'planned_start' => ['nullable', 'date'],
+            'planned_finish' => ['nullable', 'date', 'after_or_equal:planned_start'],
+            'assigned_to' => ['nullable', 'string', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
             'notes' => ['nullable', 'string', 'max:2000'],
         ];
     }

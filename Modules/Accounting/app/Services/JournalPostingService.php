@@ -27,6 +27,8 @@ class JournalPostingService
         array $lines,
         ?string $createdBy = null,
         ?DateTimeInterface $entryDate = null,
+        string $type = 'system',
+        ?string $reversalOf = null,
     ): JournalEntry {
         $totalDebits = round(array_sum(array_column($lines, 'debit')), 2);
         $totalCredits = round(array_sum(array_column($lines, 'credit')), 2);
@@ -35,11 +37,13 @@ class JournalPostingService
             throw new UnbalancedJournalEntryException($totalDebits, $totalCredits);
         }
 
-        return DB::transaction(function () use ($tenantId, $ref, $description, $lines, $createdBy, $entryDate) {
+        return DB::transaction(function () use ($tenantId, $ref, $description, $lines, $createdBy, $entryDate, $type, $reversalOf) {
             $entry = JournalEntry::create([
                 'tenant_id' => $tenantId,
                 'created_by' => $createdBy,
                 'ref' => $ref,
+                'type' => $type,
+                'reversal_of' => $reversalOf,
                 'description' => $description,
                 'entry_date' => $entryDate ?? now(),
                 'posted' => true,

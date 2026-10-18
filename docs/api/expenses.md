@@ -3,12 +3,14 @@
 Operating expenses (rent, utilities, transport, etc.) recorded as drafts and
 then approved or rejected. **Nothing reaches the journal until approval.**
 
-| Role | Permissions |
+Permissions are **per endpoint** (see [permissions.md](./permissions.md)): `expenses.view|create|update|delete|export|approve|reject|upload-receipt` for expenses and `expense-categories.view|create|update|delete` for categories — a role can read expenses without reading the categories, or approve without rejecting.
+
+| Role | What it holds |
 |---|---|
-| `Accountant` | `expenses.view/add/edit/print/export` + `expenses.approve` |
-| `Purchasing` | `expenses.view/add/edit` — records expenses, can't approve |
-| `Owner` | `expenses.view/print/export/audit` — **not** `expenses.approve` |
-| `Administrator` | everything, including `expenses.delete` (no other role has it) |
+| `Accountant` | all expense and category permissions except delete, **including `expenses.approve` and `expenses.reject`** |
+| `Purchasing` | `expenses.view/create/update/upload-receipt` and `expense-categories.view/create/update` — records expenses, can't approve |
+| `Owner` | view and export only — **not** approve/reject |
+| `Administrator` | everything, including the `*.delete` permissions (no other seeded role has them) |
 
 Every expense belongs to the caller's tenant; another tenant's expense or
 category returns **404**.
@@ -20,13 +22,13 @@ category returns **404**.
 Each category points at one **Expense-type** chart-of-accounts account
 (e.g. `6200` General & Administrative Expense) — approving an expense in
 that category debits it. `DELETE /api/v1/expense-categories/{id}` (needs
-`expenses.delete`) works only while no expense uses the category (otherwise
+`expense-categories.delete`) works only while no expense uses the category (otherwise
 409) — retire a used one with `active: false` (inactive categories can't take
 new expenses, existing ones keep it).
 
 ### `GET /api/v1/expense-categories`
 
-Requires `expenses.view`. Paginated. `search` matches name, description and
+Requires `expense-categories.view`. Paginated. `search` matches name, description and
 the account's name/code.
 
 ```json
@@ -42,7 +44,7 @@ the account's name/code.
 
 ### `POST /api/v1/expense-categories`
 
-Requires `expenses.add`.
+Requires `expense-categories.create`.
 
 ```json
 { "name": "Office Rent", "account_id": "01m...", "description": null, "active": true }
@@ -56,11 +58,11 @@ be an `Expense`-type account in the caller's tenant — anything else is `422`.
 
 ### `PUT /api/v1/expense-categories/{id}`
 
-Requires `expenses.edit`. All fields optional, same rules as create.
+Requires `expense-categories.update`. All fields optional, same rules as create.
 
 ### `DELETE /api/v1/expense-categories/{id}` 🆕 NEW
 
-Requires `expenses.delete`. **204**, audit-logged as `DELETE`. **409**
+Requires `expense-categories.delete`. **204**, audit-logged as `DELETE`. **409**
 `This ExpenseCategory is referenced by other records and cannot be deleted.`
 while any expense uses the category — retire it with `active: false` instead.
 Another tenant's category is **404**.
@@ -110,7 +112,7 @@ are also filled on rejection (who rejected it, and when).
 
 Requires `expenses.view`. Paginated. `search` matches id, payee, reference,
 description, and the category/supplier/warehouse names. Export
-(`?export=csv|xlsx`) needs `expenses.export` **or** `accounting.export`.
+(`?export=csv|xlsx`) needs `expenses.export`.
 
 ### `GET /api/v1/expenses/{id}`
 
@@ -118,7 +120,7 @@ Requires `expenses.view`. Returns the expense object.
 
 ### `POST /api/v1/expenses/receipts`
 
-Requires `expenses.add`. **Step 1 of attaching a receipt.** `multipart/form-data`
+Requires `expenses.upload-receipt`. **Step 1 of attaching a receipt.** `multipart/form-data`
 with a single `receipt` file — `jpg`, `jpeg`, `png` or `pdf`, max 5 MB.
 
 **201**
@@ -139,7 +141,7 @@ isn't already attached to another expense — otherwise `422`.
 
 ### `POST /api/v1/expenses`
 
-Requires `expenses.add`. Always created as `draft`.
+Requires `expenses.create`. Always created as `draft`.
 
 ```json
 {
@@ -158,7 +160,7 @@ Required: `category_id` (an **active** category), `payment_method`,
 
 ### `PUT /api/v1/expenses/{id}`
 
-Requires `expenses.edit`. **Drafts only.** All fields optional, same rules
+Requires `expenses.update`. **Drafts only.** All fields optional, same rules
 as create; `status` can't be set here. Send a new `receipt_path` to replace
 the receipt (the old file is deleted) or `null` to remove it.
 
@@ -188,7 +190,7 @@ Sets `status: "approved"`, `approved_by`, `approved_at` and
 
 ### `POST /api/v1/expenses/{id}/reject`
 
-Requires `expenses.approve`. **Drafts only.** Posts nothing to the journal.
+Requires `expenses.reject`. **Drafts only.** Posts nothing to the journal.
 
 ```json
 { "reason": "No receipt attached" }

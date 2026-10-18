@@ -39,8 +39,8 @@ class RecapApprovalService
             foreach ($locked->lines()->orderBy('id')->get() as $line) {
                 $batch = InventoryBatch::query()->whereKey($line->batch_id)->lockForUpdate()->firstOrFail();
 
-                if ($batch->qty_cartons < $line->qty_cartons) {
-                    throw new RecapStockShortageException($batch->batch_no, $line->qty_cartons, $batch->qty_cartons);
+                if ($batch->freeCartons() < $line->qty_cartons) {
+                    throw new RecapStockShortageException($batch->batch_no, $line->qty_cartons, $batch->freeCartons());
                 }
 
                 $batch->decrement('qty_cartons', $line->qty_cartons);

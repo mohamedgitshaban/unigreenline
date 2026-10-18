@@ -19,6 +19,8 @@ use Modules\Purchasing\Models\PurchaseOrder;
  * real expiry date is required per line, never fabricated. Idempotent via
  * stock_added; a second call is rejected rather than silently re-processed,
  * so the caller knows their receipt data wasn't applied twice.
+ *
+ * Posts Dr Inventory (net of tax) + Dr VAT Receivable (tax) / Cr Accounts Payable (total).
  */
 class ReceivePurchaseOrderService
 {
@@ -102,10 +104,14 @@ class ReceivePurchaseOrderService
                 $po->tenant_id,
                 $po->id,
                 "Goods receipt for purchase order {$po->id}",
-                [
-                    ['account_code' => '1300', 'debit' => (float) $po->total],
+                // Stock is booked at its cost (the batches carry cost per carton excluding tax) and the
+                // tax paid to the supplier goes to the VAT Receivable (input VAT) account, to be
+                // offset against VAT Payable — not buried in the inventory value.
+                array_values(array_filter([
+                    ['account_code' => '1300', 'debit' => round((float) $po->total - (float) $po->tax_amount, 2)],
+                    ['account_code' => '1400', 'debit' => (float) $po->tax_amount],
                     ['account_code' => '2100', 'credit' => (float) $po->total],
-                ],
+                ], fn (array $line) => ($line['debit'] ?? 0) > 0 || ($line['credit'] ?? 0) > 0)),
                 $actor['actor_id'] ?? null,
             );
 

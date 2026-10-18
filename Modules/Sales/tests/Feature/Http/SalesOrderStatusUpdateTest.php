@@ -14,11 +14,12 @@ use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
+use Tests\Concerns\EnsuresLedgerAccounts;
 use Tests\TestCase;
 
 class SalesOrderStatusUpdateTest extends TestCase
 {
-    use RefreshDatabase;
+    use EnsuresLedgerAccounts, RefreshDatabase;
 
     public function test_sales_rep_can_advance_their_own_order(): void
     {
@@ -143,5 +144,6 @@ class SalesOrderStatusUpdateTest extends TestCase
         foreach (['1200' => 'Asset', '4100' => 'Revenue', '2300' => 'Liability'] as $code => $type) {
             Account::factory()->recycle($tenant)->create(['code' => $code, 'type' => $type]);
         }
+        $this->ensureLedgerAccounts($tenant);
     }
 }

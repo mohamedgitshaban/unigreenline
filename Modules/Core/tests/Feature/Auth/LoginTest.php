@@ -28,10 +28,12 @@ class LoginTest extends TestCase
         $response->assertJsonPath('user.id', $user->id);
         $response->assertJsonPath('user.email', 'jane@example.com');
         $response->assertJsonPath('user.role', 'Sales Rep');
-        $response->assertJsonPath('user.permissions', [
-            'sales.view', 'sales.add', 'sales.edit', 'sales.print',
-            'crm.view', 'crm.add', 'crm.edit', 'crm.print',
-        ]);
+        $permissions = $response->json('user.permissions');
+        $this->assertContains('sales-orders.view', $permissions);
+        $this->assertContains('sales-orders.update', $permissions);
+        $this->assertContains('customers.create', $permissions);
+        $this->assertNotContains('sales-orders.delete', $permissions);
+        $this->assertNotContains('suppliers.view', $permissions);
     }
 
     public function test_unknown_email_returns_422(): void

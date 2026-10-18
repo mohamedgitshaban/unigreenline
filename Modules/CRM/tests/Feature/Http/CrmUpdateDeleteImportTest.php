@@ -82,7 +82,7 @@ class CrmUpdateDeleteImportTest extends TestCase
         $this->deleteJson("/api/v1/{$path}/{$record->id}")->assertForbidden();
 
         // Once an admin grants crm.delete to the role, the same user can delete.
-        $user->roles->first()->givePermissionTo('crm.delete');
+        $user->roles->first()->givePermissionTo("{$path}.delete");
         $user->unsetRelation('roles')->unsetRelation('permissions');
         app()[PermissionRegistrar::class]->forgetCachedPermissions();
         $this->deleteJson("/api/v1/{$path}/{$record->id}")->assertNoContent();

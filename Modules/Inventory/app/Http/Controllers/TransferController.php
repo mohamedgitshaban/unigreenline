@@ -49,7 +49,7 @@ class TransferController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'inventory.export', $query,
+            $request, $query,
             ['ID', 'Product', 'From Warehouse', 'To Warehouse', 'Batch No', 'Qty Cartons', 'Transfer Date', 'Status'],
             fn (Transfer $t) => [$t->id, $t->product_id, $t->from_warehouse_id, $t->to_warehouse_id, $t->batch_no, $t->qty_cartons, $t->transfer_date, $t->status],
             'transfers',

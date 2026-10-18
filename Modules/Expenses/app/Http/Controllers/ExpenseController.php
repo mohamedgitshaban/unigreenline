@@ -45,7 +45,7 @@ class ExpenseController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, ['expenses.export', 'accounting.export'], $query,
+            $request, $query,
             ['ID', 'Date', 'Category', 'Account', 'Amount', 'Payment Method', 'Status', 'Payee', 'Supplier', 'Warehouse', 'Reference', 'Description'],
             fn (Expense $e) => [
                 $e->id, $e->expense_date->toDateString(), $e->category->name, $e->category->account->code, $e->amount,

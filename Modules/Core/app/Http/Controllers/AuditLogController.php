@@ -25,8 +25,6 @@ class AuditLogController extends Controller
 
     public function index(Request $request)
     {
-        $this->authorize('admin.audit');
-
         $query = AuditLog::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->when($request->filled('module'), fn ($query) => $query->where('module', $request->query('module')))
@@ -39,7 +37,7 @@ class AuditLogController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'admin.export', $query,
+            $request, $query,
             ['ID', 'Occurred At', 'User', 'Module', 'Entity Type', 'Entity ID', 'Operation', 'IP Address', 'Prev Hash', 'Entry Hash'],
             fn (AuditLog $a) => [$a->id, $a->occurred_at->toDateTimeString(), $a->user_name, $a->module, $a->entity_type, $a->entity_id, $a->operation, $a->ip_address, $a->prev_hash, $a->entry_hash],
             'audit-log',
@@ -54,8 +52,6 @@ class AuditLogController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $this->authorize('admin.audit');
-
         $auditLog = AuditLog::query()
             ->where('tenant_id', $request->user()->tenant_id)
             ->with(self::RELATIONS)
@@ -71,8 +67,6 @@ class AuditLogController extends Controller
      */
     public function verifyIntegrity(Request $request)
     {
-        $this->authorize('admin.audit');
-
         $brokenAt = $this->auditLog->verifyChain();
 
         return response()->json([

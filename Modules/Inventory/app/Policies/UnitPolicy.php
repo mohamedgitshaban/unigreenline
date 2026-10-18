@@ -11,7 +11,7 @@ class UnitPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->canAny(['inventory.view', 'purchasing.view', 'sales.view']);
+        return true;
     }
 
     public function view(User $user): bool
@@ -21,16 +21,16 @@ class UnitPolicy
 
     public function create(User $user): bool
     {
-        return $user->can('inventory.add');
+        return true;
     }
 
     public function update(User $user): bool
     {
-        return $user->can('inventory.edit');
+        return true;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('inventory.delete');
+        return true;
     }
 }

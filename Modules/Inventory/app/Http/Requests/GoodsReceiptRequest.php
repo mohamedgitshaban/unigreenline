@@ -10,10 +10,6 @@ class GoodsReceiptRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        if (! $this->user()->can('inventory.add')) {
-            return false;
-        }
-
         $warehouse = Warehouse::find($this->input('warehouse_id'));
 
         return $warehouse !== null && $warehouse->isVisibleTo($this->user());

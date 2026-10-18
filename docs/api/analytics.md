@@ -1,8 +1,10 @@
 # Analytics & Scheduled Jobs
 
-All endpoints below require `analytics.view` (or `analytics.export` for the
-two `/reports/*` endpoints). **Only `Administrator`, `Owner`, and `Auditor`
-have any `analytics.*` permission in this build** — the spec's own role
+Each endpoint below names its own permission — `analytics-dashboard.view`,
+`expiry-analytics.view|export`, `stock-analytics.view|export`, and
+`sales-report.export` / `inventory-report.export` for the two `/reports/*`
+endpoints (the product life cycle needs `products.lifecycle`). **Only
+`Administrator`, `Owner`, and `Auditor` hold the analytics permissions by default** — the spec's own role
 table (§2) never grants it to an operational role (Sales Manager,
 Warehouse Manager, etc.), so this build doesn't invent that access either.
 If the frontend needs, say, a Sales Manager to see the dashboard, that's a
@@ -60,7 +62,7 @@ row — each product's `warehouses` array can have multiple entries.
 
 ## `GET /api/v1/reports/sales`
 
-Requires `analytics.export` specifically (not just `view`). Same row shape
+Requires `sales-report.export` specifically (not just `view`). Same row shape
 as `GET /sales-orders`.
 
 `?start_date=&end_date=&warehouse_id=&per_page=` — all optional, filtering
@@ -68,7 +70,7 @@ on `order_date` and `warehouse_id`.
 
 ## `GET /api/v1/reports/inventory`
 
-Requires `analytics.export`. Batch-level detail (not the `/analytics/stock`
+Requires `inventory-report.export`. Batch-level detail (not the `/analytics/stock`
 rollup) — same row shape as batches elsewhere.
 
 `?start_date=&end_date=&warehouse_id=&per_page=` — date filters apply to
@@ -76,7 +78,7 @@ rollup) — same row shape as batches elsewhere.
 
 ## `GET /api/v1/products/{id}/lifecycle` 🆕 NEW
 
-Requires `analytics.view` **or** `inventory.view`. A product's whole journey as
+Requires `products.lifecycle`. A product's whole journey as
 one date-ordered timeline — purchase, transfers, manufacturing, sale, returns,
 write-offs — plus where the stock is now. `?from=&to=` (optional dates,
 `to` ≥ `from`) narrow the window. Another tenant's product is **404**.

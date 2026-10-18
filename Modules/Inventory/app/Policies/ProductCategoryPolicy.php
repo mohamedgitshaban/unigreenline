@@ -9,7 +9,7 @@ class ProductCategoryPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('inventory.view');
+        return true;
     }
 
     /**
@@ -17,21 +17,21 @@ class ProductCategoryPolicy
      */
     public function view(User $user): bool
     {
-        return $user->can('inventory.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('inventory.add');
+        return true;
     }
 
     public function update(User $user, ProductCategory $category): bool
     {
-        return $user->can('inventory.edit') && $category->tenant_id === $user->tenant_id;
+        return $category->tenant_id === $user->tenant_id;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('inventory.delete');
+        return true;
     }
 }

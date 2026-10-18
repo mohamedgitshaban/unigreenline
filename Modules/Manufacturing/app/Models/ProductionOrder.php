@@ -21,8 +21,12 @@ use Modules\Manufacturing\Database\Factories\ProductionOrderFactory;
  * finished batch and posts the cost to the ledger.
  */
 #[Fillable([
-    'tenant_id', 'bom_id', 'warehouse_id', 'status', 'runs', 'output_qty_cartons', 'production_date',
+    'tenant_id', 'number', 'bom_id', 'bom_revision_id', 'parent_order_id', 'warehouse_id', 'status', 'priority', 'reservation_status',
+    'runs', 'output_qty_cartons', 'produced_qty_cartons', 'rejected_qty_cartons', 'production_date',
+    'planned_start', 'planned_finish', 'actual_start', 'actual_finish', 'assigned_to', 'source_type', 'source_id', 'cancellation_reason',
     'batch_no', 'mfg_date', 'exp_date', 'conversion_cost', 'material_cost', 'cost_per_carton',
+    'planned_material_cost', 'planned_operation_cost', 'planned_overhead_cost', 'actual_operation_cost', 'actual_overhead_cost',
+    'scrap_cost', 'capitalized_cost', 'capitalized_material', 'variance_cost', 'wip_accounting', 'variance_journal_entry_id',
     'output_batch_id', 'journal_entry_id', 'notes', 'created_by', 'completed_by', 'completed_at',
 ])]
 class ProductionOrder extends Model
@@ -31,17 +35,48 @@ class ProductionOrder extends Model
 
     protected $attributes = [
         'status' => 'draft',
+        'priority' => 1,
+        'reservation_status' => 'none',
         'runs' => 1,
+        'produced_qty_cartons' => 0,
+        'rejected_qty_cartons' => 0,
         'conversion_cost' => 0,
         'material_cost' => 0,
         'cost_per_carton' => 0,
+        'planned_material_cost' => 0,
+        'planned_operation_cost' => 0,
+        'planned_overhead_cost' => 0,
+        'actual_operation_cost' => 0,
+        'actual_overhead_cost' => 0,
+        'scrap_cost' => 0,
+        'capitalized_cost' => 0,
+        'capitalized_material' => 0,
+        'variance_cost' => 0,
+        'wip_accounting' => false,
     ];
 
     protected function casts(): array
     {
         return [
             'runs' => 'integer',
+            'priority' => 'integer',
             'output_qty_cartons' => 'integer',
+            'produced_qty_cartons' => 'integer',
+            'rejected_qty_cartons' => 'integer',
+            'planned_start' => 'datetime',
+            'planned_finish' => 'datetime',
+            'actual_start' => 'datetime',
+            'actual_finish' => 'datetime',
+            'planned_material_cost' => 'decimal:2',
+            'planned_operation_cost' => 'decimal:2',
+            'planned_overhead_cost' => 'decimal:2',
+            'actual_operation_cost' => 'decimal:2',
+            'actual_overhead_cost' => 'decimal:2',
+            'scrap_cost' => 'decimal:2',
+            'capitalized_cost' => 'decimal:2',
+            'capitalized_material' => 'decimal:2',
+            'variance_cost' => 'decimal:2',
+            'wip_accounting' => 'boolean',
             'production_date' => 'date',
             'mfg_date' => 'date',
             'exp_date' => 'date',
@@ -55,6 +90,24 @@ class ProductionOrder extends Model
     public function isDraft(): bool
     {
         return $this->status === 'draft';
+    }
+
+    /**
+     * Cartons still to be made: planned less what has been received or rejected.
+     */
+    public function remainingQty(): int
+    {
+        return max(0, $this->output_qty_cartons - $this->produced_qty_cartons - $this->rejected_qty_cartons);
+    }
+
+    /**
+     * Whether any stock has moved for this order (material issued or output received).
+     */
+    public function hasMovedStock(): bool
+    {
+        return $this->produced_qty_cartons > 0
+            || $this->rejected_qty_cartons > 0
+            || $this->consumptions()->exists();
     }
 
     public function tenant(): BelongsTo
@@ -85,6 +138,56 @@ class ProductionOrder extends Model
     public function consumptions(): HasMany
     {
         return $this->hasMany(ProductionConsumption::class);
+    }
+
+    public function bomRevision(): BelongsTo
+    {
+        return $this->belongsTo(BomRevision::class, 'bom_revision_id');
+    }
+
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_order_id');
+    }
+
+    public function backorders(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_order_id');
+    }
+
+    public function components(): HasMany
+    {
+        return $this->hasMany(ProductionOrderComponent::class);
+    }
+
+    public function outputs(): HasMany
+    {
+        return $this->hasMany(ProductionOutput::class);
+    }
+
+    public function scraps(): HasMany
+    {
+        return $this->hasMany(ProductionScrap::class);
+    }
+
+    public function events(): HasMany
+    {
+        return $this->hasMany(ProductionOrderEvent::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(WorkOrder::class)->orderBy('sequence');
+    }
+
+    public function qualityChecks(): HasMany
+    {
+        return $this->hasMany(QualityCheck::class);
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 
     public function createdBy(): BelongsTo

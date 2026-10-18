@@ -7,6 +7,7 @@ use Modules\Accounting\Database\Seeders\AccountingDatabaseSeeder;
 use Modules\Core\Database\Seeders\CoreDatabaseSeeder;
 use Modules\CRM\Database\Seeders\CrmDatabaseSeeder;
 use Modules\Expenses\Database\Seeders\ExpensesDatabaseSeeder;
+use Modules\HR\Database\Seeders\HRDatabaseSeeder;
 use Modules\Inventory\Database\Seeders\InventoryDatabaseSeeder;
 use Modules\Purchasing\Database\Seeders\PurchasingDatabaseSeeder;
 
@@ -21,6 +22,7 @@ class DatabaseSeeder extends Seeder
             AccountingDatabaseSeeder::class,
             ExpensesDatabaseSeeder::class,
             CrmDatabaseSeeder::class,
+            HRDatabaseSeeder::class,
         ]);
     }
 }

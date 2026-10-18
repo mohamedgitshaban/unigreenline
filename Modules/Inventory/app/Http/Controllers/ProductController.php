@@ -50,7 +50,7 @@ class ProductController extends Controller
         $this->applySorting($request, $query);
 
         if ($export = $this->exportIfRequested(
-            $request, 'inventory.export', $query,
+            $request, $query,
             ['ID', 'SKU', 'Name', 'Brand', 'Pack Unit', 'Carton Qty', 'Cost Price', 'Selling Price', 'Tax %', 'Active'],
             fn (Product $p) => [$p->id, $p->sku, $p->name, $p->brand, $p->pack_unit, $p->carton_qty, $p->cost_price, $p->selling_price, $p->tax_pct, $p->active ? 'Yes' : 'No'],
             'products',
@@ -196,23 +196,23 @@ class ProductController extends Controller
      * Every warehouse holding sellable stock of this product, so an order
      * line can pick which warehouse to draw from. Open to anyone who can
      * view inventory or sales, since reps pick warehouses while ordering.
+     * Cartons reserved for a manufacturing order are not counted as available.
      */
     public function availability(Request $request, string $id)
     {
-        abort_unless($request->user()->canAny(['inventory.view', 'sales.view']), 403);
-
         $product = Product::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
 
         $rows = $product->batches()->getQuery()
             ->join('warehouses', 'warehouses.id', '=', 'inventory_batches.warehouse_id')
-            ->where('inventory_batches.qty_cartons', '>', 0)
+            ->whereColumn('inventory_batches.qty_cartons', '>', 'inventory_batches.reserved_cartons')
             ->where('warehouses.status', 'active')
             ->whereDate('inventory_batches.exp_date', '>=', now()->toDateString())
             ->groupBy('warehouses.id', 'warehouses.name', 'warehouses.city', 'warehouses.governorate')
-            ->orderByDesc(DB::raw('SUM(inventory_batches.qty_cartons)'))
+            ->orderByDesc(DB::raw('SUM(inventory_batches.qty_cartons - inventory_batches.reserved_cartons)'))
             ->get([
                 'warehouses.id', 'warehouses.name', 'warehouses.city', 'warehouses.governorate',
-                DB::raw('SUM(inventory_batches.qty_cartons) as available_cartons'),
+                DB::raw('SUM(inventory_batches.qty_cartons - inventory_batches.reserved_cartons) as available_cartons'),
+                DB::raw('SUM(inventory_batches.reserved_cartons) as reserved_cartons'),
                 DB::raw('COUNT(*) as batches_count'),
                 DB::raw('MIN(inventory_batches.exp_date) as nearest_expiry'),
             ]);
@@ -229,6 +229,7 @@ class ProductController extends Controller
                 'governorate' => $row->governorate,
                 'available_cartons' => (int) $row->available_cartons,
                 'available_base_units' => (int) $row->available_cartons * $product->carton_qty,
+                'reserved_cartons' => (int) $row->reserved_cartons,
                 'batches_count' => (int) $row->batches_count,
                 'nearest_expiry' => substr((string) $row->nearest_expiry, 0, 10),
             ])->values(),

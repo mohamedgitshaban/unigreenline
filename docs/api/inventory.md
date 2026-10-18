@@ -41,7 +41,7 @@ carton. Both are idempotent.
 
 ### `GET /api/v1/units` 🆕 NEW
 
-Requires `inventory.view`, `purchasing.view` or `sales.view`. Paginated (50 per
+Requires `units.view`, . Paginated (50 per
 page); `search` matches `name`.
 
 ```json
@@ -54,16 +54,16 @@ Same permissions. **404** for another tenant's unit.
 
 ### `POST /api/v1/units` 🆕 NEW
 
-Requires `inventory.add`. `{ "name": "Pallet", "active": true }` — `name` unique
+Requires `units.create`. `{ "name": "Pallet", "active": true }` — `name` unique
 per tenant (**422** otherwise). **201**.
 
 ### `PUT /api/v1/units/{id}` 🆕 NEW
 
-Requires `inventory.edit`. Rename or set `active: false`.
+Requires `units.update`. Rename or set `active: false`.
 
 ### `DELETE /api/v1/units/{id}` 🆕 NEW
 
-Requires `inventory.delete`. **204**. **409** while any product is packaged in
+Requires `units.delete`. **204**. **409** while any product is packaged in
 the unit — deactivate it instead.
 
 ### The `units` field on products 🔄 CHANGED
@@ -100,7 +100,7 @@ Product responses include (on show / index / store / update):
 
 ## `GET /api/v1/warehouses`
 
-Requires `inventory.view`.
+Requires `warehouses.view`.
 
 **200**
 ```json
@@ -128,7 +128,7 @@ Requires `inventory.view`.
 
 ## `GET /api/v1/warehouses/{id}`
 
-Requires `inventory.view` + the warehouse being visible to this user.
+Requires `warehouses.view` + the warehouse being visible to this user.
 
 **200** — same shape as above, plus `"batches_count": 12`. The batches
 themselves are paged by the endpoint below.
@@ -156,7 +156,7 @@ user). Paginated like every list (**10 per page by default**, `?per_page=`, `?pa
 
 ## `POST /api/v1/warehouses`
 
-Requires `inventory.add`. `manager_name` is derived server-side from
+Requires `warehouses.create`. `manager_name` is derived server-side from
 `manager_id` — don't send it, it's ignored if you do.
 
 **Request**
@@ -173,17 +173,17 @@ Only `name`, `city`, `governorate` are required.
 
 ## `PUT /api/v1/warehouses/{id}`
 
-Requires `inventory.edit` + visibility. All fields optional (partial update).
+Requires `warehouses.update` + visibility. All fields optional (partial update).
 
 ## `DELETE /api/v1/warehouses/{id}` 🆕 NEW
 
-Requires `inventory.delete` + visibility. **204**, audit-logged as `DELETE`.
+Requires `warehouses.delete` + visibility. **204**, audit-logged as `DELETE`.
 **409** while the warehouse holds batches or has transfers, purchase orders or
 sales orders against it. Another tenant's warehouse is **404**.
 
 ## `POST /api/v1/warehouses/import` 🆕 NEW
 
-Requires `inventory.add`. Multipart `file` (+ optional `update_existing`) — see
+Requires `warehouses.import`. Multipart `file` (+ optional `update_existing`) — see
 [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
 Matched by **name**. Columns: `Name`*, `City`*, `Governorate`*, `Address`,
 `Manager Email` (an existing user; their name is copied to `manager_name`),
@@ -191,13 +191,13 @@ Matched by **name**. Columns: `Name`*, `City`*, `Governorate`*, `Address`,
 
 ## `GET /api/v1/warehouses/import-template` 🆕 NEW
 
-Requires `inventory.add`. Downloads `warehouses-import-template.xlsx`.
+Requires `warehouses.import`. Downloads `warehouses-import-template.xlsx`.
 
 ---
 
 ## `GET /api/v1/products`
 
-Requires `inventory.view`. Not warehouse-scoped (catalog-wide).
+Requires `products.view`. Not warehouse-scoped (catalog-wide).
 
 > 🔄 **CHANGED — cost is administrator-only.** `pack_cost_price` and
 > `cost_price` are returned **only to Administrators**; every other user gets the
@@ -211,7 +211,7 @@ below.
 
 ## `GET /api/v1/products/{id}/batches`
 
-Requires `inventory.view`. The product's batches as a normal paginated list —
+Requires `products.view`. The product's batches as a normal paginated list —
 **10 per page by default**, `?per_page=` to change it. Each batch includes its
 `warehouse`.
 
@@ -255,7 +255,7 @@ warehouse name; sorting and `filter[...]` work as described in the README.
 
 ## `POST /api/v1/products` 🔄 CHANGED
 
-Requires `inventory.add`. 🔄 New: `min_selling_price`, `units` (see
+Requires `products.create`. 🔄 New: `min_selling_price`, `units` (see
 [Units & product packaging](#units--product-packaging--new)).
 
 **`min_selling_price`** (🔄 CHANGED, optional, per smallest unit like
@@ -295,18 +295,18 @@ server-side (`pack_price × carton_qty`), always present, always in sync:
 
 ## `PUT /api/v1/products/{id}` 🔄 CHANGED
 
-Requires `inventory.edit`. All fields optional. 🔄 Also accepts
+Requires `products.update`. All fields optional. 🔄 Also accepts
 `min_selling_price` and `units` (replaces the whole ladder).
 
 ## `DELETE /api/v1/products/{id}` 🆕 NEW
 
-Requires `inventory.delete`. **204**, audit-logged. **409** while the product has
+Requires `products.delete`. **204**, audit-logged. **409** while the product has
 batches, order lines, transfers or complaints against it — set `active: false`
 instead. Another tenant's product is **404**.
 
 ## `GET /api/v1/products/{id}/availability` 🆕 NEW
 
-Requires `inventory.view` **or** `sales.view` (so a Sales Rep can use it while
+Requires `products.availability` (so a Sales Rep can use it while
 ordering). Every active warehouse that holds unexpired stock of the product,
 largest first — the list a seller picks from when each sales-order line can draw
 from a different warehouse.
@@ -329,7 +329,7 @@ kind a line draws from. Another tenant's product is **404**.
 
 ## `POST /api/v1/products/import` 🆕 NEW
 
-Requires `inventory.add`. Multipart `file` (+ optional `update_existing`) — see
+Requires `products.import`. Multipart `file` (+ optional `update_existing`) — see
 [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
 Matched by **SKU**. Columns: `SKU`*, `Name`*, `Category`* (name **or** code, must
 exist), `Supplier` (name, must exist), `Brand`, `Pack Unit`*, `Carton Qty`*,
@@ -339,21 +339,21 @@ Packaging ladders are not imported — set them with `PUT /products/{id}`.
 
 ## `GET /api/v1/products/import-template` 🆕 NEW
 
-Requires `inventory.add`. Downloads `products-import-template.xlsx`.
+Requires `products.import`. Downloads `products-import-template.xlsx`.
 
 ---
 
 ## `GET /api/v1/categories`
 
-Requires `inventory.view`.
+Requires `categories.view`.
 
 ## `GET /api/v1/categories/{id}`
 
-Requires `inventory.view`. **404** — the category belongs to another account.
+Requires `categories.view`. **404** — the category belongs to another account.
 
 ## `POST /api/v1/categories`
 
-Requires `inventory.add`. Only `name` is required; unique per account.
+Requires `categories.create`. Only `name` is required; unique per account.
 
 ```json
 { "name": "Antibiotics", "code": null, "description": null, "active": true }
@@ -361,7 +361,7 @@ Requires `inventory.add`. Only `name` is required; unique per account.
 
 ## `PUT /api/v1/categories/{id}`
 
-Requires `inventory.edit`, and the category must belong to your account
+Requires `categories.update`, and the category must belong to your account
 (**403** otherwise). Partial update — send only the fields you're changing;
 same fields and rules as `POST`. `name` stays unique per account, but keeping
 a category's own current name is fine.
@@ -374,7 +374,7 @@ a category's own current name is fine.
 
 ## `DELETE /api/v1/categories/{id}` 🆕 NEW
 
-Requires `inventory.delete`. **204**. **409** while any product uses the
+Requires `categories.delete`. **204**. **409** while any product uses the
 category — set `active: false` instead.
 
 ---
@@ -382,7 +382,7 @@ category — set `active: false` instead.
 ## `POST /api/v1/inventory/grn`
 
 Manual goods receipt — stock that didn't come from a purchase order (that flow
-arrives with the Purchasing module). Requires `inventory.add` + the warehouse
+arrives with the Purchasing module). Requires `goods-receipts.create` + the warehouse
 being visible to this user.
 
 **Request**
@@ -411,6 +411,13 @@ always creates a new one, even for the same product+warehouse.
 
 **422** — missing `exp_date`, or `product_id`/`warehouse_id` don't exist.
 **403** — warehouse not assigned to this user.
+
+🔄 **Ledger.** A receipt with a value (`qty_cartons × cost_per_carton` above zero)
+posts **Dr Inventory (1300) / Cr Opening Balance Equity (3300)**, so the stock
+asset in the books matches what is on the shelf. A receipt from a purchase
+order does not use this endpoint — it posts against Accounts Payable instead
+(see [purchasing.md](./purchasing.md)). Clear 3300 against capital or the
+supplier with a manual journal entry once you know where the stock came from.
 
 ---
 
@@ -441,17 +448,17 @@ gift flag.
 
 ## `GET /api/v1/transfers`
 
-Requires `inventory.view`.
+Requires `transfers.view`.
 
 ## `GET /api/v1/transfers/{id}`
 
-Requires `inventory.view`. Includes the nested `product`, `from_warehouse`,
+Requires `transfers.view`. Includes the nested `product`, `from_warehouse`,
 `to_warehouse` and `created_by`. **404** — the transfer belongs to another
 account.
 
 ## `POST /api/v1/transfers`
 
-Requires `inventory.add` + both warehouses visible to this user (unlike
+Requires `transfers.create` + both warehouses visible to this user (unlike
 Sales Orders — a transfer is warehouse-staff work, so the same assignment
 check as GRN and the warehouse endpoints applies to *both* sides).
 Executes immediately and atomically — there's no separate "complete"

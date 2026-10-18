@@ -12,7 +12,7 @@ class UploadSupplierContractRequest extends FormRequest
      */
     public function authorize(): bool
     {
-        return $this->user()->can('create', Supplier::class) || $this->user()->can('purchasing.edit');
+        return true;
     }
 
     public function rules(): array

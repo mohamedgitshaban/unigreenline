@@ -12,27 +12,27 @@ class RecapPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->can('recap.view');
+        return true;
     }
 
     public function view(User $user): bool
     {
-        return $user->can('recap.view');
+        return true;
     }
 
     public function create(User $user): bool
     {
-        return $user->can('recap.add');
+        return true;
     }
 
     public function update(User $user): bool
     {
-        return $user->can('recap.edit');
+        return true;
     }
 
     public function delete(User $user): bool
     {
-        return $user->can('recap.delete');
+        return true;
     }
 
     /**
@@ -41,6 +41,6 @@ class RecapPolicy
      */
     public function approve(User $user): bool
     {
-        return $user->can('recap.approve');
+        return true;
     }
 }
