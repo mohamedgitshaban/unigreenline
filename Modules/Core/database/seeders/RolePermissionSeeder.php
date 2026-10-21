@@ -36,8 +36,9 @@ class RolePermissionSeeder extends Seeder
         // Expense approval sits with Accountant/Administrator only, so Owner's
         // module-wide approve stops short of expenses.
         'Owner' => ['modules' => '*', 'capabilities' => ['view', 'approve', 'print', 'export', 'audit'], 'except' => ['expenses.approve'], 'grant' => ['manufacturing-settings.update']],
+        // Runs a sales team: CRM as well as sales, so they can see their reps' customers, visits and calls and hand customers out.
         // Can also ask production to make what an open sales order needs, and see how that is going.
-        'Sales Manager' => ['modules' => ['sales'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['production-orders.view', 'production-orders.from-sales-order']],
+        'Sales Manager' => ['modules' => ['sales', 'crm'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['production-orders.view', 'production-orders.from-sales-order']],
         // Spec §2 groups "Own orders/customers only" as one scope for Sales
         // Rep — crm.* is included here (not just sales.*) so a rep can
         // manage their own customers, not only their own orders.

@@ -17,9 +17,11 @@ class EveryEndpointIsGuardedTest extends TestCase
      */
     private const UNGUARDED = [
         'POST api/v1/auth/login', 'POST api/v1/auth/logout', 'GET api/v1/auth/me', 'POST api/v1/auth/change-password',
-        'GET api/v1/notifications', 'PUT api/v1/notifications/read-all', 'GET api/v1/notifications/{id}',
+        'GET api/v1/notifications', 'PUT api/v1/notifications/read-all', 'GET api/v1/notifications/{id}', 'GET api/v1/notifications/unread-count', 'PUT api/v1/notifications/{id}/read',
         'GET api/v1/governorates', 'GET api/v1/governorates/{governorate}/cities',
         'POST api/v1/discarded-actions',
+        'GET api/v1/team',
+        'GET api/v1/dashboards',
     ];
 
     public function test_every_api_endpoint_declares_the_permission_that_guards_it(): void

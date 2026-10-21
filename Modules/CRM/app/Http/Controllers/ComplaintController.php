@@ -78,6 +78,10 @@ class ComplaintController extends Controller
 
         $complaint = Complaint::create($data);
 
+        $this->recordAudit($request, 'crm', 'Complaint', $complaint, 'INSERT', null, [
+            'customer_id' => $complaint->customer_id, 'assigned_to' => $complaint->assigned_to, 'type' => $complaint->type, 'priority' => $complaint->priority,
+        ]);
+
         return (new ComplaintResource($complaint))->response()->setStatusCode(201);
     }
 
@@ -88,6 +92,8 @@ class ComplaintController extends Controller
             'status' => 'resolved',
             'resolved_date' => now()->toDateString(),
         ]);
+
+        $this->recordAudit($request, 'crm', 'Complaint', $complaint, 'UPDATE', ['status' => 'investigating'], ['status' => 'resolved']);
 
         return new ComplaintResource($complaint);
     }

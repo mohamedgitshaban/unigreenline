@@ -3,11 +3,13 @@
 namespace Modules\Inventory\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Transfer;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Support\StockMovementContext;
 
 /**
  * Inter-warehouse stock transfer (spec §5.8): moves quantity out of the
@@ -50,11 +52,15 @@ class TransferStockService
                 ]]);
             }
 
+            $transferId = (string) Str::ulid();
             $expDate = $sourceBatch->exp_date;
             $mfgDate = $sourceBatch->mfg_date;
             $costPerCarton = $sourceBatch->cost_per_carton;
 
-            $sourceBatch->decrement('qty_cartons', $data['qty_cartons']);
+            StockMovementContext::run(
+                ['type' => 'transfer_out', 'reference_type' => 'transfer', 'reference_id' => $transferId, 'counterpart_warehouse_id' => $data['to_warehouse_id'], 'user_id' => $data['actor_id'] ?? null],
+                fn () => $sourceBatch->decrement('qty_cartons', $data['qty_cartons']),
+            );
 
             if ($sourceBatch->fresh()->qty_cartons === 0) {
                 $sourceBatch->delete();
@@ -68,26 +74,35 @@ class TransferStockService
                 ->lockForUpdate()
                 ->first();
 
-            if ($destinationBatch) {
-                $destinationBatch->increment('qty_cartons', $data['qty_cartons']);
-            } else {
-                InventoryBatch::create([
-                    'tenant_id' => $data['tenant_id'],
-                    'product_id' => $data['product_id'],
-                    'warehouse_id' => $data['to_warehouse_id'],
-                    'batch_no' => $data['batch_no'],
-                    'mfg_date' => $mfgDate,
-                    'exp_date' => $expDate,
-                    'rcv_date' => now(),
-                    'qty_cartons' => $data['qty_cartons'],
-                    'qty_packs' => 0,
-                    'cost_per_carton' => $costPerCarton,
-                    'is_free_gift' => $sourceBatch->is_free_gift,
-                    'source_po_id' => $sourceBatch->source_po_id,
-                ]);
-            }
+            StockMovementContext::run(
+                ['type' => 'transfer_in', 'reference_type' => 'transfer', 'reference_id' => $transferId, 'counterpart_warehouse_id' => $data['from_warehouse_id'], 'user_id' => $data['actor_id'] ?? null],
+                function () use ($destinationBatch, $data, $mfgDate, $expDate, $costPerCarton, $sourceBatch) {
+                    if ($destinationBatch) {
+                        $destinationBatch->increment('qty_cartons', $data['qty_cartons']);
 
-            $transfer = Transfer::create([
+                        return;
+                    }
+
+                    InventoryBatch::create([
+                        'tenant_id' => $data['tenant_id'],
+                        'product_id' => $data['product_id'],
+                        'warehouse_id' => $data['to_warehouse_id'],
+                        'batch_no' => $data['batch_no'],
+                        'mfg_date' => $mfgDate,
+                        'exp_date' => $expDate,
+                        'rcv_date' => now(),
+                        'qty_cartons' => $data['qty_cartons'],
+                        'qty_packs' => 0,
+                        'cost_per_carton' => $costPerCarton,
+                        'is_free_gift' => $sourceBatch->is_free_gift,
+                        'source_po_id' => $sourceBatch->source_po_id,
+                    ]);
+                },
+            );
+
+            $transfer = new Transfer;
+            $transfer->id = $transferId;
+            $transfer->fill([
                 'tenant_id' => $data['tenant_id'],
                 'product_id' => $data['product_id'],
                 'from_warehouse_id' => $data['from_warehouse_id'],
@@ -99,6 +114,7 @@ class TransferStockService
                 'status' => 'completed',
                 'created_by' => $data['created_by'] ?? null,
             ]);
+            $transfer->save();
 
             Warehouse::find($data['from_warehouse_id'])?->recalculateStockValue();
             Warehouse::find($data['to_warehouse_id'])?->recalculateStockValue();

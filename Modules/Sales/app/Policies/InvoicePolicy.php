@@ -3,6 +3,7 @@
 namespace Modules\Sales\Policies;
 
 use Modules\Core\Models\User;
+use Modules\Core\Support\DataScope;
 use Modules\Sales\Models\Invoice;
 
 /**
@@ -12,6 +13,8 @@ use Modules\Sales\Models\Invoice;
  */
 class InvoicePolicy
 {
+    public function __construct(private readonly DataScope $scope) {}
+
     public function viewAny(User $user): bool
     {
         return true;
@@ -19,12 +22,7 @@ class InvoicePolicy
 
     public function view(User $user, Invoice $invoice): bool
     {
-
-        if ($user->hasRole('Sales Rep')) {
-            return $invoice->salesOrder?->sales_rep_id === $user->id;
-        }
-
-        return true;
+        return $this->scope->canSee($user, $invoice->salesOrder?->sales_rep_id);
     }
 
     public function create(User $user): bool
@@ -34,11 +32,6 @@ class InvoicePolicy
 
     public function void(User $user, Invoice $invoice): bool
     {
-
-        if ($user->hasRole('Sales Rep')) {
-            return $invoice->salesOrder?->sales_rep_id === $user->id;
-        }
-
-        return true;
+        return $this->view($user, $invoice);
     }
 }

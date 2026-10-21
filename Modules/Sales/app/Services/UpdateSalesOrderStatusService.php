@@ -98,7 +98,7 @@ class UpdateSalesOrderStatusService
             ),
         ])->all();
 
-        $deductions = $this->fefoStock->deduct($lines);
+        $deductions = $this->fefoStock->deduct($lines, ['type' => 'sale', 'reference_type' => 'sales_order', 'reference_id' => $order->id]);
 
         $order->update(['stock_deducted' => true]);
 

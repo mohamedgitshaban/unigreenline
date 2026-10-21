@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Database\Factories\NotificationFactory;
 
 #[Fillable([
-    'tenant_id', 'user_id', 'type', 'title', 'body', 'icon', 'link_module', 'link_id', 'unread',
+    'tenant_id', 'user_id', 'actor_id', 'type', 'title', 'body', 'icon', 'link_module', 'link_entity', 'link_id', 'link_url', 'unread',
 ])]
 class Notification extends Model
 {

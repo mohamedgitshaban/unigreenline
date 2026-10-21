@@ -4,6 +4,8 @@ namespace Modules\CRM\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
+use Modules\Core\Support\DataScope;
 
 class UpdateCustomerVisitRequest extends FormRequest
 {
@@ -24,6 +26,19 @@ class UpdateCustomerVisitRequest extends FormRequest
             'outcome' => ['nullable', Rule::in(['positive', 'neutral', 'negative'])],
             'notes' => ['nullable', 'string', 'max:2000'],
             'next_visit' => ['nullable', 'date', 'after_or_equal:visit_date'],
+        ];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                $requested = $this->input('rep_id');
+
+                if ($requested && ! app(DataScope::class)->canAssignTo($this->user(), $requested)) {
+                    $validator->errors()->add('rep_id', 'You can only log visits under your own name or a member of your team.');
+                }
+            },
         ];
     }
 }

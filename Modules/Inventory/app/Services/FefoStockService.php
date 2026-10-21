@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Support\StockMovementContext;
 
 /**
  * First-Expired, First-Out stock deduction (spec §5.1). This service is
@@ -52,9 +53,19 @@ class FefoStockService
      * combination cannot be fully satisfied.
      *
      * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int}>  $lines
+     * @param  array{type?: string, reference_type?: ?string, reference_id?: ?string, notes?: ?string}  $context  Why the stock leaves, for the stock ledger.
      * @return array<int, array{product_id: string, warehouse_id: string, batch_id: string, batch_no: string, cartons_taken: int}>
      */
-    public function deduct(array $lines): array
+    public function deduct(array $lines, array $context = []): array
+    {
+        return StockMovementContext::run($context + ['type' => 'sale'], fn () => $this->deductLines($lines));
+    }
+
+    /**
+     * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int}>  $lines
+     * @return array<int, array{product_id: string, warehouse_id: string, batch_id: string, batch_no: string, cartons_taken: int}>
+     */
+    private function deductLines(array $lines): array
     {
         return DB::transaction(function () use ($lines) {
             $shortfalls = $this->checkAvailability($lines);

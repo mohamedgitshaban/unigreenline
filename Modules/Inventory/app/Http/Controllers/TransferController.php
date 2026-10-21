@@ -7,9 +7,11 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
 use Modules\Inventory\Http\Requests\StoreTransferRequest;
 use Modules\Inventory\Http\Resources\TransferResource;
 use Modules\Inventory\Models\Transfer;
+use Modules\Inventory\Printing\TransferDocument;
 use Modules\Inventory\Services\TransferStockService;
 
 class TransferController extends Controller
@@ -72,6 +74,18 @@ class TransferController extends Controller
         $this->authorize('view', $transfer);
 
         return new TransferResource($transfer);
+    }
+
+    /**
+     * The transfer slip ready to print (GET /transfers/{id}/print) — no prices.
+     */
+    public function print(Request $request, string $id, TransferDocument $document, DocumentPrinter $printer)
+    {
+        $transfer = Transfer::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
+
+        $this->authorize('view', $transfer);
+
+        return $printer->respond($request, $document->build($transfer));
     }
 
     public function store(StoreTransferRequest $request)

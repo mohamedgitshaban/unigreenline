@@ -6,6 +6,7 @@ use Illuminate\Support\Carbon;
 use Modules\Accounting\Services\JournalPostingService;
 use Modules\Core\Exceptions\ImportRowException;
 use Modules\Core\Imports\ImportDefinition;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Models\Invoice;
 
@@ -60,8 +61,8 @@ class InvoiceImport extends ImportDefinition
             ->first()
             ?? throw new ImportRowException('customer', "No customer named \"{$row['customer']}\".");
 
-        if ($this->user->hasRole('Sales Rep') && $customer->sales_rep_id !== $this->user->id) {
-            throw new ImportRowException('customer', 'A Sales Rep can only import invoices for their own customers.');
+        if (! app(DataScope::class)->canSee($this->user, $customer->sales_rep_id)) {
+            throw new ImportRowException('customer', 'You can only import invoices for your own customers or those of your team.');
         }
 
         $subtotal = round((float) $row['subtotal'], 2);

@@ -33,6 +33,7 @@ class LegacyPermissionMap
         'end' => 'edit', 'assign-users' => 'edit', 'reverse' => 'edit', 'recalculate' => 'edit', 'check-in' => 'add', 'check-out' => 'add',
         'delete' => 'delete', 'void' => 'delete',
         'export' => 'export',
+        'print' => 'print',
         'approve' => 'approve', 'reject' => 'approve', 'receive' => 'approve', 'complete' => 'approve', 'pay' => 'approve',
         'upload-contract' => 'add|edit', 'upload-receipt' => 'add',
         'upload-invoice' => 'edit', 'quick-deliver' => 'add&edit',
@@ -44,6 +45,15 @@ class LegacyPermissionMap
         'reschedule' => 'edit', 'assign' => 'edit', 'restore' => 'edit', 'revise' => 'edit', 'dismiss' => 'edit', 'record' => 'edit',
         'create-backorder' => 'add', 'from-sales-order' => 'add', 'run' => 'add',
         'traceability' => 'view', 'history' => 'view', 'schedule' => 'view',
+        // Recruitment and fleet: working an applicant or a vehicle is `edit`; hiring someone is a decision.
+        'move' => 'edit', 'refuse' => 'edit', 'offer' => 'edit', 'upload-resume' => 'edit', 'add-note' => 'edit', 'record-result' => 'edit',
+        'mark-done' => 'edit', 'close' => 'edit', 'assign-driver' => 'edit', 'hire' => 'approve', 'resume' => 'view', 'cost-summary' => 'view',
+        // Fixed assets and loans: day-to-day bookkeeping is `edit`; selling an asset or repaying a loan early moves real money and needs sign-off.
+        'preview' => 'view', 'summary' => 'view', 'forecast' => 'view', 'due' => 'view',
+        'activate' => 'edit', 'post-depreciation' => 'edit', 'depreciate' => 'edit', 'modify' => 'edit', 'pay-installment' => 'edit',
+        'dispose' => 'approve', 'early-repay' => 'approve',
+        // Warehouse lenses and dashboards: reading, limited to the warehouses the user may see.
+        'movements' => 'view', 'incoming' => 'view', 'outgoing' => 'view', 'overview' => 'view',
         'costs' => 'audit',
     ];
 
@@ -55,6 +65,8 @@ class LegacyPermissionMap
     private const PERMISSION_CAPABILITY = [
         'users.view' => 'audit',
         'audit-log.view' => 'audit',
+        // Anyone's reporting line: never given by the grid, only granted by name (everyone can read their own at GET /team).
+        'users.team' => 'manage',
         'purchase-orders.upload-invoice' => 'approve',
         // What things cost in production is for the people who audit or sign off, like other cost figures.
         'manufacturing-cost-reports.view' => 'audit',
@@ -72,6 +84,7 @@ class LegacyPermissionMap
     private const IMPLIED = [
         'accounting.view' => ['suppliers.view', 'invoices.view', 'collections.view', 'ar-aging.view', 'ap-aging.view', 'supplier-payments.view'],
         'accounting.add' => ['collections.create', 'supplier-payments.create'],
+        'accounting.print' => ['invoices.print', 'collections.print'],
         'accounting.export' => ['suppliers.export', 'invoices.export', 'collections.export', 'expenses.export', 'recaps.export', 'supplier-payments.export'],
         'sales.view' => ['units.view', 'products.availability'],
         'purchasing.view' => ['units.view', 'returns.view'],

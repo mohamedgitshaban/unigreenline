@@ -10,11 +10,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\CRM\Database\Factories\CustomerVisitFactory;
+use Modules\CRM\Models\Concerns\VisibleToTeam;
 
 #[Fillable(['tenant_id', 'customer_id', 'rep_id', 'visit_date', 'type', 'outcome', 'notes', 'next_visit'])]
 class CustomerVisit extends Model
 {
-    use HasFactory, HasUlids;
+    use HasFactory, HasUlids, VisibleToTeam;
 
     public const UPDATED_AT = null;
 

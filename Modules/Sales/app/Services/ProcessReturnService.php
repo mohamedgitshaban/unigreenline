@@ -3,6 +3,7 @@
 namespace Modules\Sales\Services;
 
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Modules\Accounting\Services\JournalPostingService;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Models\Customer;
@@ -10,6 +11,7 @@ use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Purchasing\Models\Supplier;
 use Modules\Sales\Exceptions\ReturnBatchNotFoundException;
 use Modules\Sales\Models\ReturnRecord;
@@ -49,6 +51,7 @@ class ProcessReturnService
 
         return DB::transaction(function () use ($data, $restocked) {
             $stockValue = 0.0;
+            $data['return_id'] = (string) Str::ulid();
 
             if ($data['type'] === 'Purchase Return') {
                 $stockValue = $this->deductFromBatch($data);
@@ -56,7 +59,9 @@ class ProcessReturnService
                 $stockValue = $this->addToBatch($data);
             }
 
-            $return = ReturnRecord::create([
+            $return = new ReturnRecord;
+            $return->id = $data['return_id'];
+            $return->fill([
                 'tenant_id' => $data['tenant_id'],
                 'invoice_id' => $data['invoice_id'] ?? null,
                 'customer_id' => $data['customer_id'] ?? null,
@@ -73,6 +78,7 @@ class ProcessReturnService
                 'status' => 'completed',
                 'return_date' => $data['return_date'] ?? now()->toDateString(),
             ]);
+            $return->save();
 
             $this->postToLedger($return, $data, $stockValue);
 
@@ -187,7 +193,10 @@ class ProcessReturnService
 
         $value = $cartons * (float) $batch->cost_per_carton;
 
-        $batch->decrement('qty_cartons', $cartons);
+        StockMovementContext::run(
+            ['type' => 'return_to_supplier', 'reference_type' => 'return', 'reference_id' => $data['return_id'] ?? null, 'notes' => $data['reason'] ?? null],
+            fn () => $batch->decrement('qty_cartons', $cartons),
+        );
 
         if ($batch->fresh()->qty_cartons === 0) {
             $batch->delete();
@@ -217,7 +226,10 @@ class ProcessReturnService
             throw new ReturnBatchNotFoundException($data['product_id'], $data['warehouse_id'], $data['batch_no']);
         }
 
-        $batch->increment('qty_cartons', $cartons);
+        StockMovementContext::run(
+            ['type' => 'sale_return', 'reference_type' => 'return', 'reference_id' => $data['return_id'] ?? null, 'notes' => $data['reason'] ?? null],
+            fn () => $batch->increment('qty_cartons', $cartons),
+        );
 
         Warehouse::find($data['warehouse_id'])?->recalculateStockValue();
 

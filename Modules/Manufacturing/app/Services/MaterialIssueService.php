@@ -7,6 +7,7 @@ use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Services\StockReservationService;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Manufacturing\Exceptions\ManufacturingRuleException;
 use Modules\Manufacturing\Models\ProductionOrder;
 use Modules\Manufacturing\Models\ProductionOrderComponent;
@@ -33,7 +34,7 @@ class MaterialIssueService
             return [];
         }
 
-        return DB::transaction(function () use ($order, $component, $cartons) {
+        return StockMovementContext::run(['type' => 'production_consumption', 'reference_type' => 'production_order', 'reference_id' => $order->id], fn () => DB::transaction(function () use ($order, $component, $cartons) {
             $taken = [];
 
             foreach ($this->reservations->consume(MaterialReservationService::SOURCE, $order->id, $component->id, $cartons) as $row) {
@@ -91,6 +92,6 @@ class MaterialIssueService
             Warehouse::query()->find($order->warehouse_id)?->recalculateStockValue();
 
             return $taken;
-        });
+        }));
     }
 }

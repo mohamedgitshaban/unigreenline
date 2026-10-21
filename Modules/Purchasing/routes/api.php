@@ -2,11 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Purchasing\Http\Controllers\PurchaseOrderController;
+use Modules\Purchasing\Http\Controllers\PurchasingDashboardController;
 use Modules\Purchasing\Http\Controllers\ReportController;
 use Modules\Purchasing\Http\Controllers\SupplierController;
 use Modules\Purchasing\Http\Controllers\SupplierPaymentController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    Route::get('dashboards/purchasing', [PurchasingDashboardController::class, 'show'])->defaults('module', 'purchasing')->can('purchasing-dashboard.view');
     Route::get('suppliers', [SupplierController::class, 'index'])->can('suppliers.view')->exportable('suppliers.export');
     Route::post('suppliers/import', [SupplierController::class, 'import'])->can('suppliers.import');
     Route::get('suppliers/import-template', [SupplierController::class, 'importTemplate'])->can('suppliers.import');
@@ -23,6 +25,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('purchase-orders/pending-pricing', [PurchaseOrderController::class, 'pendingPricing'])->can('purchase-orders.pricing');
     Route::get('purchase-orders/{id}/invoice', [PurchaseOrderController::class, 'downloadInvoice'])->can('purchase-orders.view');
     Route::get('purchase-orders/{id}', [PurchaseOrderController::class, 'show'])->can('purchase-orders.view');
+    Route::get('purchase-orders/{id}/print', [PurchaseOrderController::class, 'print'])->can('purchase-orders.print');
     Route::get('purchase-orders/{id}/lines', [PurchaseOrderController::class, 'lines'])->can('purchase-orders.view');
     Route::put('purchase-orders/{purchaseOrder}', [PurchaseOrderController::class, 'update'])->can('purchase-orders.update');
     Route::put('purchase-orders/{purchaseOrder}/pricing', [PurchaseOrderController::class, 'price'])->can('purchase-orders.pricing');

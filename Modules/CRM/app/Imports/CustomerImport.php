@@ -6,6 +6,7 @@ use Illuminate\Validation\Rule;
 use Modules\Core\Exceptions\ImportRowException;
 use Modules\Core\Imports\ImportDefinition;
 use Modules\Core\Models\User;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 
 /**
@@ -92,10 +93,10 @@ class CustomerImport extends ImportDefinition
 
     private function resolveSalesRepId(?string $email): ?string
     {
-        $isSalesRep = $this->user->hasRole('Sales Rep');
+        $scope = app(DataScope::class);
 
         if ($email === null) {
-            return $isSalesRep ? $this->user->id : null;
+            return $scope->isTeamScoped($this->user) ? $this->user->id : null;
         }
 
         $rep = User::query()->where('tenant_id', $this->user->tenant_id)->where('email', $email)->first();
@@ -104,8 +105,8 @@ class CustomerImport extends ImportDefinition
             throw new ImportRowException('sales_rep_email', "No user with email {$email}.");
         }
 
-        if ($isSalesRep && $rep->id !== $this->user->id) {
-            throw new ImportRowException('sales_rep_email', 'A Sales Rep can only import customers under their own name.');
+        if (! $scope->canAssignTo($this->user, $rep->id)) {
+            throw new ImportRowException('sales_rep_email', 'You can only import customers under your own name or a member of your team.');
         }
 
         return $rep->id;

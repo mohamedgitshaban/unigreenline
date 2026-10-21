@@ -68,6 +68,8 @@ class LeadController extends Controller
 
         $lead = Lead::create($data);
 
+        $this->recordAudit($request, 'crm', 'Lead', $lead, 'INSERT', null, ['name' => $lead->name, 'assigned_to' => $lead->assigned_to, 'status' => $lead->status]);
+
         return (new LeadResource($lead))->response()->setStatusCode(201);
     }
 

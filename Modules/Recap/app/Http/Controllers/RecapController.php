@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Recap\Http\Requests\GenerateExpiredRecapsRequest;
 use Modules\Recap\Http\Requests\RejectRecapRequest;
@@ -14,6 +15,7 @@ use Modules\Recap\Http\Requests\StoreRecapRequest;
 use Modules\Recap\Http\Requests\UpdateRecapRequest;
 use Modules\Recap\Http\Resources\RecapResource;
 use Modules\Recap\Models\Recap;
+use Modules\Recap\Printing\RecapDocument;
 use Modules\Recap\Services\CreateRecapService;
 use Modules\Recap\Services\DeleteRecapService;
 use Modules\Recap\Services\ExpiredRecapGenerator;
@@ -65,6 +67,18 @@ class RecapController extends Controller
         $this->authorize('view', $recap);
 
         return new RecapResource($recap->load(self::RELATIONS));
+    }
+
+    /**
+     * The write-off slip ready to print (GET /recaps/{recap}/print).
+     */
+    public function print(Request $request, Recap $recap, RecapDocument $document, DocumentPrinter $printer)
+    {
+        abort_unless($recap->tenant_id === $request->user()->tenant_id, 404);
+
+        $this->authorize('view', $recap);
+
+        return $printer->respond($request, $document->build($recap, $request->user()));
     }
 
     /**

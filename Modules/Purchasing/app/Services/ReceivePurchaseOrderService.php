@@ -8,6 +8,7 @@ use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Services\GoodsReceiptService;
 use Modules\Inventory\Services\UnitConverter;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Purchasing\Exceptions\IncompleteReceiptException;
 use Modules\Purchasing\Exceptions\PurchaseOrderAlreadyReceivedException;
 use Modules\Purchasing\Exceptions\PurchaseOrderNotPricedException;
@@ -54,7 +55,7 @@ class ReceivePurchaseOrderService
             throw new IncompleteReceiptException;
         }
 
-        return DB::transaction(function () use ($po, $lines, $receiptsByLine, $actor, $invoiceData, $freeGifts) {
+        return StockMovementContext::run(['type' => 'purchase_receipt', 'reference_type' => 'purchase_order', 'reference_id' => $po->id, 'user_id' => $actor['actor_id'] ?? null], fn () => DB::transaction(function () use ($po, $lines, $receiptsByLine, $actor, $invoiceData, $freeGifts) {
             foreach ($lines as $line) {
                 $receipt = $receiptsByLine[$line->id];
 
@@ -129,6 +130,6 @@ class ReceivePurchaseOrderService
             ]);
 
             return $po->fresh(['lines']);
-        });
+        }));
     }
 }

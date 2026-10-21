@@ -23,6 +23,8 @@ class StoreUserRequest extends FormRequest
             'password' => ['required', 'string', 'min:8'],
             'role' => ['required', 'string', Rule::exists('roles', 'name')],
             'status' => ['sometimes', Rule::in(['active', 'inactive', 'suspended'])],
+            'manager_id' => ['nullable', 'string', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
+            'data_scope' => ['nullable', Rule::in(['all', 'team'])],
             'warehouse_ids' => ['sometimes', 'array'],
             'warehouse_ids.*' => ['string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
         ];

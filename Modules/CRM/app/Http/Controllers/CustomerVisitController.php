@@ -33,9 +33,13 @@ class CustomerVisitController extends Controller
         $this->authorize('viewAny', CustomerVisit::class);
 
         $query = CustomerVisit::query()
-            ->where('tenant_id', $request->user()->tenant_id);
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->visibleTo($request->user());
 
         $query->with(self::RELATIONS);
+
+        $query->when($request->filled('customer_id'), fn ($q) => $q->where('customer_id', $request->query('customer_id')))
+            ->when($request->filled('rep_id'), fn ($q) => $q->where('rep_id', $request->query('rep_id')));
 
         $this->applyFilters($request, $query, ['type', 'notes', 'customer.name', 'rep.name']);
 
@@ -68,6 +72,7 @@ class CustomerVisitController extends Controller
 
         $query = CustomerVisit::query()
             ->where('customer_id', $customer->id)
+            ->visibleTo($request->user())
             ->with(self::RELATIONS);
 
         $this->applyFilters($request, $query, ['type', 'notes', 'rep.name']);
@@ -98,6 +103,10 @@ class CustomerVisitController extends Controller
         $data['rep_id'] ??= $request->user()->id;
 
         $visit = CustomerVisit::create($data);
+
+        $this->recordAudit($request, 'crm', 'CustomerVisit', $visit, 'INSERT', null, [
+            'customer_id' => $visit->customer_id, 'rep_id' => $visit->rep_id, 'type' => $visit->type, 'notes' => $visit->notes,
+        ]);
 
         return (new CustomerVisitResource($visit))->response()->setStatusCode(201);
     }

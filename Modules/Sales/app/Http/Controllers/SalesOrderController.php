@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Http\Requests\StoreAndDeliverSalesOrderRequest;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
@@ -15,6 +16,7 @@ use Modules\Sales\Http\Requests\UpdateSalesOrderStatusRequest;
 use Modules\Sales\Http\Resources\SalesOrderLineResource;
 use Modules\Sales\Http\Resources\SalesOrderResource;
 use Modules\Sales\Models\SalesOrder;
+use Modules\Sales\Printing\SalesDocuments;
 use Modules\Sales\Services\CreateAndDeliverSalesOrderService;
 use Modules\Sales\Services\CreateSalesOrderService;
 use Modules\Sales\Services\DeleteSalesOrderService;
@@ -83,6 +85,18 @@ class SalesOrderController extends Controller
         $this->authorize('view', $salesOrder);
 
         return new SalesOrderResource($salesOrder);
+    }
+
+    /**
+     * The order ready to print (GET /sales-orders/{id}/print).
+     */
+    public function print(Request $request, string $id, SalesDocuments $documents, DocumentPrinter $printer)
+    {
+        $salesOrder = $this->findForTenant($request, $id);
+
+        $this->authorize('view', $salesOrder);
+
+        return $printer->respond($request, $documents->salesOrder($salesOrder));
     }
 
     /**

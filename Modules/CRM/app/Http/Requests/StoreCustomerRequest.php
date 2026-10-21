@@ -5,6 +5,7 @@ namespace Modules\CRM\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 
 class StoreCustomerRequest extends FormRequest
@@ -33,6 +34,7 @@ class StoreCustomerRequest extends FormRequest
             'credit_limit' => ['sometimes', 'numeric', 'min:0'],
             'pay_terms' => ['nullable', 'string', 'max:255'],
             'status' => ['sometimes', Rule::in(['active', 'inactive'])],
+            'allow_duplicate' => ['sometimes', 'boolean'],
         ];
     }
 
@@ -42,8 +44,8 @@ class StoreCustomerRequest extends FormRequest
             function (Validator $validator) {
                 $requested = $this->input('sales_rep_id');
 
-                if ($this->user()->hasRole('Sales Rep') && $requested && $requested !== $this->user()->id) {
-                    $validator->errors()->add('sales_rep_id', 'A Sales Rep can only create customers under their own name.');
+                if ($requested && ! app(DataScope::class)->canAssignTo($this->user(), $requested)) {
+                    $validator->errors()->add('sales_rep_id', 'You can only create customers under your own name or a member of your team.');
                 }
             },
         ];

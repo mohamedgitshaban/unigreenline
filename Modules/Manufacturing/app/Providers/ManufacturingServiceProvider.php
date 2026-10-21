@@ -4,15 +4,19 @@ namespace Modules\Manufacturing\Providers;
 
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Gate;
+use Modules\Core\Dashboards\Dashboard;
+use Modules\Core\Dashboards\DashboardRegistry;
 use Modules\Core\Policies\RoutePermissionPolicy;
 use Modules\Manufacturing\Console\Commands\RunMrpPlanning;
+use Modules\Manufacturing\Dashboards\PlanningSection;
+use Modules\Manufacturing\Dashboards\ProductionSection;
 use Modules\Manufacturing\Models\Bom;
 use Modules\Manufacturing\Models\MrpDemand;
+use Modules\Manufacturing\Models\ProductionOrder;
 use Modules\Manufacturing\Models\ProductPlanning;
 use Modules\Manufacturing\Models\QualityCheckDefinition;
 use Modules\Manufacturing\Models\Routing;
 use Modules\Manufacturing\Models\WorkCenter;
-use Modules\Manufacturing\Models\ProductionOrder;
 use Modules\Manufacturing\Policies\BomPolicy;
 use Modules\Manufacturing\Policies\ProductionOrderPolicy;
 use Nwidart\Modules\Support\ModuleServiceProvider;
@@ -59,6 +63,11 @@ class ManufacturingServiceProvider extends ModuleServiceProvider
         foreach ([WorkCenter::class, Routing::class, QualityCheckDefinition::class, ProductPlanning::class, MrpDemand::class] as $model) {
             Gate::policy($model, RoutePermissionPolicy::class);
         }
+
+        $dashboards = app(DashboardRegistry::class);
+        $dashboards->register(new Dashboard('manufacturing', 'Manufacturing', 'manufacturing-dashboard.view', 'Production orders, planning and quality.'));
+        $dashboards->section('manufacturing', app(ProductionSection::class));
+        $dashboards->section('manufacturing', app(PlanningSection::class));
     }
 
     /**

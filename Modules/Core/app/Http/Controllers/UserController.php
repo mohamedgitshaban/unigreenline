@@ -27,8 +27,9 @@ class UserController extends Controller
         $this->authorize('viewAny', User::class);
 
         $query = User::query()
-            ->with(['roles.permissions', 'permissions'])
+            ->with(['roles.permissions', 'permissions', 'manager:id,name'])
             ->where('tenant_id', $request->user()->tenant_id)
+            ->when($request->filled('manager_id'), fn ($query) => $query->where('manager_id', $request->query('manager_id')))
             ->when($request->filled('role'), fn ($query) => $query->role($request->query('role')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->query('status')));
 
@@ -57,6 +58,7 @@ class UserController extends Controller
     {
         $this->authorize('view', $user);
 
+        $user->load('manager:id,name');
         $user->setAttribute('warehouse_ids', $this->warehouseIds($user));
 
         return new UserResource($user);
@@ -72,6 +74,8 @@ class UserController extends Controller
             'email' => $data['email'],
             'password' => Hash::make($data['password']),
             'status' => $data['status'] ?? 'active',
+            'manager_id' => $data['manager_id'] ?? null,
+            'data_scope' => $data['data_scope'] ?? null,
         ]);
 
         $user->assignRole($data['role']);
@@ -85,11 +89,12 @@ class UserController extends Controller
             'user_id' => $request->user()->id,
             'user_name' => $request->user()->name,
             'tenant_id' => $request->user()->tenant_id,
-            'new_values' => ['name' => $user->name, 'email' => $user->email, 'role' => $data['role'], 'status' => $user->status],
+            'new_values' => ['name' => $user->name, 'email' => $user->email, 'role' => $data['role'], 'status' => $user->status, 'manager_id' => $user->manager_id],
             'ip_address' => $request->ip(),
         ]);
 
         $user->setAttribute('warehouse_ids', $this->warehouseIds($user));
+        $user->load('manager:id,name');
 
         return new UserResource($user);
     }
@@ -103,6 +108,7 @@ class UserController extends Controller
             'email' => $user->email,
             'role' => $user->getRoleNames()->first(),
             'status' => $user->status,
+            'manager_id' => $user->manager_id,
         ];
 
         $user->fill(collect($data)->except(['role', 'warehouse_ids'])->all());
@@ -130,11 +136,13 @@ class UserController extends Controller
                 'email' => $user->email,
                 'role' => $user->getRoleNames()->first(),
                 'status' => $user->status,
+                'manager_id' => $user->manager_id,
             ],
             'ip_address' => $request->ip(),
         ]);
 
         $user->setAttribute('warehouse_ids', $this->warehouseIds($user));
+        $user->load('manager:id,name');
 
         return new UserResource($user);
     }

@@ -7,10 +7,13 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
+use Modules\Core\Support\DataScope;
 use Modules\Sales\Http\Requests\StoreCollectionRequest;
 use Modules\Sales\Http\Resources\CollectionResource;
 use Modules\Sales\Models\Collection;
 use Modules\Sales\Models\Invoice;
+use Modules\Sales\Printing\SalesDocuments;
 use Modules\Sales\Services\CreateCollectionService;
 
 class CollectionController extends Controller
@@ -44,21 +47,16 @@ class CollectionController extends Controller
         'collectedBy.permissions',
     ];
 
-    public function __construct(private readonly CreateCollectionService $createCollection) {}
+    public function __construct(private readonly CreateCollectionService $createCollection, private readonly DataScope $scope) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Collection::class);
 
         $query = Collection::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->when(
-                $request->user()->hasRole('Sales Rep'),
-                fn ($query) => $query->whereHas(
-                    'invoice.salesOrder',
-                    fn ($q) => $q->where('sales_rep_id', $request->user()->id)
-                )
-            );
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->scope->constrainThrough($query, $request->user(), 'invoice.salesOrder', 'sales_rep_id');
 
         $query->with(self::RELATIONS);
 
@@ -128,5 +126,17 @@ class CollectionController extends Controller
         $this->authorize('view', $collection);
 
         return new CollectionResource($collection);
+    }
+
+    /**
+     * The payment receipt ready to print (GET /collections/{id}/print).
+     */
+    public function print(Request $request, string $id, SalesDocuments $documents, DocumentPrinter $printer)
+    {
+        $collection = Collection::query()->where('tenant_id', $request->user()->tenant_id)->with('invoice.salesOrder')->findOrFail($id);
+
+        $this->authorize('view', $collection);
+
+        return $printer->respond($request, $documents->collection($collection));
     }
 }

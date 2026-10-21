@@ -3,6 +3,7 @@
 namespace Modules\Sales\Policies;
 
 use Modules\Core\Models\User;
+use Modules\Core\Support\DataScope;
 use Modules\Sales\Models\Collection;
 
 /**
@@ -12,6 +13,8 @@ use Modules\Sales\Models\Collection;
  */
 class CollectionPolicy
 {
+    public function __construct(private readonly DataScope $scope) {}
+
     public function viewAny(User $user): bool
     {
         return true;
@@ -19,12 +22,7 @@ class CollectionPolicy
 
     public function view(User $user, Collection $collection): bool
     {
-
-        if ($user->hasRole('Sales Rep')) {
-            return $collection->invoice->salesOrder?->sales_rep_id === $user->id;
-        }
-
-        return true;
+        return $this->scope->canSee($user, $collection->invoice->salesOrder?->sales_rep_id);
     }
 
     public function create(User $user): bool

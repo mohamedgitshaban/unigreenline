@@ -3,7 +3,12 @@
 namespace Modules\CRM\Policies;
 
 use Modules\Core\Models\User;
+use Modules\CRM\Models\CustomerVisit;
 
+/**
+ * Visits are visible to whoever logged them, their managers up the reporting line, and whoever owns the customer.
+ * Tenant scoping is enforced in the controller.
+ */
 class CustomerVisitPolicy
 {
     public function viewAny(User $user): bool
@@ -11,12 +16,9 @@ class CustomerVisitPolicy
         return true;
     }
 
-    /**
-     * Tenant scoping is enforced in the controller, not here.
-     */
-    public function view(User $user): bool
+    public function view(User $user, CustomerVisit $visit): bool
     {
-        return true;
+        return $visit->isVisibleTo($user);
     }
 
     public function create(User $user): bool
@@ -24,13 +26,13 @@ class CustomerVisitPolicy
         return true;
     }
 
-    public function update(User $user): bool
+    public function update(User $user, CustomerVisit $visit): bool
     {
-        return true;
+        return $visit->isVisibleTo($user);
     }
 
-    public function delete(User $user): bool
+    public function delete(User $user, CustomerVisit $visit): bool
     {
-        return true;
+        return $visit->isVisibleTo($user);
     }
 }

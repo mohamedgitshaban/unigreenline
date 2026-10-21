@@ -31,12 +31,12 @@ class AccountManagementTest extends TestCase
         $this->actingAsRole('Administrator');
         $parent = Account::factory()->recycle($this->tenant)->create(['code' => '6000', 'level' => 1, 'type' => 'Expense']);
 
-        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6500', 'name' => 'Fuel', 'type' => 'Expense', 'parent_id' => $parent->id])
+        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6800', 'name' => 'Fuel', 'type' => 'Expense', 'parent_id' => $parent->id])
             ->assertCreated()
             ->assertJsonPath('data.level', 2)
             ->assertJsonPath('data.parent.code', '6000');
 
-        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6500', 'name' => 'Dup', 'type' => 'Expense'])
+        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6800', 'name' => 'Dup', 'type' => 'Expense'])
             ->assertUnprocessable()
             ->assertJsonValidationErrors('code');
     }
@@ -44,7 +44,7 @@ class AccountManagementTest extends TestCase
     public function test_renames_and_deactivates_an_account(): void
     {
         $this->actingAsRole('Accountant');
-        $account = Account::factory()->recycle($this->tenant)->create(['code' => '6500', 'type' => 'Expense']);
+        $account = Account::factory()->recycle($this->tenant)->create(['code' => '6800', 'type' => 'Expense']);
 
         $this->putJson("/api/v1/chart-of-accounts/{$account->id}", ['name' => 'Vehicle fuel', 'active' => false])
             ->assertOk()
@@ -56,9 +56,9 @@ class AccountManagementTest extends TestCase
     {
         $this->actingAsRole('Administrator');
         $system = Account::factory()->recycle($this->tenant)->create(['code' => '1300', 'type' => 'Asset']);
-        $used = Account::factory()->recycle($this->tenant)->create(['code' => '6500', 'type' => 'Expense']);
+        $used = Account::factory()->recycle($this->tenant)->create(['code' => '6800', 'type' => 'Expense']);
         $entry = JournalEntry::create(['tenant_id' => $this->tenant->id, 'ref' => 'x', 'description' => 'x', 'entry_date' => now(), 'posted' => true]);
-        $entry->lines()->create(['account_id' => $used->id, 'account_code' => '6500', 'account_name' => 'x', 'debit' => 1, 'credit' => 0]);
+        $entry->lines()->create(['account_id' => $used->id, 'account_code' => '6800', 'account_name' => 'x', 'debit' => 1, 'credit' => 0]);
 
         $this->putJson("/api/v1/chart-of-accounts/{$system->id}", ['code' => '1301'])->assertUnprocessable()->assertJsonValidationErrors('code');
         $this->putJson("/api/v1/chart-of-accounts/{$used->id}", ['type' => 'Asset'])->assertUnprocessable()->assertJsonValidationErrors('type');
@@ -68,13 +68,13 @@ class AccountManagementTest extends TestCase
     public function test_only_unused_non_system_leaf_accounts_can_be_deleted(): void
     {
         $this->actingAsRole('Administrator');
-        $free = Account::factory()->recycle($this->tenant)->create(['code' => '6500', 'type' => 'Expense']);
+        $free = Account::factory()->recycle($this->tenant)->create(['code' => '6800', 'type' => 'Expense']);
         $system = Account::factory()->recycle($this->tenant)->create(['code' => '1300', 'type' => 'Asset']);
         $parent = Account::factory()->recycle($this->tenant)->create(['code' => '6000', 'type' => 'Expense']);
         Account::factory()->recycle($this->tenant)->create(['code' => '6100', 'type' => 'Expense', 'parent_id' => $parent->id]);
-        $used = Account::factory()->recycle($this->tenant)->create(['code' => '6600', 'type' => 'Expense']);
+        $used = Account::factory()->recycle($this->tenant)->create(['code' => '6810', 'type' => 'Expense']);
         $entry = JournalEntry::create(['tenant_id' => $this->tenant->id, 'ref' => 'x', 'description' => 'x', 'entry_date' => now(), 'posted' => true]);
-        $entry->lines()->create(['account_id' => $used->id, 'account_code' => '6600', 'account_name' => 'x', 'debit' => 1, 'credit' => 0]);
+        $entry->lines()->create(['account_id' => $used->id, 'account_code' => '6810', 'account_name' => 'x', 'debit' => 1, 'credit' => 0]);
 
         $this->deleteJson("/api/v1/chart-of-accounts/{$free->id}")->assertNoContent();
         $this->deleteJson("/api/v1/chart-of-accounts/{$system->id}")->assertConflict();
@@ -87,11 +87,11 @@ class AccountManagementTest extends TestCase
 
     public function test_writes_follow_accounting_permissions_and_tenant(): void
     {
-        $account = Account::factory()->recycle($this->tenant)->create(['code' => '6500', 'type' => 'Expense']);
+        $account = Account::factory()->recycle($this->tenant)->create(['code' => '6800', 'type' => 'Expense']);
 
         $this->actingAsRole('Accountant');
         $this->deleteJson("/api/v1/chart-of-accounts/{$account->id}")->assertForbidden();
-        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6700', 'name' => 'Ok', 'type' => 'Expense'])->assertCreated();
+        $this->postJson('/api/v1/chart-of-accounts', ['code' => '6820', 'name' => 'Ok', 'type' => 'Expense'])->assertCreated();
 
         $this->actingAsRole('Auditor');
         $this->putJson("/api/v1/chart-of-accounts/{$account->id}", ['name' => 'No'])->assertForbidden();

@@ -9,11 +9,14 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
 use Modules\Core\Services\AuditLogService;
+use Modules\Core\Support\DataScope;
 use Modules\Sales\Http\Requests\DeliverDeliveryRequest;
 use Modules\Sales\Http\Requests\UploadDeliveryInvoiceRequest;
 use Modules\Sales\Http\Resources\DeliveryResource;
 use Modules\Sales\Models\Delivery;
+use Modules\Sales\Printing\SalesDocuments;
 
 class DeliveryController extends Controller
 {
@@ -55,18 +58,16 @@ class DeliveryController extends Controller
         'customer.salesRep.permissions',
     ];
 
-    public function __construct(private readonly AuditLogService $auditLog) {}
+    public function __construct(private readonly AuditLogService $auditLog, private readonly DataScope $scope) {}
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Delivery::class);
 
         $query = Delivery::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->when(
-                $request->user()->hasRole('Sales Rep'),
-                fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
-            );
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->scope->constrainThrough($query, $request->user(), 'salesOrder', 'sales_rep_id');
 
         $query->with(self::RELATIONS);
 
@@ -88,11 +89,25 @@ class DeliveryController extends Controller
         return DeliveryResource::collection($deliveries);
     }
 
-    public function show(Delivery $delivery)
+    public function show(Request $request, Delivery $delivery)
     {
+        abort_unless($delivery->tenant_id === $request->user()->tenant_id, 404);
+
         $this->authorize('view', $delivery);
 
         return new DeliveryResource($delivery);
+    }
+
+    /**
+     * The delivery note ready to print (GET /deliveries/{id}/print) — quantities and batches, no prices.
+     */
+    public function print(Request $request, string $id, SalesDocuments $documents, DocumentPrinter $printer)
+    {
+        $delivery = Delivery::query()->where('tenant_id', $request->user()->tenant_id)->with('salesOrder')->findOrFail($id);
+
+        $this->authorize('view', $delivery);
+
+        return $printer->respond($request, $documents->delivery($delivery));
     }
 
     /**
@@ -101,6 +116,8 @@ class DeliveryController extends Controller
      */
     public function deliver(DeliverDeliveryRequest $request, Delivery $delivery)
     {
+        abort_unless($delivery->tenant_id === $request->user()->tenant_id, 404);
+
         $oldInvoice = $delivery->invoice_data;
 
         DB::transaction(function () use ($request, $delivery) {

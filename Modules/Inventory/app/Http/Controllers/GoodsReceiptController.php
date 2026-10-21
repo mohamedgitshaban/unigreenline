@@ -9,6 +9,7 @@ use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\GoodsReceiptRequest;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Services\GoodsReceiptService;
+use Modules\Inventory\Support\StockMovementContext;
 
 class GoodsReceiptController extends Controller
 {
@@ -24,7 +25,7 @@ class GoodsReceiptController extends Controller
         $data['tenant_id'] = $request->user()->tenant_id;
 
         $batch = DB::transaction(function () use ($data, $request) {
-            $batch = $this->goodsReceipt->receive($data);
+            $batch = StockMovementContext::run(['type' => 'goods_receipt', 'user_id' => $request->user()->id], fn () => $this->goodsReceipt->receive($data));
 
             // Stock that arrives without a purchase order has no supplier to owe, so its value
             // goes in against Opening Balance Equity: Dr Inventory / Cr Opening Balance Equity.

@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Sales\Database\Factories\SalesOrderFactory;
@@ -76,17 +77,14 @@ class SalesOrder extends Model
     }
 
     /**
-     * Ownership scoping (spec §2): a Sales Rep sees only their own orders.
-     * Any other role holding sales.view permission sees every order.
+     * Ownership scoping (spec §2): a user whose data scope is `team` (a Sales Rep by default) sees only
+     * the orders of themselves and of everyone who reports to them; any other user holding
+     * sales.view permission sees every order. See {@see DataScope}.
      */
     #[Scope]
     protected function visibleTo(Builder $query, User $user): Builder
     {
-        if ($user->hasRole('Sales Rep')) {
-            return $query->where('sales_rep_id', $user->id);
-        }
-
-        return $query;
+        return app(DataScope::class)->constrain($query, $user, 'sales_rep_id');
     }
 
     protected static function newFactory(): SalesOrderFactory

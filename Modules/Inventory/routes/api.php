@@ -2,19 +2,28 @@
 
 use Illuminate\Support\Facades\Route;
 use Modules\Inventory\Http\Controllers\GoodsReceiptController;
+use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\ProductCategoryController;
 use Modules\Inventory\Http\Controllers\ProductController;
 use Modules\Inventory\Http\Controllers\TransferController;
 use Modules\Inventory\Http\Controllers\UnitController;
+use Modules\Inventory\Http\Controllers\WarehouseActivityController;
 use Modules\Inventory\Http\Controllers\WarehouseController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    Route::get('dashboards/inventory', [InventoryDashboardController::class, 'show'])->defaults('module', 'inventory')->can('inventory-dashboard.view');
     Route::get('warehouses', [WarehouseController::class, 'index'])->can('warehouses.view')->exportable('warehouses.export');
     Route::post('warehouses/import', [WarehouseController::class, 'import'])->can('warehouses.import');
     Route::get('warehouses/import-template', [WarehouseController::class, 'importTemplate'])->can('warehouses.import');
     Route::post('warehouses', [WarehouseController::class, 'store'])->can('warehouses.create');
     Route::get('warehouses/{id}', [WarehouseController::class, 'show'])->can('warehouses.view');
     Route::get('warehouses/{id}/batches', [WarehouseController::class, 'batches'])->can('warehouses.view');
+    Route::get('warehouses/{id}/overview', [WarehouseActivityController::class, 'overview'])->can('warehouses.overview');
+    Route::get('warehouses/{id}/movements', [WarehouseActivityController::class, 'movements'])->can('warehouses.movements')->exportable('warehouses.export');
+    Route::get('warehouses/{id}/incoming', [WarehouseActivityController::class, 'incoming'])->can('warehouses.incoming');
+    Route::get('warehouses/{id}/outgoing', [WarehouseActivityController::class, 'outgoing'])->can('warehouses.outgoing');
+    Route::get('warehouses/{id}/users', [WarehouseActivityController::class, 'users'])->can('warehouses.view');
+    Route::put('warehouses/{id}/users', [WarehouseActivityController::class, 'assignUsers'])->can('warehouses.assign-users');
     Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->can('warehouses.update');
     Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->can('warehouses.delete');
 
@@ -24,6 +33,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('products', [ProductController::class, 'store'])->can('products.create');
     Route::get('products/{id}', [ProductController::class, 'show'])->can('products.view');
     Route::get('products/{id}/batches', [ProductController::class, 'batches'])->can('products.view');
+    Route::get('products/{id}/movements', [WarehouseActivityController::class, 'productMovements'])->can('products.movements')->exportable('products.export');
     Route::get('products/{id}/availability', [ProductController::class, 'availability'])->can('products.availability');
     Route::put('products/{product}', [ProductController::class, 'update'])->can('products.update');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->can('products.delete');
@@ -45,4 +55,5 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('transfers', [TransferController::class, 'index'])->can('transfers.view')->exportable('transfers.export');
     Route::post('transfers', [TransferController::class, 'store'])->can('transfers.create');
     Route::get('transfers/{id}', [TransferController::class, 'show'])->can('transfers.view');
+    Route::get('transfers/{id}/print', [TransferController::class, 'print'])->can('transfers.print');
 });

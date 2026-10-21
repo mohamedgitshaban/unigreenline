@@ -5,6 +5,7 @@ namespace Modules\Sales\Http\Requests;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use Modules\Core\Support\DataScope;
 
 class UpdateSalesOrderRequest extends FormRequest
 {
@@ -67,8 +68,8 @@ class UpdateSalesOrderRequest extends FormRequest
     {
         $requested = $this->input('sales_rep_id');
 
-        if ($this->user()->hasRole('Sales Rep') && $requested && $requested !== $this->user()->id) {
-            $validator->errors()->add('sales_rep_id', 'A Sales Rep can only create orders under their own name.');
+        if ($requested && ! app(DataScope::class)->canAssignTo($this->user(), $requested)) {
+            $validator->errors()->add('sales_rep_id', 'You can only create orders under your own name or a member of your team.');
         }
     }
 }

@@ -10,6 +10,8 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Http\Resources\InvoiceResource;
 use Modules\Sales\Http\Resources\SalesOrderLineResource;
@@ -17,6 +19,7 @@ use Modules\Sales\Imports\InvoiceImport;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Models\SalesOrderLine;
+use Modules\Sales\Printing\SalesDocuments;
 use Modules\Sales\Services\VoidInvoiceService;
 
 class InvoiceController extends Controller
@@ -42,16 +45,16 @@ class InvoiceController extends Controller
         'customer.salesRep.permissions',
     ];
 
+    public function __construct(private readonly DataScope $scope) {}
+
     public function index(Request $request)
     {
         $this->authorize('viewAny', Invoice::class);
 
         $query = Invoice::query()
-            ->where('tenant_id', $request->user()->tenant_id)
-            ->when(
-                $request->user()->hasRole('Sales Rep'),
-                fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
-            );
+            ->where('tenant_id', $request->user()->tenant_id);
+
+        $this->scope->constrainThrough($query, $request->user(), 'salesOrder', 'sales_rep_id');
 
         $query->with(self::RELATIONS)->withCount('collections')->addSelect(['lines_count' => self::linesCount()]);
 
@@ -114,6 +117,18 @@ class InvoiceController extends Controller
     }
 
     /**
+     * The invoice ready to print (GET /invoices/{id}/print); `?format=json` returns the same content as data.
+     */
+    public function print(Request $request, string $id, SalesDocuments $documents, DocumentPrinter $printer)
+    {
+        $invoice = Invoice::query()->where('tenant_id', $request->user()->tenant_id)->with('salesOrder')->findOrFail($id);
+
+        $this->authorize('view', $invoice);
+
+        return $printer->respond($request, $documents->invoice($invoice));
+    }
+
+    /**
      * A sales order's invoices as a paginated list (GET /sales-orders/{id}/invoices).
      */
     public function forSalesOrder(Request $request, string $id)
@@ -139,11 +154,9 @@ class InvoiceController extends Controller
         $this->authorize('view', $customer);
 
         $query = Invoice::query()
-            ->where('customer_id', $customer->id)
-            ->when(
-                $request->user()->hasRole('Sales Rep'),
-                fn ($query) => $query->whereHas('salesOrder', fn ($q) => $q->where('sales_rep_id', $request->user()->id))
-            );
+            ->where('customer_id', $customer->id);
+
+        $this->scope->constrainThrough($query, $request->user(), 'salesOrder', 'sales_rep_id');
 
         return $this->paginatedList($request, $query);
     }

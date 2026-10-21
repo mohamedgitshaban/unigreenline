@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Core\Printing\DocumentPrinter;
 use Modules\Purchasing\Http\Requests\PricePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\ReceivePurchaseOrderRequest;
 use Modules\Purchasing\Http\Requests\StorePurchaseOrderRequest;
@@ -16,6 +17,7 @@ use Modules\Purchasing\Http\Requests\UploadPurchaseOrderInvoiceRequest;
 use Modules\Purchasing\Http\Resources\PurchaseOrderLineResource;
 use Modules\Purchasing\Http\Resources\PurchaseOrderResource;
 use Modules\Purchasing\Models\PurchaseOrder;
+use Modules\Purchasing\Printing\PurchaseOrderDocument;
 use Modules\Purchasing\Services\CreatePurchaseOrderService;
 use Modules\Purchasing\Services\DeletePurchaseOrderService;
 use Modules\Purchasing\Services\PricePurchaseOrderService;
@@ -81,6 +83,18 @@ class PurchaseOrderController extends Controller
         $this->authorize('view', $purchaseOrder);
 
         return new PurchaseOrderResource($purchaseOrder);
+    }
+
+    /**
+     * The purchase order ready to print (GET /purchase-orders/{id}/print).
+     */
+    public function print(Request $request, string $id, PurchaseOrderDocument $document, DocumentPrinter $printer)
+    {
+        $purchaseOrder = $this->findForTenant($request, $id);
+
+        $this->authorize('view', $purchaseOrder);
+
+        return $printer->respond($request, $document->build($purchaseOrder));
     }
 
     /**

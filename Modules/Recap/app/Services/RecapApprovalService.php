@@ -7,6 +7,7 @@ use Modules\Accounting\Services\JournalPostingService;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Recap\Exceptions\RecapNotDraftException;
 use Modules\Recap\Exceptions\RecapStockShortageException;
 use Modules\Recap\Models\Recap;
@@ -43,7 +44,10 @@ class RecapApprovalService
                     throw new RecapStockShortageException($batch->batch_no, $line->qty_cartons, $batch->freeCartons());
                 }
 
-                $batch->decrement('qty_cartons', $line->qty_cartons);
+                StockMovementContext::run(
+                    ['type' => 'write_off', 'reference_type' => 'recap', 'reference_id' => $locked->id, 'notes' => $locked->reason],
+                    fn () => $batch->decrement('qty_cartons', $line->qty_cartons),
+                );
 
                 $value = round($line->qty_cartons * (float) $batch->cost_per_carton, 2);
                 $line->update(['cost_per_carton' => $batch->cost_per_carton, 'line_value' => $value]);

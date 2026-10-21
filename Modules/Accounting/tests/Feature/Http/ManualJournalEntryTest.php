@@ -131,7 +131,8 @@ class ManualJournalEntryTest extends TestCase
         $this->assertNull($byCode['1110']['attention']);
         $this->assertSame('custom', $byCode['7000']['kind']);
         $this->assertSame('custom account with no postings', $byCode['7000']['attention']);
-        $this->assertSame('manual', $byCode['1510']['kind']);
+        $this->assertSame('manual', $byCode['4200']['kind']);
+        $this->assertSame('posted', $byCode['1590']['kind']);
     }
 
     /**

@@ -104,6 +104,10 @@ class WarehouseController extends Controller
 
         $warehouse = Warehouse::create($data);
 
+        if ($warehouse->manager_id) {
+            $warehouse->users()->syncWithoutDetaching([$warehouse->manager_id]);
+        }
+
         $this->auditLog->record([
             'module' => 'inventory',
             'entity_type' => 'Warehouse',
@@ -129,6 +133,10 @@ class WarehouseController extends Controller
 
         $prevValues = $warehouse->only(array_keys($data));
         $warehouse->update($data);
+
+        if (! empty($data['manager_id'])) {
+            $warehouse->users()->syncWithoutDetaching([$data['manager_id']]);
+        }
 
         $this->auditLog->record([
             'module' => 'inventory',

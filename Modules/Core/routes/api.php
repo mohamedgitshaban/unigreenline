@@ -4,9 +4,11 @@ use Illuminate\Support\Facades\Route;
 use Modules\Core\Http\Controllers\AuditLogController;
 use Modules\Core\Http\Controllers\Auth\AuthController;
 use Modules\Core\Http\Controllers\CityController;
+use Modules\Core\Http\Controllers\DashboardController;
 use Modules\Core\Http\Controllers\DiscardedActionController;
 use Modules\Core\Http\Controllers\NotificationController;
 use Modules\Core\Http\Controllers\RoleController;
+use Modules\Core\Http\Controllers\TeamController;
 use Modules\Core\Http\Controllers\UserController;
 
 Route::prefix('v1/auth')->group(function () {
@@ -38,8 +40,13 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::post('audit-log/verify-integrity', [AuditLogController::class, 'verifyIntegrity'])->can('audit-log.verify');
     Route::get('audit-log/{id}', [AuditLogController::class, 'show'])->can('audit-log.view');
 
+    Route::get('team', [TeamController::class, 'mine']);
+    Route::get('dashboards', [DashboardController::class, 'index']);
+    Route::get('users/{user}/team', [TeamController::class, 'of'])->can('users.team');
     Route::get('notifications', [NotificationController::class, 'index']);
     Route::put('notifications/read-all', [NotificationController::class, 'readAll']);
+    Route::get('notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::put('notifications/{id}/read', [NotificationController::class, 'read']);
     Route::get('notifications/{id}', [NotificationController::class, 'show']);
 
     Route::get('discarded-actions', [DiscardedActionController::class, 'index'])->can('discarded-actions.view')->exportable('discarded-actions.export');

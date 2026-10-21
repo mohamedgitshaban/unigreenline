@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Manufacturing\Http\Controllers\BomController;
 use Modules\Manufacturing\Http\Controllers\ManufacturingAttachmentController;
+use Modules\Manufacturing\Http\Controllers\ManufacturingDashboardController;
 use Modules\Manufacturing\Http\Controllers\ManufacturingReportController;
 use Modules\Manufacturing\Http\Controllers\ManufacturingSettingsController;
 use Modules\Manufacturing\Http\Controllers\MrpController;
@@ -18,6 +19,7 @@ use Modules\Manufacturing\Http\Controllers\WorkCenterController;
 use Modules\Manufacturing\Http\Controllers\WorkOrderController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    Route::get('dashboards/manufacturing', [ManufacturingDashboardController::class, 'show'])->defaults('module', 'manufacturing')->can('manufacturing-dashboard.view');
     Route::get('manufacturing/settings', [ManufacturingSettingsController::class, 'show'])->can('manufacturing-settings.view');
     Route::put('manufacturing/settings', [ManufacturingSettingsController::class, 'update'])->can('manufacturing-settings.update');
 

@@ -3,8 +3,10 @@
 use Illuminate\Support\Facades\Route;
 use Modules\Expenses\Http\Controllers\ExpenseCategoryController;
 use Modules\Expenses\Http\Controllers\ExpenseController;
+use Modules\Expenses\Http\Controllers\ExpensesDashboardController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
+    Route::get('dashboards/expenses', [ExpensesDashboardController::class, 'show'])->defaults('module', 'expenses')->can('expenses-dashboard.view');
     Route::get('expense-categories', [ExpenseCategoryController::class, 'index'])->can('expense-categories.view');
     Route::post('expense-categories', [ExpenseCategoryController::class, 'store'])->can('expense-categories.create');
     Route::put('expense-categories/{expenseCategory}', [ExpenseCategoryController::class, 'update'])->can('expense-categories.update');

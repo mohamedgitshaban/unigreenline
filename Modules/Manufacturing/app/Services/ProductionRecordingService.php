@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\DB;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Manufacturing\Events\FinishedGoodsReceived;
 use Modules\Manufacturing\Events\MaterialsConsumed;
 use Modules\Manufacturing\Exceptions\BatchNumberTakenException;
@@ -422,18 +423,21 @@ class ProductionRecordingService
 
         $unit = round($value / $qty, 2);
 
-        $batch = InventoryBatch::create([
-            'tenant_id' => $order->tenant_id,
-            'product_id' => $productId,
-            'warehouse_id' => $warehouseId,
-            'batch_no' => $batchNo,
-            'mfg_date' => $input['mfg_date'] ?? $order->mfg_date ?? $order->production_date,
-            'exp_date' => $exp,
-            'rcv_date' => now()->toDateString(),
-            'qty_cartons' => $qty,
-            'qty_packs' => 0,
-            'cost_per_carton' => $unit,
-        ]);
+        $batch = StockMovementContext::run(
+            ['type' => $kind === 'finished' ? 'production_output' : 'production_by_product', 'reference_type' => 'production_order', 'reference_id' => $order->id],
+            fn () => InventoryBatch::create([
+                'tenant_id' => $order->tenant_id,
+                'product_id' => $productId,
+                'warehouse_id' => $warehouseId,
+                'batch_no' => $batchNo,
+                'mfg_date' => $input['mfg_date'] ?? $order->mfg_date ?? $order->production_date,
+                'exp_date' => $exp,
+                'rcv_date' => now()->toDateString(),
+                'qty_cartons' => $qty,
+                'qty_packs' => 0,
+                'cost_per_carton' => $unit,
+            ]),
+        );
 
         return ProductionOutput::create([
             'production_order_id' => $order->id,

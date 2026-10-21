@@ -22,13 +22,51 @@ class NotificationController extends Controller
             ->where('tenant_id', $user->tenant_id)
             ->where(fn (Builder $query) => $query->where('user_id', $user->id)->orWhereNull('user_id'));
 
-        $this->applyFilters($request, $query, ['title', 'body', 'type']);
+        $query->when($request->filled('unread'), fn (Builder $q) => $q->where('unread', $request->boolean('unread')))
+            ->when($request->filled('module'), fn (Builder $q) => $q->where('link_module', $request->query('module')))
+            ->when($request->filled('type'), fn (Builder $q) => $q->where('type', $request->query('type')));
+
+        $this->applyFilters($request, $query, ['title', 'body']);
 
         $this->applySorting($request, $query);
 
         $notifications = $query->paginate($request->integer('per_page', 15))->withQueryString();
 
         return NotificationResource::collection($notifications);
+    }
+
+    /**
+     * How many notifications are unread, in total and per module (GET /notifications/unread-count).
+     */
+    public function unreadCount(Request $request)
+    {
+        $user = $request->user();
+
+        $perModule = Notification::query()
+            ->where('tenant_id', $user->tenant_id)
+            ->where(fn (Builder $query) => $query->where('user_id', $user->id)->orWhereNull('user_id'))
+            ->where('unread', true)
+            ->selectRaw('link_module, count(*) as total')
+            ->groupBy('link_module')
+            ->pluck('total', 'link_module');
+
+        return response()->json(['data' => ['total' => (int) $perModule->sum(), 'by_module' => $perModule->map(fn ($n) => (int) $n)]]);
+    }
+
+    /**
+     * Marks one of the caller's own notifications read (PUT /notifications/{id}/read). A broadcast
+     * (no user_id) is shared state and is left to read-all.
+     */
+    public function read(Request $request, string $id)
+    {
+        $notification = Notification::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->where('user_id', $request->user()->id)
+            ->findOrFail($id);
+
+        $notification->update(['unread' => false]);
+
+        return new NotificationResource($notification);
     }
 
     /**

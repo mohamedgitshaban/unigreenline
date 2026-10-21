@@ -12,10 +12,13 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Modules\Core\Console\Commands\DocumentPermissions;
 use Modules\Core\Console\Commands\VerifyAuditChain;
+use Modules\Core\Dashboards\DashboardRegistry;
 use Modules\Core\Models\User;
+use Modules\Core\Notifications\ChangeNotificationRegistry;
 use Modules\Core\Policies\RolePolicy;
 use Modules\Core\Policies\UserPolicy;
 use Modules\Core\Services\AuditLogService;
+use Modules\Core\Support\DataScope;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 use RuntimeException;
 use Spatie\Permission\Models\Role;
@@ -75,6 +78,11 @@ class CoreServiceProvider extends ModuleServiceProvider
             return $this;
         });
 
+        // Who may see whose records; the reporting tree is read once per request.
+        $this->app->scoped(DataScope::class);
+        $this->app->singleton(ChangeNotificationRegistry::class);
+        $this->app->singleton(DashboardRegistry::class);
+
         $this->app->singleton(AuditLogService::class, function () {
             $hmacKey = config('audit.hmac_key');
 
@@ -91,6 +99,8 @@ class CoreServiceProvider extends ModuleServiceProvider
     public function boot(): void
     {
         parent::boot();
+
+        $this->loadViewsFrom(dirname(__DIR__, 2).'/resources/views', 'core');
 
         // Pure JSON API — there is no web login page to redirect guests to.
         Authenticate::redirectUsing(fn () => null);

@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\Inventory\Database\Factories\WarehouseFactory;
+use Modules\Inventory\Support\WarehouseAccess;
 
 #[Fillable([
     'tenant_id', 'name', 'city', 'governorate', 'address', 'manager_id', 'manager_name',
@@ -58,31 +59,24 @@ class Warehouse extends Model
     }
 
     /**
-     * Warehouse-level scoping (spec §2, layer 1): a user assigned to specific
-     * warehouses only sees those, unless they hold a role with oversight
-     * across the whole tenant. This is a plain Eloquent scope/method, not a
-     * Gate/Policy check, so CoreServiceProvider's `Gate::before` bypass for
-     * Administrator never reaches it — Administrator must be listed here
-     * explicitly too, or "full system access" (spec §2) silently excludes
-     * every warehouse-scoped read/write.
+     * Warehouse-level scoping (spec §2, layer 1): a user sees the warehouses they are
+     * assigned to or manage, and those of everyone who reports to them, unless they hold
+     * a role with oversight across the whole tenant (see {@see WarehouseAccess}). This is
+     * a plain Eloquent scope/method, not a Gate/Policy check, so CoreServiceProvider's
+     * `Gate::before` bypass for Administrator never reaches it — the roles with full
+     * access are listed in WarehouseAccess explicitly.
      */
     #[Scope]
     protected function visibleTo(Builder $query, User $user): Builder
     {
-        if ($user->hasAnyRole(['Administrator', 'Owner', 'Auditor'])) {
-            return $query;
-        }
+        $ids = app(WarehouseAccess::class)->idsFor($user);
 
-        return $query->whereHas('users', fn (Builder $q) => $q->whereKey($user->id));
+        return $ids === null ? $query : $query->whereIn($query->qualifyColumn('id'), $ids);
     }
 
     public function isVisibleTo(User $user): bool
     {
-        if ($user->hasAnyRole(['Administrator', 'Owner', 'Auditor'])) {
-            return true;
-        }
-
-        return $this->users()->whereKey($user->id)->exists();
+        return app(WarehouseAccess::class)->canSee($user, $this->id);
     }
 
     /**

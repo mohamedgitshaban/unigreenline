@@ -5,6 +5,7 @@ namespace Modules\Core\Services;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Modules\Core\Events\AuditEntryRecorded;
 use Modules\Core\Models\AuditLog;
 
 /**
@@ -43,7 +44,7 @@ class AuditLogService
      */
     public function record(array $attributes): AuditLog
     {
-        return Cache::lock(self::LOCK_NAME, 10)->block(5, function () use ($attributes) {
+        $log = Cache::lock(self::LOCK_NAME, 10)->block(5, function () use ($attributes) {
             return DB::transaction(function () use ($attributes) {
                 $last = DB::table('audit_log')
                     ->lockForUpdate()
@@ -91,6 +92,10 @@ class AuditLogService
                 return AuditLog::findOrFail($nextId);
             });
         });
+
+        event(new AuditEntryRecorded($log->id));
+
+        return $log;
     }
 
     /**

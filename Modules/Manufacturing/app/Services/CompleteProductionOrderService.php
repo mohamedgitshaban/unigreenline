@@ -8,6 +8,7 @@ use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Services\FefoStockService;
+use Modules\Inventory\Support\StockMovementContext;
 use Modules\Manufacturing\Exceptions\BatchNumberTakenException;
 use Modules\Manufacturing\Exceptions\ProductionOrderNotDraftException;
 use Modules\Manufacturing\Models\ProductionOrder;
@@ -60,7 +61,7 @@ class CompleteProductionOrderService
                 'product_id' => $line->component_product_id,
                 'warehouse_id' => $locked->warehouse_id,
                 'cartons_needed' => $line->qty_cartons * $locked->runs,
-            ])->all());
+            ])->all(), ['type' => 'production_consumption', 'reference_type' => 'production_order', 'reference_id' => $locked->id]);
 
             $costs = InventoryBatch::query()->whereIn('id', array_column($deductions, 'batch_id'))->pluck('cost_per_carton', 'id');
             $materialCost = 0.0;
@@ -85,18 +86,21 @@ class CompleteProductionOrderService
             $totalCost = round($materialCost + $conversionCost, 2);
             $costPerCarton = round($totalCost / $locked->output_qty_cartons, 2);
 
-            $outputBatch = InventoryBatch::create([
-                'tenant_id' => $locked->tenant_id,
-                'product_id' => $bom->product_id,
-                'warehouse_id' => $locked->warehouse_id,
-                'batch_no' => $locked->batch_no,
-                'mfg_date' => $locked->mfg_date,
-                'exp_date' => $locked->exp_date,
-                'rcv_date' => $locked->production_date,
-                'qty_cartons' => $locked->output_qty_cartons,
-                'qty_packs' => 0,
-                'cost_per_carton' => $costPerCarton,
-            ]);
+            $outputBatch = StockMovementContext::run(
+                ['type' => 'production_output', 'reference_type' => 'production_order', 'reference_id' => $locked->id],
+                fn () => InventoryBatch::create([
+                    'tenant_id' => $locked->tenant_id,
+                    'product_id' => $bom->product_id,
+                    'warehouse_id' => $locked->warehouse_id,
+                    'batch_no' => $locked->batch_no,
+                    'mfg_date' => $locked->mfg_date,
+                    'exp_date' => $locked->exp_date,
+                    'rcv_date' => $locked->production_date,
+                    'qty_cartons' => $locked->output_qty_cartons,
+                    'qty_packs' => 0,
+                    'cost_per_carton' => $costPerCarton,
+                ]),
+            );
 
             $entry = $totalCost <= 0 ? null : $this->journalPosting->post(
                 $locked->tenant_id,
