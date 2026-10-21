@@ -76,6 +76,8 @@ by a listener; they do not need the queue.
 * **Attachments.** Files attached to recipes, orders and the like are stored on the default filesystem disk under `manufacturing-attachments/{company}/`; back that disk up with the database.
 * **Deadlocks.** The critical write paths (confirm, reserve, record production, consume, scrap, complete, cancel, start) run their transaction with up to three attempts, so a database deadlock between two busy requests is retried instead of surfacing as an error. Each is safe to repeat.
 * **Audit.** Every action writes the order's history and the tamper-evident audit log (module `manufacturing`).
+* **Stock ledger.** Materials issued to an order are written to the warehouse stock ledger as `production_consumption`, finished goods as `production_output` and by-products as `production_by_product`, each referencing the order (`GET /warehouses/{id}/movements`, `GET /products/{id}/movements`). Existing stock appears once as an `opening_balance`.
+* **Dashboard.** `GET /dashboards/manufacturing` (`manufacturing-dashboard.view`) shows orders finished, cartons produced, yield, orders in progress and late, open planning suggestions and open quality alerts, limited to the warehouses the caller may see.
 * **Performance.** Heavy work is bounded: planning reads by aggregation and runs on the queue; reports aggregate in SQL and paginate; the
   scheduler holds a lock only on the work center being booked.
 

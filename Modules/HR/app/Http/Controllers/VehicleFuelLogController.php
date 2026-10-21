@@ -36,6 +36,11 @@ class VehicleFuelLogController extends Controller
         return ['vendor_name', 'notes', 'vehicle.license_plate'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['fueled_on', 'desc'];
+    }
+
     protected function with(): array
     {
         return ['vehicle:id,license_plate', 'employee:id,code,name'];

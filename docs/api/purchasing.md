@@ -116,6 +116,12 @@ bearer token; it isn't a public link.
 
 Requires `purchase-orders.view`. Includes `lines_count`.
 
+## `GET /api/v1/purchase-orders/{id}/print` 🆕 NEW
+
+Requires `purchase-orders.print`. The purchase order as it is sent to the supplier: supplier and delivery warehouse, dates, lines with cost per carton and amounts (shown as `—` while the order is pending pricing) and totals, with *Prepared by / Approved by / Supplier* signature boxes. `?format=json` for the data. See [Printing documents](./README.md#printing-documents--new).
+
+> 🆕 The **warehouse** receiving an order sees it, without prices, in [`GET /warehouses/{id}/incoming`](./inventory.md#get-apiv1warehousesidincoming--new) and its manager is notified when it is created, priced or received. Receiving writes `purchase_receipt` lines in the [stock ledger](./inventory.md#stock-movement-ledger--new).
+
 ## `GET /api/v1/purchase-orders/{id}/lines`
 
 Requires `purchase-orders.view`. The PO's lines (each with its `product`) as

@@ -59,15 +59,15 @@ class RecruitmentController extends Controller
     {
         $tenant = $request->user()->tenant_id;
         $period = DashboardPeriod::fromRequest($request);
-        $applied = fn () => Applicant::query()->where('tenant_id', $tenant)->whereBetween('applied_on', [$period->from->toDateString(), $period->to->toDateString()]);
-        $hired = fn () => Applicant::query()->where('tenant_id', $tenant)->where('status', 'hired')->whereBetween('hired_at', [$period->from, $period->to]);
+        $applied = fn () => Applicant::query()->where('hr_applicants.tenant_id', $tenant)->whereBetween('hr_applicants.applied_on', [$period->from->toDateString(), $period->to->toDateString()]);
+        $hired = fn () => Applicant::query()->where('hr_applicants.tenant_id', $tenant)->where('hr_applicants.status', 'hired')->whereBetween('hr_applicants.hired_at', [$period->from, $period->to]);
 
         $timeToHire = $hired()->selectRaw('avg(datediff(date(hired_at), applied_on)) as days')->value('days');
         $accepted = Applicant::query()->where('tenant_id', $tenant)->where('offer_status', 'accepted')->whereBetween('updated_at', [$period->from, $period->to])->count();
         $declined = Applicant::query()->where('tenant_id', $tenant)->where('offer_status', 'declined')->whereBetween('updated_at', [$period->from, $period->to])->count();
 
-        $bySource = $applied()->selectRaw("coalesce(source, 'Unknown') as source, count(*) as applicants, sum(status = 'hired') as hired")->groupBy('source')->orderByDesc('applicants')->get();
-        $refusals = $applied()->where('status', 'refused')->leftJoin('hr_refuse_reasons', 'hr_refuse_reasons.id', '=', 'hr_applicants.refuse_reason_id')
+        $bySource = $applied()->selectRaw("coalesce(hr_applicants.source, 'Unknown') as source, count(*) as applicants, sum(hr_applicants.status = 'hired') as hired")->groupBy('hr_applicants.source')->orderByDesc('applicants')->get();
+        $refusals = $applied()->where('hr_applicants.status', 'refused')->leftJoin('hr_refuse_reasons', 'hr_refuse_reasons.id', '=', 'hr_applicants.refuse_reason_id')
             ->selectRaw("coalesce(hr_refuse_reasons.name, 'No reason given') as reason, count(*) as total")->groupBy('hr_refuse_reasons.name')->orderByDesc('total')->get();
 
         $jobs = JobPosition::query()->where('tenant_id', $tenant)->whereIn('status', ['open', 'closed'])
@@ -78,7 +78,7 @@ class RecruitmentController extends Controller
             'period' => $period->toArray(),
             'applications' => $applied()->count(),
             'hired' => $hired()->count(),
-            'refused' => $applied()->where('status', 'refused')->count(),
+            'refused' => $applied()->where('hr_applicants.status', 'refused')->count(),
             'average_days_to_hire' => $timeToHire === null ? null : round((float) $timeToHire, 1),
             'offer_acceptance_pct' => $accepted + $declined > 0 ? round($accepted / ($accepted + $declined) * 100, 1) : null,
             'by_source' => $bySource->map(fn ($row) => ['source' => $row->source, 'applicants' => (int) $row->applicants, 'hired' => (int) $row->hired])->values(),

@@ -11,7 +11,7 @@ use Modules\Core\Models\User;
 /**
  * One line of an applicant's history: created, moved, interviewed, refused, hired, a note. Never edited.
  */
-#[Fillable(['tenant_id', 'applicant_id', 'user_id', 'type', 'summary', 'data'])]
+#[Fillable(['tenant_id', 'applicant_id', 'user_id', 'type', 'summary', 'payload'])]
 class ApplicantEvent extends Model
 {
     use HasUlids;
@@ -23,7 +23,7 @@ class ApplicantEvent extends Model
     protected function casts(): array
     {
         return [
-            'data' => 'array',
+            'payload' => 'array',
         ];
     }
 

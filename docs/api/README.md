@@ -33,6 +33,14 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **HR module** — employees, attendance (check-in/out), work schedules, global holidays, time permissions (late / early leave / partial), leave, and monthly payroll posted to the chart of accounts → [hr.md](./hr.md)
 > - 🔄 **Finance review** — cost of goods sold on delivery, input VAT on purchases, returns and manual goods receipts now post to the ledger; supplier payments, manual journal entries (with reversal), an account-connections map, and a balance sheet that balances → [accounting.md](./accounting.md#finance-review--what-was-missing-and-what-changed)
 > - 🆕 **Create + deliver in one call** — `POST /sales-orders/deliver` → [sales.md](./sales.md#post-apiv1sales-ordersdeliver--new)
+> - 🆕 **Reporting line** — every user can have a manager and a data scope; managers see (and hand out) the customers, orders, visits and calls of everyone below them → [Reporting line](#reporting-line-who-sees-whose-data--new)
+> - 🆕 **Call log** — record every customer call with what was said → [crm.md](./crm.md#calls--new); 🆕 **customer assignment** and a **duplicate check** when creating a customer
+> - 🆕 **Warehouse managers** — assign people and a manager to a warehouse, see what is coming in (purchase orders) and going out (sales orders), and a **stock movement ledger** of every in and out → [inventory.md](./inventory.md#warehouses-for-the-people-who-run-them--new)
+> - 🆕 **Fixed assets** (depreciation board, disposal) and **loans** (amortization schedule, early repayment) → [accounting.md](./accounting.md#fixed-assets--new)
+> - 🆕 **Printable documents** — invoices, orders, delivery notes, receipts, purchase orders, transfers and write-offs → [Printing](#printing-documents--new)
+> - 🆕 **Recruitment and Fleet** inside HR → [hr.md](./hr.md#recruitment--new)
+> - 🆕 **Notifications for changes** to records, with a link to the record → [Change notifications](#change-notifications--new)
+> - 🆕 **Dashboards for every department** and a way to add one for the next → [dashboards.md](./dashboards.md)
 
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 
@@ -62,6 +70,69 @@ Unauthenticated requests return `401`:
 ```json
 { "message": "Unauthenticated." }
 ```
+
+## Reporting line: who sees whose data 🆕 NEW
+
+Every user can have a **manager** (`manager_id`), which makes a tree. Together with a **data scope** it decides whose records a
+user sees:
+
+| `data_scope` | Sees |
+|---|---|
+| `all` | every record their permissions allow in the company |
+| `team` | only records owned by themselves or by anyone who reports to them, directly or through others |
+| *(not set)* | follows the role: a **Sales Rep** is `team`, everyone else `all` (what the API did before) |
+
+So a rep sees their own customers, orders, invoices, collections, deliveries, visits and calls; a manager set to `team` also sees
+those of every rep under them (and theirs, and so on down the tree); a manager left on `all` sees everything. Records with no owner
+are visible only to users whose scope is `all`. The same tree shapes warehouse access (a manager sees the warehouses of their
+people) and who is told about a change.
+
+- Set it when creating or editing a user: `manager_id` (a user of the same company; a person cannot report to themselves or to someone on their own team — `422`) and `data_scope` (`all` / `team` / `null`). The user object returns `manager`, `data_scope` and `effective_data_scope`. [admin.md](./admin.md#reporting-line--new)
+- `GET /api/v1/team` — the signed-in user's own team; `GET /api/v1/users/{id}/team` — anyone's (`users.team`).
+- A manager can **hand a customer to someone on their team** (`POST /customers/{id}/assign`) and sees their team's visits and calls. Creating a customer that already exists under another user is refused and says whose it is. [crm.md](./crm.md)
+
+## Change notifications 🆕 NEW
+
+When a record changes, the people it concerns are notified (in the in-app inbox, `GET /notifications`) with a **link to the record**:
+its owner, **and everyone the owner reports to**, plus extra people where it makes sense (the warehouse manager for a purchase order
+heading to their warehouse, the driver of a vehicle). Nobody is told about their own change, only users who hold the permission to open the
+record are told, and nothing is sent for a request that failed.
+
+| Record | Told | Permission needed |
+|---|---|---|
+| Customer, visit, call, lead, complaint (CRM) | the owner / rep / assignee (and the customer's owner), and their managers | `customers.view`, `visits.view`, `calls.view`, `leads.view`, `complaints.view` |
+| Sales order, invoice, collection, delivery | the order's sales rep and their managers; the **warehouse managers** of the warehouses the order draws from | `sales-orders.view` … (warehouse managers: `warehouses.outgoing`) |
+| Purchase order, supplier payment | whoever created it and their managers; the **manager of the receiving warehouse** | `purchase-orders.view` (warehouse: `warehouses.incoming`) |
+| Warehouse, transfer | the old and new warehouse manager; both warehouses' managers for a transfer | `warehouses.view`, `transfers.view` |
+| Expense, write-off | who created it, their managers; the warehouse manager for a write-off | `expenses.view`, `recaps.view` |
+| Leave request, time permission | the employee and their managers | `leave-requests.view`, `time-permissions.view` |
+| Payroll run | who prepared and approved it | `payroll-runs.view` |
+| Fixed asset, loan | who created it (and the asset's user); loans also send daily reminders for instalments that are due or late | `fixed-assets.view`, `loans.view` |
+| Job, applicant, interview, vehicle | the recruiter / interviewer / driver | `job-positions.view`, `applicants.view`, `interviews.view`, `vehicles.view` |
+
+A notification carries `link_module`, `link_entity`, `link_id`, a ready `link.url` (the API path of the record; `null` once it is deleted)
+and `actor_id`. A new department makes its records notify by registering them (`ChangeNotificationRegistry`) — no other change.
+Endpoints: [admin.md](./admin.md#notifications).
+
+## Printing documents 🆕 NEW
+
+Business documents print from the API as a page laid out for A4 (the browser's *Print* / *Save as PDF* turns it into a file —
+no PDF library is needed on the server):
+
+| Document | Endpoint | Permission |
+|---|---|---|
+| Sales invoice (with payments received) | `GET /invoices/{id}/print` | `invoices.print` |
+| Sales order | `GET /sales-orders/{id}/print` | `sales-orders.print` |
+| Delivery note (quantities and batches, no prices) | `GET /deliveries/{id}/print` | `deliveries.print` |
+| Payment receipt | `GET /collections/{id}/print` | `collections.print` |
+| Purchase order | `GET /purchase-orders/{id}/print` | `purchase-orders.print` |
+| Stock transfer slip (no prices) | `GET /transfers/{id}/print` | `transfers.print` |
+| Stock write-off slip | `GET /recaps/{id}/print` | `recaps.print` |
+
+The response is `text/html` (open it in a tab or an iframe; it has its own *Print* button). `?format=json` returns the same content as
+data (`type`, `number`, `company`, `meta`, `parties`, `tables`, `totals`, `notes`, `signatures`) to draw it your own way; `?dir=rtl` lays the page
+out right to left. The same record rules as the record's own endpoint apply (a rep cannot print another team's invoice; another company's
+document is `404`).
 
 ## Editing and deleting records 🆕 NEW
 
@@ -356,6 +427,13 @@ php artisan db:seed --class="Modules\\HR\\Database\\Seeders\\HRDatabaseSeeder"  
   `inventory_batches` gains `reserved_cartons`. Stock that a confirmed manufacturing order has **reserved** can no longer be taken by
   sales, transfers, write-offs or purchase returns. Set the default warehouse in `PUT /manufacturing/settings` before the nightly
   `mrp:plan` run, and run `php artisan queue:work` if you plan with `async: true` → [operations guide](../manufacturing/installation-and-operations.md).
+- **Reporting line, notifications, calls, assets, loans, recruitment, fleet, stock ledger:** the migrations add `users.manager_id` / `data_scope`,
+  `notifications.link_entity` / `link_url` / `actor_id`, `customer_calls`, `stock_movements`, `accounting_sequences`, the fixed-asset and loan tables
+  and the recruitment and fleet tables. **Existing stock becomes one `opening_balance` ledger line per batch** so the ledger adds up from day one.
+  Run the `AccountSeeder` for the new accounts (`1530`, `1540`, `1590`, `1600`, `2400`, `4300`, `4400`, `6500`, `6600`, `6700`) and the `RolePermissionSeeder` for the new
+  permissions (`Sales Manager` now also holds the CRM permissions, so a manager can see and manage their reps' customers). Users keep working exactly as before until you
+  give them a `manager_id`; only a Sales Rep is limited to `team` by default, which for a rep with nobody under them is what it always was.
+- **Scheduler** (`php artisan schedule:run` every minute): `assets:depreciate` (02:30), `loans:remind` (08:00), `fleet:remind` (07:30), in addition to the existing jobs.
 - Re-run `php docs/postman/generate.php` and `php artisan permissions:docs`
   after changing endpoints (a test fails if the permission reference is stale).
 

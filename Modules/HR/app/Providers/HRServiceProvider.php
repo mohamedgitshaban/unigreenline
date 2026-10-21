@@ -22,13 +22,19 @@ use Modules\HR\Models\Applicant;
 use Modules\HR\Models\Attendance;
 use Modules\HR\Models\Department;
 use Modules\HR\Models\Employee;
+use Modules\HR\Models\FleetServiceType;
 use Modules\HR\Models\Holiday;
 use Modules\HR\Models\Interview;
 use Modules\HR\Models\JobPosition;
 use Modules\HR\Models\LeaveRequest;
 use Modules\HR\Models\PayrollRun;
+use Modules\HR\Models\RecruitmentStage;
+use Modules\HR\Models\RefuseReason;
 use Modules\HR\Models\TimePermission;
 use Modules\HR\Models\Vehicle;
+use Modules\HR\Models\VehicleContract;
+use Modules\HR\Models\VehicleFuelLog;
+use Modules\HR\Models\VehicleService;
 use Modules\HR\Models\WorkSchedule;
 use Nwidart\Modules\Support\ModuleServiceProvider;
 
@@ -70,7 +76,7 @@ class HRServiceProvider extends ModuleServiceProvider
 
         // Access to these is the route's permission; the policy exists so the shared
         // create/update/delete helpers have something to ask.
-        foreach ([Department::class, WorkSchedule::class, Holiday::class, Employee::class, Attendance::class, TimePermission::class, LeaveRequest::class, PayrollRun::class] as $model) {
+        foreach ([Department::class, WorkSchedule::class, Holiday::class, Employee::class, Attendance::class, TimePermission::class, LeaveRequest::class, PayrollRun::class, JobPosition::class, RecruitmentStage::class, RefuseReason::class, Applicant::class, Interview::class, Vehicle::class, VehicleService::class, VehicleFuelLog::class, VehicleContract::class, FleetServiceType::class] as $model) {
             Gate::policy($model, RoutePermissionPolicy::class);
         }
 

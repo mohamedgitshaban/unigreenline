@@ -1779,7 +1779,28 @@ $admin = folder('Admin', [
 // account a category needs (and reuses the warehouse/supplier). Logout
 // runs dead last for the same reason — it revokes {{token}}, so nothing
 // after it in a full collection run could authenticate.
-$items = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $recap, $manufacturing, $hr, $analytics, $admin, folder('Session end', [
+$additions = require __DIR__.'/new-folders.php';
+
+// New requests are added inside the existing top-level folders (by name); a folder that does not exist yet becomes a new top-level one.
+$topLevel = [$auth, $reference, $inventory, $crm, $purchasing, $sales, $accounting, $expenses, $recap, $manufacturing, $hr, $analytics, $admin];
+
+foreach ($additions['folders'] as $name => $newItems) {
+    $matched = false;
+
+    foreach ($topLevel as &$existing) {
+        if (trim(preg_replace('/^(?:🆕|🔄)\s*/u', '', $existing['name'])) === $name) {
+            array_push($existing['item'], ...$newItems);
+            $matched = true;
+        }
+    }
+    unset($existing);
+
+    if (! $matched) {
+        $topLevel[] = nw(folder($name, $newItems, 'One dashboard per department; each is made of features, and every dashboard answers in the same shape.'));
+    }
+}
+
+$items = [...$topLevel, folder('Session end', [
     req('POST', 'Logout', '/auth/logout', [
         'description' => 'Revokes the token used to make this request — real Sanctum token deletion, not just an audit entry (401 on any further use of it, immediately). Deliberately the last request in the whole collection — everything above needs `{{token}}` to still be valid.',
     ]),
@@ -1927,7 +1948,7 @@ $collection = [
             'mrp_run_id' => '',
             'mrp_suggestion_id' => '',
             'attachment_id' => '',
-        ]),
+        ] + $additions['variables']),
         $vars
     ),
     'item' => $items,

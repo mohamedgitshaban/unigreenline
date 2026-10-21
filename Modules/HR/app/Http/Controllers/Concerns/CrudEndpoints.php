@@ -90,6 +90,16 @@ trait CrudEndpoints
      */
     protected function beforeDelete(Model $record): void {}
 
+    /**
+     * How the list is ordered when the request does not say (`?sort_by=`): column and direction. Newest first when null.
+     *
+     * @return array{0: string, 1: string}|null
+     */
+    protected function defaultOrder(): ?array
+    {
+        return null;
+    }
+
     protected function exportName(): ?string
     {
         return null;
@@ -116,7 +126,12 @@ trait CrudEndpoints
 
         $this->scope($query, $request);
         $this->applyFilters($request, $query, $this->searchable());
-        $this->applySorting($request, $query);
+
+        if (($order = $this->defaultOrder()) && ! $request->filled('sort_by')) {
+            $query->orderBy($this->table().'.'.$order[0], $order[1])->orderBy($this->table().'.id');
+        } else {
+            $this->applySorting($request, $query);
+        }
 
         if (($shape = $this->exportShape()) && ($export = $this->exportIfRequested($request, $query, $shape[0], $shape[1], $this->exportName() ?? $this->table()))) {
             return $export;

@@ -45,7 +45,8 @@ Requires `users.create`.
   Warehouse Employee without setting this, that account will look broken —
   always send `warehouse_ids` for those two roles.
 - `status` defaults to `active`.
-- Response is `201` with the created user (password never included).
+- 🆕 `manager_id` — who this person reports to (a user of the same company) and 🆕 `data_scope` — `all`, `team` or `null` (follow the role). See [Reporting line](./README.md#reporting-line-who-sees-whose-data--new).
+- Response is `201` with the created user (password never included). 🔄 It now also returns `manager_id`, `manager` (`{id, name}`), `data_scope` and `effective_data_scope` (`all` or `team`, after the role's default is applied).
 
 ### `PUT /api/v1/users/{id}`
 
@@ -58,6 +59,24 @@ password). Sending `warehouse_ids` replaces the full set, not a merge.
 ```json
 { "role": "Sales Manager", "status": "suspended" }
 ```
+
+🔄 `PUT` also takes `manager_id` (send `null` to remove the manager) and `data_scope`. A person cannot be made to report to themselves or to anyone on their own team — **422** `A person cannot report to themselves or to someone on their own team.` `GET /users?manager_id=` lists one manager's direct reports.
+
+### Reporting line 🆕 NEW
+
+**`GET /api/v1/team`** — any signed-in user: their own team.
+
+```json
+{ "data": {
+  "user": { "id": "01k…", "name": "Mona Adel" },
+  "manager": { "id": "01k…", "name": "Hany Samir" },
+  "data_scope": "team",
+  "direct_reports": 2,
+  "members": [ { "id": "01k…", "name": "Karim", "email": "karim@…", "role": "Sales Rep", "status": "active", "manager_id": "01k…", "depth": 1 },
+               { "id": "01k…", "name": "Dina",  "email": "dina@…",  "role": "Sales Rep", "status": "active", "manager_id": "01k…", "depth": 2 } ] } }
+```
+
+`depth` is 1 for direct reports, 2 for theirs, and so on. **`GET /api/v1/users/{id}/team`** — the same for any user; requires `users.team` (Administrator, Owner-style roles by explicit grant) and, for a team-scoped caller, that the user is on their team (else **403**). Another company's user is **404**.
 
 ### `DELETE /api/v1/users/{id}` 🆕 NEW
 
@@ -223,7 +242,27 @@ user's own inbox.
 ### `GET /api/v1/notifications`
 
 Paginated, newest first (sortable — see README's "Sorting a list"). Returns notifications where `user_id` is the
-caller's own id, or `user_id` is `null` (broadcast — spec §4.14).
+caller's own id, or `user_id` is `null` (broadcast — spec §4.14). 🔄 Filters: `?unread=1`, `?module=crm` (the module the record belongs to), `?type=customer.update`.
+
+🔄 Notifications about a changed record now carry a way to open it:
+
+```json
+{ "id": "01k…", "type": "customer.update", "title": "Customer updated",
+  "body": "Hany Samir updated customer \"Nile Farm\". Changed: phone, city.", "icon": "edit",
+  "link_module": "crm", "link_entity": "Customer", "link_id": "01k…",
+  "link": { "module": "crm", "entity": "Customer", "id": "01k…", "url": "/api/v1/customers/01k…" },
+  "actor_id": "01k…", "unread": true, "created_at": "…" }
+```
+
+`link` is `null` for notifications that point nowhere, and for a record that was deleted. Who is told, and about what, is in [Change notifications](./README.md#change-notifications--new).
+
+### `GET /api/v1/notifications/unread-count` 🆕 NEW
+
+`{ "data": { "total": 5, "by_module": { "crm": 3, "inventory": 2 } } }` — for a badge.
+
+### `PUT /api/v1/notifications/{id}/read` 🆕 NEW
+
+Marks one of the caller's own notifications read and returns it. A broadcast (no owner) is **404** here — use `read-all`.
 
 ### `GET /api/v1/notifications/{id}`
 

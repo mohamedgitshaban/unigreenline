@@ -83,7 +83,7 @@ account connected to anything?":
     "kind": "posted",
     "used_by": ["Sales invoices", "Invoice import", "Collections", "Invoice void", "Sales returns (credit to the customer)"],
     "posting_lines": 41, "balance": "12500.00", "attention": null },
-  { "code": "1510", "name": "Equipment", "kind": "manual", "used_by": ["Manual journal entries (no fixed-asset register yet)"], "posting_lines": 0, "attention": null },
+  { "code": "4200", "name": "Other Income", "kind": "manual", "used_by": ["Manual journal entries (other income)"], "posting_lines": 0, "attention": null },
   { "code": "7000", "name": "Custom", "kind": "custom", "used_by": [], "posting_lines": 0, "attention": "custom account with no postings" }
 ] }
 ```
@@ -116,10 +116,11 @@ posted to and flows that never reached the ledger. What was done:
 | **Payroll had no accounts** (6100 existed but nothing posted to it). | 🆕 HR payroll posts **Dr 6100 / Cr 2210 / Cr 2200**, then **Dr 2200 / Cr cash or bank**. See [hr.md](./hr.md#payroll). |
 | **Invoice void did not give the balance back** (a mass-assignment slip silently dropped the customer balance update). | 🔄 Fixed: voiding restores the customer's balance, with a test that would have caught it. |
 
-Still manual by design (no flow feeds them): `1510`/`1520` fixed assets, `3100`
-capital, `3200` retained earnings (year-end closing), `4200` other income — book
-them with a manual journal entry. There is no fixed-asset register, depreciation
-run, period close or bank reconciliation yet.
+Still manual by design (no flow feeds them): `3100` capital, `3200` retained
+earnings (year-end closing), `4200` other income — book them with a manual
+journal entry. 🔄 Fixed assets (`1510`–`1540`, `1590`, `6500`, `4400`, `6700`) and loans
+(`2400`, `1600`, `6600`, `4300`) now have their own flows — see [Fixed assets](#fixed-assets--new) and [Loans](#loans--new).
+There is no period close or bank reconciliation yet.
 
 ## `POST /api/v1/journal-entries` 🆕 NEW
 
@@ -263,3 +264,124 @@ every supplier's current outstanding balance, sorted by amount owed. See
   }
 }
 ```
+
+## Fixed assets 🆕 NEW
+
+A register of what the company owns and writes off over time, in the style of Odoo's *Assets*: **asset models** (categories) that carry the accounts and depreciation settings, **assets** with a computed **depreciation board**, monthly posting, changes to the plan, pausing, and sale or scrapping with the gain or loss booked.
+
+New accounts in the chart (run the `AccountSeeder` on an existing database — it is idempotent): `1530` Furniture & Office Equipment, `1540` Buildings & Improvements, **`1590` Accumulated Depreciation** (a credit balance against the asset), **`6500` Depreciation Expense**, **`4400` Gain on Disposal of Assets**, **`6700` Loss on Disposal of Assets**. `1510 Equipment` and `1520 Vehicles` are now fed by the register. They are system accounts (cannot be deleted or re-coded).
+
+Permissions (all `fixed-assets.*` / `asset-categories.*`): the **Accountant** can create, activate, depreciate, modify, pause and cancel; **selling or scrapping an asset (`fixed-assets.dispose`) needs the approve level** (Owner, Administrator) because it moves the books; deleting needs the delete level (Administrator).
+
+### Asset models — `/api/v1/asset-categories`
+
+`GET` / `POST` / `GET {id}` / `PUT {id}` / `DELETE {id}` (`asset-categories.view|create|update|delete`). **409** while assets use the model.
+
+```json
+{ "name": "Lab equipment", "asset_account_code": "1510", "accumulated_account_code": "1590", "expense_account_code": "6500",
+  "method": "straight_line", "duration_periods": 60, "period_months": 1, "declining_factor": 0.3,
+  "prorata": false, "salvage_pct": 0, "auto_post": true, "active": true, "description": null }
+```
+
+- `method`: `straight_line` (the same each period), `declining_balance` (each period takes `declining_factor` of what is still to be depreciated; the last takes the rest), `declining_then_straight` (declining, but never less than spreading the remainder evenly over the periods left).
+- `duration_periods` periods of `period_months` (1, 2, 3, 4, 6 or 12) months each — a 5-year asset booked monthly is 60 × 1. Lines are dated the last day of each period.
+- `prorata`: the asset's life runs exactly `duration_periods` periods from the day it starts, so the first and last part-periods count only for the days they cover (a period with 16 of its 31 days weighs 16/31 of a full one) and the board has one more line.
+- `salvage_pct`: the share of the cost that is not depreciated. `auto_post`: whether the daily command books this model's assets by itself.
+- The three account codes must exist in the chart (**422**).
+
+### `POST /api/v1/fixed-assets`
+
+Requires `fixed-assets.create`.
+
+```json
+{ "name": "Centrifuge", "category_id": "01k…", "acquisition_date": "2026-01-01", "original_value": 12000,
+  "salvage_value": 0, "duration_periods": 12, "method": "straight_line", "serial_number": "SN-9", "location": "Lab 1",
+  "supplier_id": null, "assigned_user_id": null, "reference": "INV-4471" }
+```
+
+`name`, `category_id`, `acquisition_date` and `original_value` are required; everything else defaults from the model (`salvage_value` = `salvage_pct` of the cost; `depreciation_start_date` = the acquisition date). The asset is created as a **draft** with number `FA00001`… and its board computed. Returns the asset with `book_value`, `depreciable_value`, `depreciated_pct`, `next_depreciation` and `depreciations_count`.
+
+### `POST /api/v1/fixed-assets/preview`
+
+`fixed-assets.preview`. The board for figures typed in — same body as create (`category_id` and `name` optional) — without saving: `{ "data": [ {sequence, period_start, depreciation_date, amount, accumulated_after, book_value_after} … ], "summary": {periods, total} }`.
+
+### Lifecycle
+
+| Endpoint | Permission | What it does |
+|---|---|---|
+| `PUT /fixed-assets/{id}` | `fixed-assets.update` | a **draft** can change in every respect (the board is redrawn); a running asset only name, reference, serial number, location, assigned user, notes, supplier and `auto_post` (**422** otherwise) |
+| `POST /fixed-assets/{id}/activate` | `fixed-assets.activate` | draft → `running`. Body `{ "acquisition_account_code": "1120" }` (optional) also **books the purchase**: Dr the asset account / Cr that account (bank, cash or payables). Leave it out when the cost was booked already |
+| `POST /fixed-assets/{id}/depreciations/{line}/post` | `fixed-assets.post-depreciation` | books one period: **Dr 6500 Depreciation Expense / Cr 1590 Accumulated Depreciation**. Lines go in order and only when due (**422** otherwise); a paused asset books nothing |
+| `POST /fixed-assets/depreciate` | `fixed-assets.depreciate` | `{ "date": "2026-03-31" }` (default today): books everything due for every running asset → `{ lines, assets, total, failed: [] }`. Safe to repeat — a line is only ever booked once |
+| `POST /fixed-assets/{id}/modify` | `fixed-assets.modify` | redraws what is left: `{ "remaining_periods": 6, "salvage_value": 900, "method": "straight_line" }` spreads the current book value (less the new salvage value) over 6 periods after the last booked one. What was booked stays |
+| `POST /fixed-assets/{id}/pause` · `/resume` | `fixed-assets.pause` · `.resume` | stops booking; `resume` (`{ "date": … }`) re-plans the unbooked periods from that month |
+| `POST /fixed-assets/{id}/dispose` | `fixed-assets.dispose` | **sell or scrap**: `{ "date": "2026-04-30", "sale_value": 9500, "proceeds_account_code": "1110", "reason": "Upgraded" }`. Depreciation due up to the date is booked, later periods are dropped, then the asset leaves the books: Dr accumulated depreciation, Dr proceeds, Cr the asset's cost, and the difference with the book value is a **gain (Cr 4400)** or a **loss (Dr 6700)**. Status `sold` (with proceeds) or `disposed` |
+| `POST /fixed-assets/{id}/cancel` | `fixed-assets.cancel` | a draft only |
+| `DELETE /fixed-assets/{id}` | `fixed-assets.delete` | a draft or cancelled asset only |
+
+Statuses: `draft`, `running`, `paused`, `fully_depreciated`, `sold`, `disposed`, `cancelled`.
+
+### Reading
+
+`GET /fixed-assets` (`?status=a,b`, `?category_id=`, `?assigned_user_id=`, `search` on number, name, serial, reference, location; `?export=csv|xlsx` needs `fixed-assets.export`), `GET /fixed-assets/{id}` (with the board), `GET /fixed-assets/{id}/schedule` (`fixed-assets.schedule`; `?status=planned|posted`; `summary` totals), `GET /fixed-assets/summary` (`fixed-assets.summary`: counts by status, cost, accumulated depreciation, book value, depreciation this year, lines due now, per category) and `GET /fixed-assets/forecast?months=12` (`fixed-assets.forecast`: planned depreciation per month).
+
+### Scheduler 🆕
+
+`php artisan assets:depreciate [--date=] [--tenant=] [--all]` runs daily at 02:30 and books what is due for assets whose model has `auto_post` (add `--all` to include the rest). The Accounting dashboard shows book value by category and the depreciation still to come.
+
+## Loans 🆕 NEW
+
+Money the company **borrowed** (`kind: borrowed`, a liability) or **lent** (`kind: granted`, an asset — a staff advance, a loan to a customer), with its repayment schedule — the amortization table — instalments paid one by one, early repayment, and reminders. Modelled on Odoo's loan management.
+
+New accounts: **`2400` Loans Payable**, **`1600` Loans Receivable**, **`6600` Interest Expense**, **`4300` Interest Income** (system accounts).
+
+### Methods
+
+| `method` | Instalment |
+|---|---|
+| `annuity` | the same payment every period (interest falls, principal grows) — the usual bank loan; payment = P·r / (1 − (1+r)^−n) with r = annual rate × months in the period ÷ 12 |
+| `fixed_principal` | the same principal every period, so the payment falls with the interest |
+| `interest_only` | interest every period and the whole principal with the last instalment |
+
+`grace_periods` at the start pay interest only (annuity and fixed principal). Interest for a period is the opening balance × the period rate. The last instalment always clears the balance to the cent. Example — 10 000 at 12 % over 12 months, annuity: payment **888.49**; first instalment 100.00 interest + 788.49 principal, balance 9 211.51.
+
+### `POST /api/v1/loans`
+
+Requires `loans.create`.
+
+```json
+{ "name": "Bank loan", "kind": "borrowed", "counterparty_name": "National Bank", "principal": 120000, "annual_rate_pct": 12,
+  "method": "annuity", "periods": 24, "period_months": 1, "grace_periods": 0,
+  "start_date": "2026-01-01", "first_due_date": "2026-02-01", "notes": null }
+```
+
+`name`, `principal`, `periods` and `start_date` are required; `first_due_date` defaults to one period after the start; `counterparty_type` (`supplier`, `customer`, `employee`, `other`) / `counterparty_id` / `counterparty_name` say who; `principal_account_code` and `interest_account_code` default by kind (`2400`/`6600` borrowed, `1600`/`4300` granted) and must exist. The loan starts as a **draft** `LN00001`… with its schedule.
+
+### `POST /api/v1/loans/preview` (`loans.preview`)
+
+The schedule for terms typed in, without saving: `{ "data": [ {sequence, due_date, opening_balance, principal_amount, interest_amount, payment_amount, closing_balance} … ], "summary": {instalments, total_interest, total_to_pay, first_payment} }`.
+
+### Lifecycle
+
+| Endpoint | Permission | What it does |
+|---|---|---|
+| `PUT /loans/{id}` | `loans.update` | a draft can change its terms (the schedule is redrawn); an active loan only name, counterparty and notes |
+| `POST /loans/{id}/activate` | `loans.activate` | `{ "account_code": "1120", "date": … }`: the money changes hands. Borrowed: **Dr bank / Cr 2400**; granted: **Dr 1600 / Cr bank**. Status `active` |
+| `POST /loans/{id}/installments/{n}/pay` | `loans.pay-installment` | pays instalment *n* (in order only): borrowed **Dr 2400 principal + Dr 6600 interest / Cr bank**; granted **Dr bank / Cr 1600 + Cr 4300**. Optional `payment_date`, `payment_account_code` (default the account the loan was activated with). The last one closes the loan |
+| `POST /loans/{id}/early-repayment` | `loans.early-repay` (approve level) | repay ahead of schedule — below |
+| `POST /loans/{id}/cancel` | `loans.cancel` | a draft only |
+| `DELETE /loans/{id}` | `loans.delete` | a draft or cancelled loan only |
+
+**Early repayment** — `{ "mode": "reduce_term" | "reduce_installment" | "payoff", "amount": 3000, "date": …, "payment_account_code": "1120" }`:
+`reduce_term` keeps the instalment and the loan ends sooner; `reduce_installment` keeps the end date and lowers the instalments; `payoff` (no `amount`) repays the whole outstanding principal **plus the interest run up since the last paid instalment (or the start)** and closes the loan. A partial repayment books principal only (Dr 2400 / Cr bank) and redraws the unpaid instalments; the next instalment's interest is on the reduced balance.
+
+### Reading and reminders
+
+`GET /loans` (`?status=`, `?kind=`, `search`; export), `GET /loans/{id}` (counts, `next_installment` with `overdue`), `GET /loans/{id}/schedule` (`loans.schedule`; summary of total interest and what is left to pay), `GET /loans/summary` (`loans.summary`: per kind active loans, outstanding principal, interest paid; overdue and next-30-days instalments) and `GET /loans/due?days=30&kind=` (`loans.due`: instalments due soon or late).
+
+`php artisan loans:remind` runs daily at 08:00: for an active loan with instalments due within 7 days or overdue it notifies whoever agreed the loan and everyone who may pay instalments, once a day, with a link to the loan.
+
+## Printing
+
+`GET /api/v1/invoices/{id}/print` and `GET /api/v1/collections/{id}/print` are available to the Accountant — see [Printing documents](./README.md#printing-documents--new).
+

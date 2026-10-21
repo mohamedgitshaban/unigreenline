@@ -265,7 +265,7 @@ class RecruitmentService
     {
         return ApplicantEvent::create([
             'tenant_id' => $applicant->tenant_id, 'applicant_id' => $applicant->id, 'user_id' => $actor?->id,
-            'type' => $type, 'summary' => Str::limit($summary, 250), 'data' => $data,
+            'type' => $type, 'summary' => Str::limit($summary, 250), 'payload' => $data,
         ]);
     }
 

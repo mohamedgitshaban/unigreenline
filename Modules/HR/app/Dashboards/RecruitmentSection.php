@@ -43,8 +43,8 @@ class RecruitmentSection implements DashboardSection
         $funnel = $this->recruitment->stages($tenant)->map(fn ($stage) => ['label' => $stage->name, 'value' => (int) ($counts[$stage->id] ?? 0)])->all();
         $bySource = Applicant::query()->where('tenant_id', $tenant)->whereBetween('applied_on', [$period->from->toDateString(), $period->to->toDateString()])
             ->selectRaw("coalesce(source, 'Unknown') as source, count(*) as total")->groupBy('source')->orderByDesc('total')->limit(8)->get();
-        $interviews = Interview::query()->where('hr_interviews.tenant_id', $tenant)->where('status', 'scheduled')->where('scheduled_at', '>=', now())
-            ->join('hr_applicants', 'hr_applicants.id', '=', 'hr_interviews.applicant_id')->orderBy('scheduled_at')->limit(5)
+        $interviews = Interview::query()->where('hr_interviews.tenant_id', $tenant)->where('hr_interviews.status', 'scheduled')->where('hr_interviews.scheduled_at', '>=', now())
+            ->join('hr_applicants', 'hr_applicants.id', '=', 'hr_interviews.applicant_id')->orderBy('hr_interviews.scheduled_at')->limit(5)
             ->get(['hr_interviews.id', 'hr_applicants.name as applicant', 'hr_interviews.scheduled_at', 'hr_interviews.mode']);
         $jobs = JobPosition::query()->where('tenant_id', $tenant)->where('status', 'open')->withCount(['applicants as active_applicants' => fn ($q) => $q->where('status', 'active')])->orderByDesc('active_applicants')->limit(5)->get();
 

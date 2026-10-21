@@ -37,6 +37,11 @@ class InterviewController extends Controller
         return ['location', 'feedback', 'applicant.name'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['scheduled_at', 'asc'];
+    }
+
     protected function with(): array
     {
         return ['applicant:id,name,job_position_id,stage_id', 'interviewer:id,name'];

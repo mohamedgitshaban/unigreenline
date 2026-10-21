@@ -8,16 +8,16 @@ with a **permission on every endpoint**.
 
 | Module | What it covers |
 |---|---|
-| Core | auth, users, 🔄 roles & per-endpoint permissions, audit log, notifications |
-| Inventory | warehouses, products, categories, 🆕 packaging units, batches (FEFO), transfers, 🆕 free-gift stock |
-| Sales | sales orders (🔄 multi-warehouse, 🆕 gift lines, 🆕 minimum price), invoices (🆕 void / import), deliveries, collections, returns |
-| Purchasing | suppliers, purchase orders (🔄 lines in any unit), receiving (🔄 free gifts, 🔄 input VAT), 🆕 supplier payments |
-| CRM | customers, leads, visits, complaints, campaigns |
-| Accounting | 🔄 chart of accounts (editable, 🆕 connections map), journal entries (🆕 manual + reversal), 🔄 statements (balance sheet now balances) |
+| Core | auth, users (🆕 manager + data scope), 🔄 roles & per-endpoint permissions, audit log, 🔄 notifications (🆕 for every change, with a link), 🆕 department dashboards |
+| Inventory | warehouses (🆕 managers, assigned people, incoming / outgoing / overview), products, categories, 🆕 packaging units, batches (FEFO), 🆕 stock movement ledger, transfers (🆕 printable), 🆕 free-gift stock |
+| Sales | sales orders (🔄 multi-warehouse, 🆕 gift lines, 🆕 minimum price, 🔄 team visibility), invoices (🆕 void / import / print), deliveries (🆕 delivery note), collections (🆕 receipt), returns |
+| Purchasing | suppliers, purchase orders (🔄 lines in any unit, 🆕 print), receiving (🔄 free gifts, 🔄 input VAT), 🆕 supplier payments |
+| CRM | customers (🆕 assignment, 🆕 duplicate check), leads, visits, 🆕 call log, complaints, campaigns — 🔄 all following the reporting line |
+| Accounting | 🔄 chart of accounts (editable, 🆕 connections map), journal entries (🆕 manual + reversal), 🔄 statements (balance sheet now balances), 🆕 fixed assets (depreciation board, disposal), 🆕 loans (amortization schedule, early repayment) |
 | Expenses | categories, expenses, approval |
 | 🆕 Recap | stock write-offs for expired / damaged / lost stock, posted to the chart of accounts |
 | 🔄 Manufacturing | recipes with revisions, an order workflow with partial production and backorders, stock reservations, routing / work centers / work orders, quality control, scrap and by-products, costing (optional WIP accounting), material requirements planning, reports |
-| 🆕 HR | employees, work schedules, global holidays, attendance, time permissions (late / early leave / partial), leave, monthly payroll connected to the chart of accounts |
+| 🆕 HR | employees, work schedules, global holidays, attendance, time permissions (late / early leave / partial), leave, monthly payroll connected to the chart of accounts, 🆕 **recruitment** (jobs, pipeline, applicants, interviews, offers, hiring) and 🆕 **fleet** (vehicles, drivers, odometer, fuel, services, contracts, costs) |
 | Analytics | dashboard, reports, 🆕 product life cycle |
 
 > **Flags used in the docs and the Postman collection:** 🆕 **NEW** = a new
@@ -34,6 +34,14 @@ on expenses and nothing else. The list is derived from the routes —
 endpoints it guards and which seeded roles hold it (regenerate with
 `php artisan permissions:docs`). `Administrator` holds all of them.
 
+### Reporting line, notifications and dashboards
+
+Every user can have a **manager** and a **data scope**: a Sales Rep — or any manager you set to `team` — sees their own records and those of everyone who reports to them
+(customers, orders, invoices, visits, calls), and a manager can hand customers to their team. Warehouses work the same way: a manager sees the warehouses they manage and those
+of their people, and sees what is on its way in (purchase orders) and out (sales orders) without prices. When a record changes, its owner and the managers above them are
+**notified with a link to it**, for every department. Each department has a **dashboard** (`GET /api/v1/dashboards`) built from features, and adding a department or a feature is a registration, not a rewrite.
+See [`docs/api/README.md`](docs/api/README.md#reporting-line-who-sees-whose-data--new) and [`docs/api/dashboards.md`](docs/api/dashboards.md).
+
 ### Manufacturing
 
 A full manufacturing and planning module: bills of materials (versions, approval, alternatives, multi-level, by-products), manufacturing
@@ -46,7 +54,7 @@ work-in-progress), **material requirements planning** that proposes purchase and
 
 ### Documentation
 
-- API reference: [`docs/api/README.md`](docs/api/README.md) (overview, conventions, change flags) and one file per module in [`docs/api/`](docs/api) — also served as a site at `/docs`.
+- API reference: [`docs/api/README.md`](docs/api/README.md) (overview, conventions, change flags) and one file per module in [`docs/api/`](docs/api) (plus [dashboards](docs/api/dashboards.md)) — also served as a site at `/docs`.
 - Postman: [`docs/postman/`](docs/postman) — import the collection and the `Local` environment; regenerate with `php docs/postman/generate.php` (never hand-edit the JSON).
 
 ### Setup

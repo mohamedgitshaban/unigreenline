@@ -113,7 +113,7 @@ return new class extends Migration
             $table->foreignUlid('user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('type', 30);
             $table->string('summary');
-            $table->json('data')->nullable();
+            $table->json('payload')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
             $table->index(['applicant_id', 'created_at']);

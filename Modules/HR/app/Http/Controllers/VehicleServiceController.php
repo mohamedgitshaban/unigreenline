@@ -40,6 +40,11 @@ class VehicleServiceController extends Controller
         return ['description', 'reference', 'vendor_name', 'vehicle.license_plate'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['service_date', 'desc'];
+    }
+
     protected function with(): array
     {
         return ['vehicle:id,license_plate,brand,model', 'serviceType:id,name,category'];

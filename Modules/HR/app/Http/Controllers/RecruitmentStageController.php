@@ -35,6 +35,11 @@ class RecruitmentStageController extends Controller
         return ['name'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['sequence', 'asc'];
+    }
+
     public function index(Request $request)
     {
         $this->recruitment->stages($request->user()->tenant_id);

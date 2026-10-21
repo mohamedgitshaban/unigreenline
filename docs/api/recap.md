@@ -133,6 +133,10 @@ batch (reason `expired`). Batches already on a draft are skipped, so repeating
 the call never double-lists stock. **201** with the new drafts, or **200** with an
 empty `data` list when nothing new has expired. Drafts still need approving.
 
+## `GET /api/v1/recaps/{id}/print` 🆕 NEW
+
+Requires `recaps.print`. The write-off slip: warehouse, reason, each batch with its expiry and cartons, and signature boxes. Values and the total are included for the Administrator only. `?format=json` for the data. Approving a recap writes `write_off` lines in the [stock ledger](./inventory.md#stock-movement-ledger--new); the manager of the warehouse is notified of write-offs.
+
 ## Scheduled job 🆕 NEW
 
 ```

@@ -37,8 +37,8 @@ class FleetSection implements DashboardSection
         $now = collect(FleetCosts::perVehicle($tenant, $period));
         $before = collect(FleetCosts::perVehicle($tenant, $period->previous()));
         $byStatus = Vehicle::query()->where('tenant_id', $tenant)->selectRaw('status, count(*) as total')->groupBy('status')->pluck('total', 'status');
-        $expiring = VehicleContract::query()->where('hr_vehicle_contracts.tenant_id', $tenant)->where('status', 'active')->whereDate('expires_on', '<=', today()->addDays(30))
-            ->join('hr_vehicles', 'hr_vehicles.id', '=', 'hr_vehicle_contracts.vehicle_id')->orderBy('expires_on')->limit(5)
+        $expiring = VehicleContract::query()->where('hr_vehicle_contracts.tenant_id', $tenant)->where('hr_vehicle_contracts.status', 'active')->whereDate('hr_vehicle_contracts.expires_on', '<=', today()->addDays(30))
+            ->join('hr_vehicles', 'hr_vehicles.id', '=', 'hr_vehicle_contracts.vehicle_id')->orderBy('hr_vehicle_contracts.expires_on')->limit(5)
             ->get(['hr_vehicle_contracts.id', 'hr_vehicles.license_plate', 'hr_vehicle_contracts.type', 'hr_vehicle_contracts.expires_on']);
 
         return [

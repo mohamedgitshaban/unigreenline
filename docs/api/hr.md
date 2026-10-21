@@ -528,3 +528,109 @@ Requires `payslips.view`.
 2. Create departments, holidays and employees; **link each employee to their login** with `user_id`.
 3. Give users the `Employee` role (self-service) or `HR Manager`.
 4. Month end: payroll drafts itself (or `POST /payroll-runs`) → review payslips → `approve` → `pay`.
+
+## Recruitment 🆕 NEW
+
+Hiring in the style of Odoo's *Recruitment*: **jobs** with vacancies, a **pipeline of stages** applicants move through, **applicants** with
+their CV, notes and history, **interviews**, **offers**, refusal reasons, and **hiring** that turns an applicant into an employee.
+It is part of the HR module: the **HR Manager** holds all of it; others get what you grant them by name (an interviewer, a recruiter).
+
+Lists everywhere share the README's `search`, `filter[…]`, `sort_by`, `per_page` and — where noted — `?export=csv|xlsx`.
+
+### Jobs — `/api/v1/job-positions`
+
+`GET` (`?status=draft|open|closed`, `?department_id=`, `?recruiter_id=`, `?employment_type=`; each row has `applicants_count` and `active_applicants_count`), `POST`, `GET {id}`, `PUT {id}`, `DELETE {id}` (`job-positions.view|create|update|delete`, `.export`).
+
+```json
+{ "name": "Lab Technician", "department_id": "01k…", "recruiter_id": "01k…", "vacancies": 2, "status": "open",
+  "employment_type": "full_time", "location": "Cairo", "salary_min": 7000, "salary_max": 10000,
+  "description": "…", "requirements": "…", "deadline": "2026-12-31" }
+```
+
+`hired_count` rises with each hire; **when it reaches `vacancies` the job closes by itself**. A job with applicants cannot be deleted (**422**) — close it instead.
+
+### Pipeline stages — `/api/v1/recruitment-stages`
+
+`GET` / `POST` / `GET {id}` / `PUT {id}` / `DELETE {id}` (`recruitment-stages.*`). A company that has none gets the standard six the first time it looks: *New, Initial Qualification, First Interview, Second Interview, Contract Proposal, Contract Signed* (`is_hired: true`). Stages are listed by `sequence`; add your own with a `sequence` between. Only one stage can be the `is_hired` one (flagging another clears the first). A stage with applicants cannot be deleted (**409**).
+
+### Refusal reasons — `/api/v1/refuse-reasons`
+
+`GET` / `POST` / `GET {id}` / `PUT {id}` / `DELETE {id}` (`refuse-reasons.*`), with five standard reasons created on first use.
+
+### Applicants — `/api/v1/applicants`
+
+`POST` (`applicants.create`):
+
+```json
+{ "name": "Salma Hassan", "email": "salma@example.com", "phone": "0100…", "job_position_id": "01k…", "source": "LinkedIn",
+  "expected_salary": 9000, "availability_date": "2026-12-01", "priority": 2, "recruiter_id": null, "notes": null }
+```
+
+Only `name` is required. The applicant enters the **first stage** (or `stage_id`), the recruiter defaults to the job's recruiter, and the history starts with *Applied for …*. Returns the applicant with `stage`, `job_position`, `recruiter`, `refuse_reason` and `employee`. `priority` is 0–3 (stars); `kanban_state` is `normal`, `blocked` or `done` ("ready for the next stage").
+
+`GET` (`?job_position_id=`, `?stage_id=`, `?status=active|hired|refused|archived`, `?recruiter_id=`, `?priority=`, `?source=`, `?offer_status=`, `?mine=1`; `search` on name, e-mail, phone, source, notes; each row has `interviews_count` and `upcoming_interviews_count`), `GET {id}`, `PUT {id}` (the descriptive fields — stage, status, offer and employee change only through the actions below), `DELETE {id}` (not for a hired applicant).
+
+| Action | Permission | What it does |
+|---|---|---|
+| `POST /applicants/{id}/move` `{ "stage_id" }` | `applicants.move` | to another stage (history: *Moved from New to First Interview*); only an active applicant |
+| `POST /applicants/{id}/refuse` `{ "refuse_reason_id", "note" }` | `applicants.refuse` | status `refused`; an offer still open is marked `declined` |
+| `POST /applicants/{id}/archive` · `/restore` | `applicants.archive` · `applicants.restore` | out of the pipeline and back |
+| `POST /applicants/{id}/offer` `{ "offer_status": "sent", "proposed_salary": 9500, "offer_valid_until": "2026-12-01" }` | `applicants.offer` | records the offer (`draft`, `sent`, `accepted`, `declined`) |
+| `POST /applicants/{id}/hire` `{ "hire_date": "2026-12-01", "basic_salary": 9500, "code": "EMP-100", "department_id", "work_schedule_id", "user_id" }` | `applicants.hire` (approve level) | creates the **employee** (code generated `EMP-00001`… unless given; name, e-mail, phone, job title and department from the applicant and the job; salary = `basic_salary`, else the proposed, else the expected one — **422** if none), marks the applicant `hired`, moves them to the *contract signed* stage, counts the hire on the job |
+| `GET /applicants/{id}/history` | `applicants.history` | the applicant's log, newest first: created, moved, interviews, offers, refused, hired, notes, CV |
+| `POST /applicants/{id}/notes` `{ "text" }` | `applicants.add-note` | a note in the history |
+| `POST /applicants/{id}/resume` (multipart `file`) | `applicants.upload-resume` | the CV (pdf, doc, docx, up to 5 MB), replacing any earlier one |
+| `GET /applicants/{id}/resume` | `applicants.resume` | downloads it (**404** if none) |
+
+### Interviews — `/api/v1/interviews`
+
+`POST` (`interviews.create`) `{ "applicant_id", "interviewer_id", "scheduled_at", "duration_minutes": 45, "mode": "onsite|phone|video", "location" }` — logged in the applicant's history, and the interviewer is notified. `GET` (`?applicant_id=`, `?interviewer_id=`, `?status=scheduled|done|cancelled`, `?result=`, `?mode=`, `?from=`, `?to=`, `?mine=1` for the caller's own; earliest first), `GET {id}`, `PUT {id}`, `DELETE {id}`. `POST /interviews/{id}/record-result` (`interviews.record-result`) `{ "result": "pass|fail", "score": 8, "feedback": "…" }` marks it done.
+
+### Overview
+
+`GET /api/v1/recruitment/pipeline` (`recruitment-pipeline.view`; `?job_position_id=`, `?limit=` applicants per stage) — the board: every stage with its `count` and its active applicants (`name`, `priority`, `kanban_state`, `offer_status`, job, recruiter, `days_in_stage`), plus `totals` of active / hired / refused / archived.
+`GET /api/v1/recruitment/analysis` (`recruitment-analysis.view`; `?period=` as for [dashboards](./dashboards.md)) — `applications`, `hired`, `refused`, `average_days_to_hire`, `offer_acceptance_pct`, `by_source` (applicants and hires per source), `refusal_reasons`, and per job how many vacancies are still open. The HR dashboard has a **Recruitment** feature with the same figures.
+
+## Fleet 🆕 NEW
+
+A company vehicle register in the style of Odoo's *Fleet*: vehicles, **drivers and their history**, **odometer** readings, **fuel**, **services and repairs**, **contracts** (insurance, leasing, registration) with expiry reminders, and **costs** per vehicle and per kilometre. Permissions `vehicles.*`, `vehicle-odometer-logs.*`, `vehicle-services.*`, `vehicle-fuel-logs.*`, `vehicle-contracts.*`, `fleet-service-types.*`, `fleet-analysis.view` — all held by the HR Manager.
+
+### Vehicles — `/api/v1/vehicles`
+
+```json
+{ "license_plate": "ABC-1234", "vin": null, "brand": "Toyota", "model": "Hilux", "model_year": 2024, "vehicle_type": "truck",
+  "fuel_type": "diesel", "transmission": "manual", "color": "White", "seats": 3, "odometer": 10000,
+  "acquisition_date": "2025-01-10", "acquisition_cost": 850000, "residual_value": 400000, "status": "active",
+  "fixed_asset_id": null, "location": "Main Depot", "notes": null }
+```
+
+Only `license_plate` (unique in the company) is required. `vehicle_type`: `car`, `van`, `truck`, `motorcycle`, `other`; `fuel_type`: `diesel`, `gasoline`, `electric`, `hybrid`, `cng`, `other`; `status`: `active`, `in_maintenance`, `out_of_service`, `sold`. `fixed_asset_id` can tie the vehicle to its [fixed asset](./accounting.md#fixed-assets--new). The initial `odometer` becomes the first reading; afterwards the odometer **changes only through readings** (it is ignored on `PUT`).
+
+`GET` (`?status=a,b`, `?vehicle_type=`, `?fuel_type=`, `?driver_employee_id=`, `?brand=`; `search` on plate, VIN, brand, model, location, driver; rows have `services_count`, `fuel_logs_count`, `contracts_count` and the current `driver`; export `vehicles.export`), `GET {id}`, `PUT {id}`, `DELETE {id}` — **409** once it has services, fuel logs or contracts (mark it `sold` or `out_of_service` instead).
+
+- `POST /vehicles/{id}/assign-driver` (`vehicles.assign-driver`) `{ "employee_id": "01k…" | null, "date": "2026-03-01", "notes" }` gives the vehicle to an active employee from a date, ending the previous driver's turn the day before; `null` takes it away. A sold vehicle cannot be assigned (**422**). The driver (if they have a login) is notified.
+- `GET /vehicles/{id}/assignments` — every driver it has had, newest first, with `starts_on` / `ends_on` (null = drives it now).
+- `GET /vehicles/{id}/costs` (`vehicles.cost-summary`; `?period=` as for [dashboards](./dashboards.md)) — fuel, services, contracts and the total, the distance driven, cost per kilometre and kilometres per litre, in total and `by_month`.
+
+### Odometer — `/api/v1/vehicle-odometer-logs`
+
+`POST` `{ "vehicle_id", "value": 10500, "logged_on": "2026-02-01", "employee_id", "notes" }`; `GET` (`?vehicle_id=`, `?from=`, `?to=`). A reading must fit between the ones before and after it in date order — an odometer that goes backwards is **422**. The newest reading becomes the vehicle's `odometer`.
+
+### Fuel — `/api/v1/vehicle-fuel-logs`
+
+`POST` `{ "vehicle_id", "fueled_on", "liters": 40, "price_per_liter": 12.5, "amount": 500, "odometer": 10400, "full_tank": true, "vendor_name", "employee_id" }` — give the litres and **either** the price per litre or the amount (the other is worked out; neither is **422**); the driver defaults to the vehicle's driver; a reading, if given, is added to the odometer log. `GET` / `GET {id}` / `PUT {id}` (editing litres or price recomputes the amount) / `DELETE {id}`; `?vehicle_id=`, `?employee_id=`, `?from=`, `?to=`; export.
+
+### Services — `/api/v1/vehicle-services` and `/api/v1/fleet-service-types`
+
+Service types (`GET` etc. — *Oil change, Tyres, Brakes, Battery, General inspection, Repair* created on first use). A service: `{ "vehicle_id", "service_type_id", "service_date", "status": "planned|done|cancelled", "odometer", "cost", "vendor_name", "supplier_id", "reference", "description", "next_due_date", "next_due_odometer" }`. A `planned` service puts an active vehicle `in_maintenance`; `POST /vehicle-services/{id}/mark-done` (`vehicle-services.mark-done`) `{ "service_date", "cost", "odometer", "next_due_date", "next_due_odometer" }` finishes it, logs the odometer and returns the vehicle to `active` once nothing else is planned. `?due=1` lists planned services within 14 days; `?vehicle_id=`, `?status=`, `?service_type_id=`, `?from=`, `?to=`; export.
+
+### Contracts — `/api/v1/vehicle-contracts`
+
+`{ "vehicle_id", "type": "insurance|leasing|registration|other", "reference", "vendor_name", "supplier_id", "starts_on", "expires_on", "cost", "frequency": "once|monthly|yearly", "reminder_days": 30, "status": "active|closed" }`. `POST /vehicle-contracts/{id}/close` ends it. `?expiring_within=30` lists active contracts that expire within 30 days or already have; `?vehicle_id=`, `?type=`, `?status=`; export. A contract costs its amount once on `starts_on` (`once`), or spread evenly over its days (a yearly cost ÷ 365; a monthly cost × 12 ÷ 365) for the days it covers inside the period being costed.
+
+### Analysis and reminders
+
+`GET /api/v1/fleet/analysis` (`fleet-analysis.view`; `?period=`, `?limit=`) — vehicles by status, the fleet's fuel / service / contract / total cost, distance, the vehicles ranked by cost, and alerts: contracts expiring in 30 days, contracts expired, services due, active vehicles without a driver. The HR dashboard has a **Fleet** feature.
+
+`php artisan fleet:remind` runs daily at 07:30: it notifies the people who manage the fleet — and the driver — about contracts within their `reminder_days` of expiring (or expired), planned services due within a week, and finished services whose next date or odometer is near, unless a later service of the same kind has been done. Once a day per item, with a link to the vehicle.
+

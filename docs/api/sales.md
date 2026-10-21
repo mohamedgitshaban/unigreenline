@@ -7,7 +7,12 @@
 
 **Ownership scoping**: a `Sales Rep` only sees/creates their own orders
 (`sales_rep_id`), and only sees invoices/deliveries/collections tied back to
-one of their own orders. Any other role with the sales permissions (`sales-orders.view`/`create`... or,
+one of their own orders. 🔄 "Their own" now follows the reporting line: a user whose data scope is `team` (a Sales Rep by default, any
+manager you set to `team`) sees the orders, invoices, collections and deliveries of themselves **and everyone who reports to them**;
+a manager left on `all` sees everything. Creating or editing an order for a `sales_rep_id` outside your team is **422**
+(`You can only create orders under your own name or a member of your team.`). See [Reporting line](./README.md#reporting-line-who-sees-whose-data--new).
+The **warehouse managers** of the warehouses an order draws from can see what is due to leave their warehouse in
+[`GET /warehouses/{id}/outgoing`](./inventory.md#get-apiv1warehousesidoutgoing--new) and are notified as the order moves. Any other role with the sales permissions (`sales-orders.view`/`create`... or,
 for invoices/collections, the `invoices.*` / `collections.*` ones the `Accountant` role holds — see below)
 sees/acts on everything. Warehouse assignment (`user_warehouses`) is
 unrelated to any of this — a Sales Rep or Manager is never assigned to a
@@ -33,6 +38,15 @@ another rep's order.
 
 The order's lines (each with its `product`) and invoices, each as its own
 list. Same access as the order show. Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README.
+
+## Printing 🆕 NEW
+
+`GET /api/v1/invoices/{id}/print` (`invoices.print`), `GET /api/v1/sales-orders/{id}/print` (`sales-orders.print`),
+`GET /api/v1/deliveries/{id}/print` (`deliveries.print` — the delivery note: quantities and batches, no prices) and
+`GET /api/v1/collections/{id}/print` (`collections.print` — the payment receipt) return the document as a page ready for A4, or as
+data with `?format=json`. See [Printing documents](./README.md#printing-documents--new). The Accountant can print invoices and receipts.
+
+> 🔄 `GET /deliveries/{id}` and `PUT /deliveries/{id}/deliver` were not limited to the caller's company; another company's delivery is now **404**.
 
 ## `POST /api/v1/sales-orders` 🔄 CHANGED
 

@@ -34,6 +34,11 @@ class FleetServiceTypeController extends Controller
         return ['name'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['name', 'asc'];
+    }
+
     protected function filterKeys(): array
     {
         return ['category'];

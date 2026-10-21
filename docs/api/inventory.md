@@ -98,6 +98,107 @@ Product responses include (on show / index / store / update):
 
 ---
 
+## Warehouses for the people who run them 🆕 NEW
+
+**Who sees a warehouse.** A user sees the warehouses they are *assigned* to (`user_warehouses`), the ones they *manage*
+(`manager_id`), and — so a manager sees everything their people see — those of **everyone who reports to them**. Administrator, Owner and
+Auditor see every warehouse of the company. Everything that filters by warehouse (batches, transfers, receipts, write-offs, the lenses below) uses this one rule.
+
+**How to give a warehouse to its manager.** Three equivalent ways:
+
+1. `PUT /api/v1/warehouses/{id}/users` (below) — set the people and the manager in one call.
+2. Set `manager_id` when creating (`POST /warehouses`) or editing (`PUT /warehouses/{id}`) the warehouse — the manager is attached automatically.
+3. Send `warehouse_ids` when creating or editing the *user* ([admin.md](./admin.md#post-apiv1users)).
+
+### `GET /api/v1/warehouses/{id}/users` 🆕 NEW
+
+Requires `warehouses.view` (and to see the warehouse). Who works there:
+
+```json
+{ "data": { "warehouse": { "id": "01k…", "name": "Main Depot" }, "manager_id": "01k…",
+  "users": [ { "id": "01k…", "name": "Omar", "email": "omar@…", "role": "Warehouse Manager", "status": "active", "is_manager": true } ] } }
+```
+
+### `PUT /api/v1/warehouses/{id}/users` 🆕 NEW
+
+Requires `warehouses.assign-users` (+ access to the warehouse). **Replaces** the people of the warehouse:
+
+```json
+{ "user_ids": ["01k…", "01k…"], "manager_id": "01k…" }
+```
+
+`user_ids` must be present (an empty list is fine); every id must belong to the company (**422** otherwise). `manager_id` is optional: send an id to name the manager, `null` to remove them, leave it out to keep the current one. The manager always works there too, so they stay in the list. Audit-logged; the new and the old manager are notified. Returns the same body as `GET …/users`.
+
+### `GET /api/v1/warehouses/{id}/overview` 🆕 NEW
+
+Requires `warehouses.overview`. Everything a warehouse manager looks at first:
+
+```json
+{ "data": {
+  "warehouse": { "id": "01k…", "name": "Main Depot", "city": "Cairo", "status": "active", "manager_id": "01k…", "manager_name": "Omar" },
+  "stock": { "products": 42, "batches": 77, "cartons": 3100, "reserved_cartons": 120, "available_cartons": 2980, "value": null },
+  "alerts": { "low_stock_products": 3, "expired_batches": 1, "expiring_within_30_days": 5 },
+  "incoming": { "open_purchase_orders": 2, "cartons_expected": 450 },
+  "outgoing": { "open_sales_orders": 6, "to_prepare": 4, "to_deliver": 2 },
+  "last_7_days": { "received_cartons": 300, "issued_cartons": 180 },
+  "recent_movements": [ … the last 10 ledger lines … ] } }
+```
+
+`stock.value` is shown to the Administrator only (the same rule as batch costs); `null` for everyone else.
+
+### `GET /api/v1/warehouses/{id}/incoming` 🆕 NEW
+
+Requires `warehouses.incoming`. The **purchase orders on their way to this warehouse**, soonest expected first — so the warehouse knows what to expect before it arrives, and without seeing prices:
+
+```json
+{ "data": [ { "id": "01k…", "status": "sent", "order_date": "2026-10-18", "expected_date": "2026-10-24", "received_date": null, "notes": null,
+  "supplier": { "id": "01k…", "name": "Pharma Wholesale" }, "total_cartons": 25,
+  "lines": [ { "product": { "id": "01k…", "name": "Ivermectin", "sku": "IVM-1" }, "qty_cartons": 25 } ] } ],
+  "meta": { "current_page": 1, "last_page": 1, "per_page": 15, "total": 1 } }
+```
+
+By default every order not yet received or cancelled (`draft`, `sent`, `pending`, `pending_pricing`); `?status=received` (or a comma list) shows others, `?purchase_order_id=` one order, `?search=` the supplier name. Receiving the order itself is still `POST /purchase-orders/{id}/receive`.
+
+### `GET /api/v1/warehouses/{id}/outgoing` 🆕 NEW
+
+Requires `warehouses.outgoing`. The **sales orders that will take stock out of this warehouse**, oldest first, showing only the lines for this warehouse (an order can draw from several), no prices:
+
+```json
+{ "data": [ { "id": "01k…", "status": "picking", "stage": "to_prepare", "order_date": "2026-10-20", "stock_deducted": false, "notes": null,
+  "customer": { "id": "01k…", "name": "Green Valley" }, "sales_rep": { "id": "01k…", "name": "Karim" }, "total_cartons": 5,
+  "lines": [ { "product": { "id": "01k…", "name": "Ivermectin", "sku": "IVM-1" }, "qty": 4, "unit": "Carton", "free_qty": 1, "is_gift": false, "batch_no": null, "cartons": 5 } ] } ],
+  "meta": { … } }
+```
+
+`stage` is `to_prepare` for a `draft` or `picking` order and `to_deliver` once `invoiced` and waiting to be handed over. `?status=`, `?sales_order_id=` and `?search=` (customer name) narrow it. The warehouse manager is also **notified** when such an order is created or moves on, with a link to this list.
+
+### Stock movement ledger 🆕 NEW
+
+Every change to the quantity of a batch is a line of the ledger: cartons in (positive) or out (negative), the reason, the document behind it, who did it. It is written automatically wherever stock changes — manual receipts, purchase receipts, transfers, sales, returns, write-offs, production — so the movements of a batch always add up to what it holds. Stock that existed before the ledger was introduced appears once as an `opening_balance`.
+
+| `type` | Meaning |
+|---|---|
+| `opening_balance` | stock already there when the ledger started |
+| `goods_receipt` / `purchase_receipt` | manual receipt (`/inventory/grn`) / purchase-order receipt (reference = the order) |
+| `transfer_in` / `transfer_out` | between warehouses (reference = the transfer; `counterpart_warehouse` = the other side) |
+| `sale` / `sale_return` | sales deduction (reference = the sales order) / customer return put back |
+| `return_to_supplier` | purchase return |
+| `write_off` | approved recap (reference = the recap) |
+| `production_consumption` / `production_output` / `production_by_product` | manufacturing |
+| `adjustment` | any other change |
+
+**`GET /api/v1/warehouses/{id}/movements`** (`warehouses.movements`) and **`GET /api/v1/products/{id}/movements`** (`products.movements` — across the warehouses the caller may see):
+
+```json
+{ "data": [ { "id": "01k…", "occurred_at": "2026-10-21T10:02:11+00:00", "direction": "out", "qty_cartons": -5,
+  "type": "sale", "type_label": "Sale", "warehouse": { "id": "01k…", "name": "Main Depot" },
+  "product": { "id": "01k…", "name": "Ivermectin", "sku": "IVM-1" }, "batch_no": "B-77", "is_free_gift": false,
+  "counterpart_warehouse": null, "reference_type": "sales_order", "reference_id": "01k…", "user": { "id": "01k…", "name": "Karim" }, "notes": null } ],
+  "links": { … }, "meta": { … }, "summary": { "total_in": 107, "total_out": 30, "net": 77 } }
+```
+
+Filters: `product_id`, `warehouse_id` (product ledger), `type` (comma list), `direction` (`in`/`out`), `batch_no`, `reference_type`, `reference_id`, `from`, `to`, `search` (batch, product name, SKU). `summary` totals the whole filtered set, not only the page. `unit_cost` appears on each line for the Administrator only. `?export=csv|xlsx` needs `warehouses.export` / `products.export`.
+
 ## `GET /api/v1/warehouses`
 
 Requires `warehouses.view`.
@@ -452,6 +553,10 @@ gift flag.
 ## `GET /api/v1/transfers`
 
 Requires `transfers.view`.
+
+## `GET /api/v1/transfers/{id}/print` 🆕 NEW
+
+Requires `transfers.print`. The stock-transfer slip for the truck: both warehouses (address, manager), the product, batch and cartons, notes and signature boxes (*Sent by*, *Carrier*, *Received by*) — no prices. `?format=json` for the data. See [Printing documents](./README.md#printing-documents--new).
 
 ## `GET /api/v1/transfers/{id}`
 

@@ -35,6 +35,11 @@ class RefuseReasonController extends Controller
         return ['name'];
     }
 
+    protected function defaultOrder(): array
+    {
+        return ['name', 'asc'];
+    }
+
     public function index(Request $request)
     {
         $this->recruitment->refuseReasons($request->user()->tenant_id);
