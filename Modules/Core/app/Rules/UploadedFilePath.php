@@ -18,6 +18,7 @@ class UploadedFilePath implements ValidationRule
     /**
      * @param  class-string<Model>  $model  Model whose `$column` stores the path.
      * @param  list<string>  $extensions
+     * @param  ?string  $disk  Disk the upload endpoint stored the file on; null = the default disk.
      */
     public function __construct(
         private readonly string $directory,
@@ -26,13 +27,14 @@ class UploadedFilePath implements ValidationRule
         private readonly string $uploadEndpoint,
         private readonly array $extensions = ['jpg', 'jpeg', 'png', 'pdf'],
         private readonly ?string $ignoreId = null,
+        private readonly ?string $disk = null,
     ) {}
 
     public function validate(string $attribute, mixed $value, Closure $fail): void
     {
         $pattern = '#^'.preg_quote($this->directory, '#').'/[A-Za-z0-9]+\.('.implode('|', $this->extensions).')$#';
 
-        if (! is_string($value) || ! preg_match($pattern, $value) || ! Storage::exists($value)) {
+        if (! is_string($value) || ! preg_match($pattern, $value) || ! Storage::disk($this->disk)->exists($value)) {
             $fail("The :attribute must be a file uploaded via {$this->uploadEndpoint}.");
 
             return;

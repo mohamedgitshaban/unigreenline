@@ -41,7 +41,7 @@ class DocumentPermissions extends Command
             '- A list that can also be downloaded (`?export=csv|xlsx`) has a separate `{resource}.export` permission, needed in addition to `view`.',
             '- Giving a role `expenses.view` but not `expense-categories.view` lets its users read expenses and not the expense categories: permissions are per resource, not per module.',
             '- `Administrator` holds every permission and is not subject to the checks.',
-            '- Open to any signed-in user (no permission): `POST /auth/logout`, `GET /auth/me`, `POST /auth/change-password`, the user\'s own `notifications`, the `governorates` / cities lists and `POST /discarded-actions`. `POST /auth/login` is public.',
+            '- Open to any signed-in user (no permission): `POST /auth/logout`, `GET /auth/me`, `POST /auth/change-password`, the user\'s own `notifications`, the `governorates` / cities lists, `GET /settings` (the logo and colours of the company) and `POST /discarded-actions`. `POST /auth/login` is public.',
             '- `GET /api/v1/permissions` returns this same catalogue (grouped by module and resource, with the endpoints of each); `PUT /api/v1/roles/{id}` sets a role\'s permissions.',
             '',
             'Role columns: '.collect(self::ROLE_HEADINGS)->map(fn ($short, $role) => "**{$short}** = {$role}")->implode(', ').'.',

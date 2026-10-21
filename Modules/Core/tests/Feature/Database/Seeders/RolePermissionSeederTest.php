@@ -56,7 +56,7 @@ class RolePermissionSeederTest extends TestCase
 
         $actions = collect($this->permissionsOf('Auditor'))->diff($chat)->map(fn (string $name) => explode('.', $name, 2)[1])->unique()->sort()->values()->all();
 
-        $this->assertSame(['export', 'verify', 'view'], array_values(array_diff($actions, ['availability', 'lifecycle', 'costs', 'history', 'schedule', 'traceability', 'due', 'forecast', 'incoming', 'movements', 'outgoing', 'overview', 'preview', 'summary'])));
+        $this->assertSame(['export', 'verify', 'view'], array_values(array_diff($actions, ['availability', 'lifecycle', 'costs', 'history', 'schedule', 'traceability', 'due', 'forecast', 'incoming', 'movements', 'outgoing', 'overview', 'preview', 'summary', 'cost-summary', 'resume'])));
         $this->assertContains('products.view', $this->permissionsOf('Auditor'));
         $this->assertContains('audit-log.view', $this->permissionsOf('Auditor'));
         $this->assertNotContains('products.create', $this->permissionsOf('Auditor'));

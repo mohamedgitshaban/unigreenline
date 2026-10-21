@@ -33,10 +33,9 @@ class SalesOrderStoreTest extends TestCase
 
         $response = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $customer->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+                ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
             ],
         ]);
 
@@ -61,10 +60,9 @@ class SalesOrderStoreTest extends TestCase
         $response = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $customer->id,
             'sales_rep_id' => $otherRep->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+                ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
             ],
         ]);
 
@@ -88,10 +86,9 @@ class SalesOrderStoreTest extends TestCase
 
         $response = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $customer->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+                ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
             ],
         ]);
 
@@ -121,14 +118,57 @@ class SalesOrderStoreTest extends TestCase
 
         $response = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $customer->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+                ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
             ],
         ]);
 
         $response->assertCreated();
+    }
+
+    public function test_every_line_must_name_its_warehouse(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
+        $rep = User::factory()->recycle($tenant)->create();
+        $rep->assignRole('Sales Rep');
+        Sanctum::actingAs($rep);
+
+        $customer = Customer::factory()->recycle($tenant)->create();
+        $product = Product::factory()->recycle($tenant)->create();
+
+        $this->postJson('/api/v1/sales-orders', [
+            'customer_id' => $customer->id,
+            'pay_type' => 'cash',
+            'lines' => [
+                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+            ],
+        ])->assertUnprocessable()->assertJsonValidationErrors(['lines.0.warehouse_id']);
+    }
+
+    public function test_the_order_takes_its_warehouse_from_the_first_line_ignoring_any_top_level_value(): void
+    {
+        $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
+        $rep = User::factory()->recycle($tenant)->create();
+        $rep->assignRole('Sales Rep');
+        Sanctum::actingAs($rep);
+
+        $customer = Customer::factory()->recycle($tenant)->create();
+        $first = Warehouse::factory()->recycle($tenant)->create();
+        $other = Warehouse::factory()->recycle($tenant)->create();
+        $product = Product::factory()->recycle($tenant)->create();
+        InventoryBatch::factory()->recycle([$tenant, $product, $first])->withQtyCartons(50)->create();
+
+        $this->postJson('/api/v1/sales-orders', [
+            'customer_id' => $customer->id,
+            'warehouse_id' => $other->id,
+            'pay_type' => 'cash',
+            'lines' => [
+                ['product_id' => $product->id, 'warehouse_id' => $first->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+            ],
+        ])->assertCreated()->assertJsonPath('data.warehouse.id', $first->id);
     }
 
     public function test_customer_service_role_cannot_create_a_sales_order(): void
@@ -145,10 +185,9 @@ class SalesOrderStoreTest extends TestCase
 
         $response = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $customer->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $product->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
+                ['product_id' => $product->id, 'warehouse_id' => $warehouse->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 65],
             ],
         ]);
 

@@ -8,6 +8,7 @@ use Modules\Core\Http\Controllers\DashboardController;
 use Modules\Core\Http\Controllers\DiscardedActionController;
 use Modules\Core\Http\Controllers\NotificationController;
 use Modules\Core\Http\Controllers\RoleController;
+use Modules\Core\Http\Controllers\SettingController;
 use Modules\Core\Http\Controllers\TeamController;
 use Modules\Core\Http\Controllers\UserController;
 
@@ -39,6 +40,10 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('audit-log', [AuditLogController::class, 'index'])->can('audit-log.view')->exportable('audit-log.export');
     Route::post('audit-log/verify-integrity', [AuditLogController::class, 'verifyIntegrity'])->can('audit-log.verify');
     Route::get('audit-log/{id}', [AuditLogController::class, 'show'])->can('audit-log.view');
+
+    Route::get('settings', [SettingController::class, 'show']);
+    Route::put('settings', [SettingController::class, 'update'])->can('settings.update');
+    Route::post('settings/images', [SettingController::class, 'uploadImage'])->can('settings.update');
 
     Route::get('team', [TeamController::class, 'mine']);
     Route::get('dashboards', [DashboardController::class, 'index']);

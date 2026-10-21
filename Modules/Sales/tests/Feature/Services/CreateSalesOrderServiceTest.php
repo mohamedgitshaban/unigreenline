@@ -188,9 +188,8 @@ class CreateSalesOrderServiceTest extends TestCase
             'tenant_id' => $tenant->id,
             'customer_id' => $customer->id,
             'sales_rep_id' => $rep->id,
-            'warehouse_id' => $warehouse->id,
             'pay_type' => $payType,
-            'lines' => $lines,
+            'lines' => array_map(fn (array $line) => ['warehouse_id' => $warehouse->id] + $line, $lines),
         ];
     }
 

@@ -143,11 +143,10 @@ class SalesOrderPricingAndGiftsTest extends TestCase
      */
     private function order(array $lines): TestResponse
     {
-        $lines = array_map(fn (array $line) => ['product_id' => $this->product->id] + $line, $lines);
+        $lines = array_map(fn (array $line) => ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id] + $line, $lines);
 
         return $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $this->customer->id,
-            'warehouse_id' => $this->warehouse->id,
             'pay_type' => 'cash',
             'lines' => $lines,
         ]);

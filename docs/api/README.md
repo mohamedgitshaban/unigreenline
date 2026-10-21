@@ -363,7 +363,7 @@ The counts are on both the list and the show response of the parent.
 | 🆕 HR (Employees / Attendance / Holidays / Time permissions / Leave / Payroll) | New | [hr.md](./hr.md) |
 | 🔄 Permission reference (every permission, the endpoints it guards, the roles holding it) | Generated | [permissions.md](./permissions.md) |
 | Analytics / Reports / Scheduled Jobs | Done | [analytics.md](./analytics.md) |
-| Admin (users, 🆕 roles & permissions, audit log, notifications, discarded actions, governorates/cities) | Done — Settings has no backing schema in the spec, not built | [admin.md](./admin.md) |
+| Admin (users, 🆕 roles & permissions, audit log, notifications, discarded actions, governorates/cities, 🆕 settings/branding) | Done | [admin.md](./admin.md) |
 
 This file is updated as each module ships.
 

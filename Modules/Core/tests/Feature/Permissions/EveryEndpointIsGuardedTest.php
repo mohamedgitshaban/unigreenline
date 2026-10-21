@@ -10,8 +10,9 @@ class EveryEndpointIsGuardedTest extends TestCase
 {
     /**
      * Endpoints that are deliberately open to any signed-in (or no) user:
-     * authentication itself, a user's own inbox, shared reference lists and
-     * saving one's own abandoned form.
+     * authentication itself, a user's own inbox, shared reference lists, the
+     * company's branding (every user's screen is drawn with it) and saving
+     * one's own abandoned form.
      *
      * @var array<int, string>
      */
@@ -19,6 +20,7 @@ class EveryEndpointIsGuardedTest extends TestCase
         'POST api/v1/auth/login', 'POST api/v1/auth/logout', 'GET api/v1/auth/me', 'POST api/v1/auth/change-password',
         'GET api/v1/notifications', 'PUT api/v1/notifications/read-all', 'GET api/v1/notifications/{id}', 'GET api/v1/notifications/unread-count', 'PUT api/v1/notifications/{id}/read',
         'GET api/v1/governorates', 'GET api/v1/governorates/{governorate}/cities',
+        'GET api/v1/settings',
         'POST api/v1/discarded-actions',
         'GET api/v1/team',
         'GET api/v1/dashboards',

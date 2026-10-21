@@ -22,7 +22,6 @@ class StoreSalesOrderRequest extends FormRequest
         return [
             'customer_id' => ['required', 'string', Rule::exists('customers', 'id')->where('tenant_id', $tenantId)],
             'sales_rep_id' => ['nullable', 'string', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
-            'warehouse_id' => ['required', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
             'pay_type' => ['required', Rule::in(['cash', 'credit'])],
             'grace_period' => ['sometimes', 'integer', 'min:0'],
             'invoice_discount' => ['sometimes', 'numeric', 'min:0'],
@@ -31,7 +30,8 @@ class StoreSalesOrderRequest extends FormRequest
 
             'lines' => ['required', 'array', 'min:1'],
             'lines.*.product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
-            'lines.*.warehouse_id' => ['nullable', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
+            // Each line names the warehouse it is drawn from; the order's own warehouse is taken from the first line.
+            'lines.*.warehouse_id' => ['required', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
             'lines.*.batch_no' => ['nullable', 'string', 'max:255'],
             'lines.*.qty' => ['required', 'integer', 'min:1'],
             // Either a plain Carton/Pack, or one of the product's packaging units (unit_id).

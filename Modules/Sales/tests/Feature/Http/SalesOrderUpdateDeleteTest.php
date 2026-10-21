@@ -130,10 +130,9 @@ class SalesOrderUpdateDeleteTest extends TestCase
         // 8 cartons: only 5 exist in the second warehouse, so it must be 3 + 5 across two lines.
         $id = $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $this->customer->id,
-            'warehouse_id' => $this->warehouse->id,
             'pay_type' => 'cash',
             'lines' => [
-                ['product_id' => $this->product->id, 'qty' => 3, 'unit' => 'Carton', 'unit_price' => 100],
+                ['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'qty' => 3, 'unit' => 'Carton', 'unit_price' => 100],
                 ['product_id' => $this->product->id, 'warehouse_id' => $second->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 100],
             ],
         ])
@@ -156,7 +155,6 @@ class SalesOrderUpdateDeleteTest extends TestCase
 
         $this->postJson('/api/v1/sales-orders', [
             'customer_id' => $this->customer->id,
-            'warehouse_id' => $this->warehouse->id,
             'pay_type' => 'cash',
             'lines' => [['product_id' => $this->product->id, 'warehouse_id' => $second->id, 'qty' => 5, 'unit' => 'Carton', 'unit_price' => 100]],
         ])->assertUnprocessable()->assertJsonPath('shortfalls.0.warehouse_id', $second->id);

@@ -1,11 +1,11 @@
 # Admin
 
 Covers user management, roles & permissions, the audit log viewer, notifications, discarded
-actions, and the governorate/city reference lists. All endpoints require authentication; most additionally need their
+actions, the governorate/city reference lists, and the company settings (branding). All endpoints require authentication; most additionally need their
 own permission (`users.view|create|update|delete|export`, `roles.view|create|update|delete|assign-users`, `permissions.view`,
-`audit-log.view|verify|export`, `discarded-actions.view|export`) — **only `Administrator`, `Owner`, and `Auditor` hold
+`audit-log.view|verify|export`, `discarded-actions.view|export`, `settings.update`) — **only `Administrator`, `Owner`, and `Auditor` hold
 the viewing ones by default**, and only `Administrator` holds create/update/delete
-(Owner/Auditor are oversight roles — view/export/audit only, no data entry).
+(Owner/Auditor are oversight roles — view/export/audit only, no data entry; the one exception is `Owner`, which can also change the company `settings`).
 
 ---
 
@@ -344,12 +344,86 @@ The cities of one governorate, sorted by name.
 
 ---
 
-## Settings
+## Settings 🆕 NEW
 
-**Not built.** Spec §8 lists "Settings" as an Admin screen and §10's build
-order mentions it, but no `settings` table exists anywhere in §4 (schema)
-and no `/settings` endpoint is listed in §6 (API surface) — there's nothing
-in the spec to build against. If the frontend needs persisted app-level
-settings (company info, tax rate, invoice numbering, etc.), that needs a
-schema decision first; this isn't an oversight in this build, it's a gap
-in the source spec.
+> 🆕 **NEW.** The company's branding — logo, wide logo, favicon and colours — saved
+> once and read by every screen. (The original spec had no settings schema;
+> this is the first thing kept there, so it is a small fixed set of fields rather
+> than a free-form key/value store.)
+
+Settings are **per company** (tenant). Nothing is created until the first save:
+until then every field reads as `null`.
+
+### Settings object
+
+```json
+{
+  "data": {
+    "logo_path": "branding/01m.../a1b2c3.png",
+    "logo_url": "https://erp.example.com/storage/branding/01m.../a1b2c3.png",
+    "wide_logo_path": null,
+    "wide_logo_url": null,
+    "favicon_path": "branding/01m.../d4e5f6.ico",
+    "favicon_url": "https://erp.example.com/storage/branding/01m.../d4e5f6.ico",
+    "primary_color": "#1A7F37",
+    "secondary_color": "#0B3D91",
+    "accent_color": null
+  }
+}
+```
+
+`*_path` is what you send back to change the image; `*_url` is a plain public URL
+for `<img src>` / `<link rel="icon">` (`null` when no image is set). Images are
+stored on the `public` disk, so the server needs `php artisan storage:link` once.
+
+### `GET /api/v1/settings`
+
+**Open to every signed-in user** — everyone's screen is drawn with the logo and
+colours. Returns the settings object of the caller's company.
+
+### `POST /api/v1/settings/images`
+
+Requires `settings.update`. **Step 1 of setting an image** (same two-step flow as
+receipts and contracts). `multipart/form-data` with a single `image` file — `png`,
+`jpg`, `jpeg`, `webp` or `ico`, max 2 MB. SVG is not accepted: it can carry scripts.
+
+**201**
+```json
+{
+  "data": {
+    "path": "branding/01m.../a1b2c3.png",
+    "url": "https://erp.example.com/storage/branding/01m.../a1b2c3.png",
+    "original_name": "logo.png",
+    "mime_type": "image/png",
+    "size": 20481
+  }
+}
+```
+
+**422** — no `image`, a file of another kind, or larger than 2 MB.
+
+### `PUT /api/v1/settings`
+
+Requires `settings.update` (`Administrator` and `Owner` by default). **Step 2**: send
+any of these — a field left out stays as it is, `null` clears it.
+
+```json
+{
+  "logo_path": "branding/01m.../a1b2c3.png",
+  "wide_logo_path": "branding/01m.../b2c3d4.png",
+  "favicon_path": "branding/01m.../d4e5f6.ico",
+  "primary_color": "#1A7F37",
+  "secondary_color": "#0B3D91",
+  "accent_color": "#FF8800"
+}
+```
+
+- `logo_path`, `wide_logo_path`, `favicon_path` — a `path` returned by
+  `POST /settings/images` for this company that still exists, otherwise **422**
+  (`The logo path must be a file uploaded via POST /api/v1/settings/images.`).
+- `primary_color`, `secondary_color`, `accent_color` — `#RRGGBB` (six hex digits,
+  with the `#`), otherwise **422**.
+- An image that is replaced or cleared is deleted from storage (unless another field
+  still uses it). The change is audit-logged (`TenantSetting`).
+
+**200** — the settings object. **403** without `settings.update`.

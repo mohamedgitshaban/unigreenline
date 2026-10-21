@@ -84,7 +84,7 @@ class SalesOrderStoreAndDeliverTest extends TestCase
     {
         $this->actingAsRole('Sales Manager');
 
-        $this->postJson('/api/v1/sales-orders/deliver', $this->payload(['lines' => [['product_id' => $this->product->id, 'qty' => 99, 'unit' => 'Carton', 'unit_price' => 100]]]))
+        $this->postJson('/api/v1/sales-orders/deliver', $this->payload(['lines' => [['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'qty' => 99, 'unit' => 'Carton', 'unit_price' => 100]]]))
             ->assertUnprocessable()
             ->assertJsonStructure(['shortfalls']);
 
@@ -111,7 +111,7 @@ class SalesOrderStoreAndDeliverTest extends TestCase
         $this->actingAsRole('Sales Manager');
         $this->product->update(['min_selling_price' => 100]);
 
-        $this->postJson('/api/v1/sales-orders/deliver', $this->payload(['lines' => [['product_id' => $this->product->id, 'qty' => 1, 'unit' => 'Pack', 'unit_price' => 50]]]))
+        $this->postJson('/api/v1/sales-orders/deliver', $this->payload(['lines' => [['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'qty' => 1, 'unit' => 'Pack', 'unit_price' => 50]]]))
             ->assertUnprocessable()
             ->assertJsonValidationErrors('lines.0.unit_price');
 
@@ -128,9 +128,8 @@ class SalesOrderStoreAndDeliverTest extends TestCase
     {
         return $overrides + [
             'customer_id' => $this->customer->id,
-            'warehouse_id' => $this->warehouse->id,
             'pay_type' => 'credit',
-            'lines' => [['product_id' => $this->product->id, 'qty' => 4, 'unit' => 'Carton', 'unit_price' => 100]],
+            'lines' => [['product_id' => $this->product->id, 'warehouse_id' => $this->warehouse->id, 'qty' => 4, 'unit' => 'Carton', 'unit_price' => 100]],
         ];
     }
 

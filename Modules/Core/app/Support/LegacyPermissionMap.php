@@ -73,6 +73,8 @@ class LegacyPermissionMap
         'manufacturing-cost-reports.export' => 'audit',
         // Changes how production is costed and which moves are allowed: never given by the grid, only granted by name.
         'manufacturing-settings.update' => 'manage',
+        // Changes the company's logo and colours for everyone: never given by the grid, only granted by name.
+        'settings.update' => 'manage',
     ];
 
     /**

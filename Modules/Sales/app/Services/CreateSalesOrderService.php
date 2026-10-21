@@ -36,10 +36,10 @@ class CreateSalesOrderService
 
     /**
      * @param  array{
-     *     tenant_id: string, customer_id: string, sales_rep_id: string, warehouse_id: string,
+     *     tenant_id: string, customer_id: string, sales_rep_id: string,
      *     pay_type: string, grace_period?: int, invoice_discount?: float, notes?: ?string, order_date?: string,
      *     actor_id?: ?string, actor_name?: ?string, ip_address?: ?string,
-     *     lines: array<int, array{product_id: string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>,
+     *     lines: array<int, array{product_id: string, warehouse_id: string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>,
      * }  $data
      */
     public function create(array $data): SalesOrder
@@ -47,14 +47,17 @@ class CreateSalesOrderService
         $customer = Customer::findOrFail($data['customer_id']);
         ['lines' => $computedLines, 'subtotal' => $subtotal, 'tax' => $taxAmount, 'discount' => $invoiceDiscount, 'total' => $total] = $this->price($data['lines'], $data['invoice_discount'] ?? 0);
 
-        $this->assertCanFulfil($customer, $data['pay_type'], $total, $computedLines, $data['warehouse_id']);
+        // The order's own warehouse is the first line's; every line carries its own.
+        $warehouseId = $computedLines[0]['warehouse_id'];
 
-        return DB::transaction(function () use ($data, $customer, $computedLines, $subtotal, $taxAmount, $invoiceDiscount, $total) {
+        $this->assertCanFulfil($customer, $data['pay_type'], $total, $computedLines, $warehouseId);
+
+        return DB::transaction(function () use ($data, $customer, $computedLines, $warehouseId, $subtotal, $taxAmount, $invoiceDiscount, $total) {
             $order = SalesOrder::create([
                 'tenant_id' => $data['tenant_id'],
                 'customer_id' => $customer->id,
                 'sales_rep_id' => $data['sales_rep_id'],
-                'warehouse_id' => $data['warehouse_id'],
+                'warehouse_id' => $warehouseId,
                 'status' => 'draft',
                 'pay_type' => $data['pay_type'],
                 'grace_period' => $data['grace_period'] ?? 0,
