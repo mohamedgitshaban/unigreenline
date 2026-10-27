@@ -42,7 +42,8 @@ carton. Both are idempotent.
 ### `GET /api/v1/units` 🆕 NEW
 
 Requires `units.view`, . Paginated (50 per
-page); `search` matches `name`.
+page); `search` matches `name`. Without `units.view` it still answers, but with only
+`id` and `name` per unit (the same pick-list rule as `GET /warehouses`).
 
 ```json
 { "data": [ { "id": "01m...", "name": "Packet", "active": true } ] }
@@ -201,7 +202,14 @@ Filters: `product_id`, `warehouse_id` (product ledger), `type` (comma list), `di
 
 ## `GET /api/v1/warehouses`
 
-Requires `warehouses.view`.
+Requires `warehouses.view` for the full list.
+
+> 🔄 **CHANGED — open as a pick-list.** Without `warehouses.view` the endpoint no longer
+> answers `403`: it returns only `id` and `name` per record (same paginated
+> envelope, `?search=` on the name, `?per_page=`), enough to fill a dropdown —
+> for example the sales-order form for a Sales Rep. `filter[...]`, sorting on
+> other columns and `?export=` are ignored. The pick-list names **every** warehouse of the
+> company, not only the ones the caller is assigned to.
 
 **200**
 ```json
@@ -298,7 +306,13 @@ Requires `warehouses.import`. Downloads `warehouses-import-template.xlsx`.
 
 ## `GET /api/v1/products`
 
-Requires `products.view`. Not warehouse-scoped (catalog-wide).
+Requires `products.view` for the full list. Not warehouse-scoped (catalog-wide).
+
+> 🔄 **CHANGED — open as a pick-list.** Without `products.view` the endpoint no longer
+> answers `403`: it returns only `id` and `name` per record (same paginated
+> envelope, `?search=` on the name, `?per_page=`), enough to fill a dropdown —
+> for example the sales-order form for a Sales Rep. `filter[...]`, sorting on
+> other columns and `?export=` are ignored.
 
 > 🔄 **CHANGED — cost is administrator-only.** `pack_cost_price` and
 > `cost_price` are returned **only to Administrators**; every other user gets the

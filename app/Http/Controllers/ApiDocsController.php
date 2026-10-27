@@ -30,6 +30,7 @@ class ApiDocsController extends Controller
         'recap' => 'recap',
         'manufacturing' => 'manufacturing',
         'hr' => 'hr',
+        'dashboards' => 'dashboards',
         'analytics' => 'analytics',
         'admin' => 'admin',
         'permissions' => 'permissions',

@@ -91,7 +91,7 @@ class PermissionCatalogue
     }
 
     /**
-     * The `can:` ability and the `export_permission` an API route declares.
+     * The `can:` (or `lookup:`, see AuthorizeOrLookup) ability and the `export_permission` an API route declares.
      *
      * @return array<int, string>
      */
@@ -100,8 +100,8 @@ class PermissionCatalogue
         $abilities = [];
 
         foreach ($route->gatherMiddleware() as $middleware) {
-            if (is_string($middleware) && str_starts_with($middleware, 'can:')) {
-                $abilities[] = explode(',', substr($middleware, 4))[0];
+            if (is_string($middleware) && preg_match('/^(?:can|lookup):([^,]+)/', $middleware, $match)) {
+                $abilities[] = $match[1];
             }
         }
 

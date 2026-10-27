@@ -42,6 +42,7 @@ class DocumentPermissions extends Command
             '- Giving a role `expenses.view` but not `expense-categories.view` lets its users read expenses and not the expense categories: permissions are per resource, not per module.',
             '- `Administrator` holds every permission and is not subject to the checks.',
             '- Open to any signed-in user (no permission): `POST /auth/logout`, `GET /auth/me`, `POST /auth/change-password`, the user\'s own `notifications`, the `governorates` / cities lists, `GET /settings` (the logo and colours of the company) and `POST /discarded-actions`. `POST /auth/login` is public.',
+            '- Pick-lists for forms (`GET /products`, `GET /warehouses`, `GET /units`) are also open to any signed-in user, but a user without the permission that guards them gets only the `id` and `name` of each record (searchable with `?search=`), enough to fill a dropdown such as the sales-order form. With the permission they get the full list as before.',
             '- `GET /api/v1/permissions` returns this same catalogue (grouped by module and resource, with the endpoints of each); `PUT /api/v1/roles/{id}` sets a role\'s permissions.',
             '',
             'Role columns: '.collect(self::ROLE_HEADINGS)->map(fn ($short, $role) => "**{$short}** = {$role}")->implode(', ').'.',

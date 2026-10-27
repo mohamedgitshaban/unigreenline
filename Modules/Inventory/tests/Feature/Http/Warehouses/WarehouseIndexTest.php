@@ -21,17 +21,22 @@ class WarehouseIndexTest extends TestCase
         $response->assertUnauthorized();
     }
 
-    public function test_user_without_inventory_view_permission_is_forbidden(): void
+    public function test_user_without_warehouses_view_permission_gets_only_id_and_name(): void
     {
         $this->seed(RolePermissionSeeder::class);
+        $tenant = Tenant::factory()->create();
 
-        $user = User::factory()->create();
+        $user = User::factory()->recycle($tenant)->create();
         $user->assignRole('Customer Service'); // has no inventory.* permissions
         Sanctum::actingAs($user);
+        $warehouse = Warehouse::factory()->recycle($tenant)->create(['name' => 'Cairo Main']);
 
         $response = $this->getJson('/api/v1/warehouses');
 
-        $response->assertForbidden();
+        $response->assertOk()
+            ->assertJsonPath('data.0.id', $warehouse->id)
+            ->assertJsonPath('data.0.name', 'Cairo Main');
+        $this->assertSame(['id', 'name'], array_keys($response->json('data.0')));
     }
 
     public function test_warehouse_manager_only_sees_their_assigned_warehouses(): void

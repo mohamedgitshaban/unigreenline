@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Modules\Core\Console\Commands\DocumentPermissions;
 use Modules\Core\Console\Commands\VerifyAuditChain;
 use Modules\Core\Dashboards\DashboardRegistry;
+use Modules\Core\Http\Middleware\AuthorizeOrLookup;
 use Modules\Core\Models\User;
 use Modules\Core\Notifications\ChangeNotificationRegistry;
 use Modules\Core\Policies\RolePolicy;
@@ -76,6 +77,14 @@ class CoreServiceProvider extends ModuleServiceProvider
             $this->action['export_permission'] = $permission;
 
             return $this;
+        });
+
+        // `->canOrLookup('products.view')` on a list route: like `->can()`, except that a user without the
+        // permission still gets the list, reduced to id and name (see AuthorizeOrLookup).
+        $this->app['router']->aliasMiddleware('lookup', AuthorizeOrLookup::class);
+        RoutingRoute::macro('canOrLookup', function (string $permission) {
+            /** @var RoutingRoute $this */
+            return $this->middleware('lookup:'.$permission);
         });
 
         // Who may see whose records; the reporting tree is read once per request.

@@ -9,6 +9,7 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Services\AuditLogService;
 use Modules\Inventory\Http\Requests\StoreProductRequest;
@@ -21,7 +22,7 @@ use Modules\Inventory\Services\ProductUnitService;
 
 class ProductController extends Controller
 {
-    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, ServesLookups, Sortable;
 
     private const RELATIONS = ['category', 'supplier', 'units.unit'];
 
@@ -42,6 +43,10 @@ class ProductController extends Controller
         $this->authorize('viewAny', Product::class);
 
         $query = Product::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, $query);
+        }
 
         $query->with(self::RELATIONS)->withCount('batches');
 

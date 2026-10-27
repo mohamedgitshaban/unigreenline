@@ -12,7 +12,7 @@ use Modules\Inventory\Http\Controllers\WarehouseController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('dashboards/inventory', [InventoryDashboardController::class, 'show'])->defaults('module', 'inventory')->can('inventory-dashboard.view');
-    Route::get('warehouses', [WarehouseController::class, 'index'])->can('warehouses.view')->exportable('warehouses.export');
+    Route::get('warehouses', [WarehouseController::class, 'index'])->canOrLookup('warehouses.view')->exportable('warehouses.export');
     Route::post('warehouses/import', [WarehouseController::class, 'import'])->can('warehouses.import');
     Route::get('warehouses/import-template', [WarehouseController::class, 'importTemplate'])->can('warehouses.import');
     Route::post('warehouses', [WarehouseController::class, 'store'])->can('warehouses.create');
@@ -27,7 +27,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::put('warehouses/{warehouse}', [WarehouseController::class, 'update'])->can('warehouses.update');
     Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->can('warehouses.delete');
 
-    Route::get('products', [ProductController::class, 'index'])->can('products.view')->exportable('products.export');
+    Route::get('products', [ProductController::class, 'index'])->canOrLookup('products.view')->exportable('products.export');
     Route::post('products/import', [ProductController::class, 'import'])->can('products.import');
     Route::get('products/import-template', [ProductController::class, 'importTemplate'])->can('products.import');
     Route::post('products', [ProductController::class, 'store'])->can('products.create');
@@ -44,7 +44,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::put('categories/{category}', [ProductCategoryController::class, 'update'])->can('categories.update');
     Route::delete('categories/{category}', [ProductCategoryController::class, 'destroy'])->can('categories.delete');
 
-    Route::get('units', [UnitController::class, 'index'])->can('units.view');
+    Route::get('units', [UnitController::class, 'index'])->canOrLookup('units.view');
     Route::post('units', [UnitController::class, 'store'])->can('units.create');
     Route::get('units/{unit}', [UnitController::class, 'show'])->can('units.view');
     Route::put('units/{unit}', [UnitController::class, 'update'])->can('units.update');

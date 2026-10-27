@@ -8,6 +8,7 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
@@ -20,7 +21,7 @@ use Modules\Inventory\Models\Warehouse;
 
 class WarehouseController extends Controller
 {
-    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, ServesLookups, Sortable;
 
     private const RELATIONS = [
         'manager',
@@ -33,6 +34,11 @@ class WarehouseController extends Controller
     public function index(Request $request)
     {
         $this->authorize('viewAny', Warehouse::class);
+
+        // A dropdown of where stock can be taken from lists every warehouse of the company, not only the user's own.
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, Warehouse::query()->where('tenant_id', $request->user()->tenant_id));
+        }
 
         $query = Warehouse::query()
             ->where('tenant_id', $request->user()->tenant_id)

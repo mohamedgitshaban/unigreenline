@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Inventory\Http\Requests\StoreUnitRequest;
 use Modules\Inventory\Http\Requests\UpdateUnitRequest;
@@ -19,13 +20,17 @@ use Modules\Inventory\Models\Unit;
  */
 class UnitController extends Controller
 {
-    use Filterable, ManagesRecords, Sortable;
+    use Filterable, ManagesRecords, ServesLookups, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Unit::class);
 
         $query = Unit::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, $query, 50);
+        }
 
         $this->applyFilters($request, $query, ['name']);
         $this->applySorting($request, $query);
