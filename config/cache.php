@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Rate Limiter Cache Store
+    |--------------------------------------------------------------------------
+    |
+    | The store that backs the throttle middleware. It is kept off the database
+    | store on purpose: parallel API calls from one client hit the same limiter
+    | row, and MySQL aborts one of them with a 1213 deadlock, returning a 500.
+    |
+    */
+
+    'limiter' => env('CACHE_LIMITER_STORE', 'file'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |
