@@ -7,9 +7,12 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
+use Modules\Sales\Http\Requests\StoreInvoiceReturnRequest;
 use Modules\Sales\Http\Requests\StoreReturnRequest;
 use Modules\Sales\Http\Resources\ReturnRecordResource;
+use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\ReturnRecord;
+use Modules\Sales\Services\ProcessInvoiceReturnService;
 use Modules\Sales\Services\ProcessReturnService;
 
 class ReturnController extends Controller
@@ -59,7 +62,7 @@ class ReturnController extends Controller
 
         $query->with(self::RELATIONS);
 
-        $this->applyFilters($request, $query, ['id', 'batch_no', 'reason', 'product.name', 'customer.name', 'supplier.name']);
+        $this->applyFilters($request, $query, ['id', 'number', 'batch_no', 'reason', 'product.name', 'customer.name', 'supplier.name']);
 
         $this->applySorting($request, $query);
 
@@ -100,5 +103,41 @@ class ReturnController extends Controller
         $return = $this->processReturn->process($data);
 
         return (new ReturnRecordResource($return))->response()->setStatusCode(201);
+    }
+
+    /**
+     * An invoice's returns as a paginated list (GET /invoices/{id}/returns).
+     */
+    public function forInvoice(Request $request, string $id)
+    {
+        $invoice = Invoice::query()->where('tenant_id', $request->user()->tenant_id)->with('salesOrder')->findOrFail($id);
+
+        $this->authorize('view', $invoice);
+
+        $query = ReturnRecord::query()->where('invoice_id', $invoice->id)->with(self::RELATIONS);
+
+        $this->applyFilters($request, $query, ['id', 'number', 'batch_no', 'reason', 'product.name']);
+        $this->applySorting($request, $query);
+
+        return ReturnRecordResource::collection($query->paginate($request->integer('per_page', 10))->withQueryString());
+    }
+
+    /**
+     * A return made from an invoice: the lines ticked and how many of each come back, priced from the invoice
+     * itself (POST /invoices/{id}/returns).
+     */
+    public function storeForInvoice(StoreInvoiceReturnRequest $request, string $id, ProcessInvoiceReturnService $invoiceReturn)
+    {
+        $invoice = Invoice::query()->where('tenant_id', $request->user()->tenant_id)->with('salesOrder')->findOrFail($id);
+
+        $this->authorize('view', $invoice);
+
+        $returns = $invoiceReturn->handle($invoice, $request->validated() + [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return ReturnRecordResource::collection(collect($returns)->map->load(self::RELATIONS))->response()->setStatusCode(201);
     }
 }

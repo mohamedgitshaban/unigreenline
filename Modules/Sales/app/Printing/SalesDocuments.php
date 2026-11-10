@@ -37,7 +37,7 @@ class SalesDocuments
 
         return new PrintableDocument(
             type: 'Invoice',
-            number: $invoice->id,
+            number: $invoice->number ?? $invoice->id,
             company: $invoice->tenant->name,
             meta: [
                 'Issued' => $invoice->issued_date->toDateString(),
@@ -69,7 +69,7 @@ class SalesDocuments
 
         return new PrintableDocument(
             type: 'Sales order',
-            number: $order->id,
+            number: $order->number ?? $order->id,
             company: $order->tenant->name,
             meta: ['Ordered' => $order->order_date?->toDateString(), 'Sales rep' => $order->salesRep?->name, 'Payment' => $order->pay_type, 'Due' => $order->due_date?->toDateString()],
             parties: [$this->customerParty('Customer', $order->customer), ['title' => 'Ships from', 'lines' => [$order->warehouse?->name, $order->warehouse?->city]]],
@@ -94,7 +94,7 @@ class SalesDocuments
 
         return new PrintableDocument(
             type: 'Delivery note',
-            number: $delivery->id,
+            number: $delivery->number ?? $delivery->id,
             company: $delivery->tenant->name,
             meta: ['Delivery date' => $delivery->delivery_date?->toDateString(), 'Driver' => $delivery->driver, 'Order' => $delivery->so_id, 'Invoice' => $delivery->invoice_id],
             parties: [$this->customerParty('Deliver to', $delivery->customer), ['title' => 'From', 'lines' => [$delivery->salesOrder?->warehouse?->name, $delivery->salesOrder?->warehouse?->city]]],
@@ -112,7 +112,7 @@ class SalesDocuments
 
         return new PrintableDocument(
             type: 'Payment receipt',
-            number: $collection->id,
+            number: $collection->number ?? $collection->id,
             company: $collection->tenant->name,
             meta: ['Date' => $collection->payment_date->toDateString(), 'Method' => $collection->method, 'Reference' => $collection->reference, 'Invoice' => $collection->invoice_id, 'Received by' => $collection->collectedBy?->name],
             parties: [$this->customerParty('Received from', $collection->customer)],

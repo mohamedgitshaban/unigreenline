@@ -11,7 +11,7 @@ use Modules\CRM\Http\Controllers\LeadController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('dashboards/crm', [CrmDashboardController::class, 'show'])->defaults('module', 'crm')->can('crm-dashboard.view');
-    Route::get('customers', [CustomerController::class, 'index'])->can('customers.view')->exportable('customers.export');
+    Route::get('customers', [CustomerController::class, 'index'])->canOrLookup('customers.view')->exportable('customers.export');
     Route::get('customers/check-duplicate', [CustomerController::class, 'checkDuplicate'])->can('customers.create');
     Route::post('customers/import', [CustomerController::class, 'import'])->can('customers.import');
     Route::get('customers/import-template', [CustomerController::class, 'importTemplate'])->can('customers.import');

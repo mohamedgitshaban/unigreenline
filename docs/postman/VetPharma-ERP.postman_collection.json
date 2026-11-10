@@ -1,7 +1,7 @@
 {
     "info": {
         "name": "VetPharma ERP API",
-        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 506 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{resource}.export` specifically (`expenses.export`, `invoices.export`...), not just `{resource}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (HR, Recap, Manufacturing, Units, Roles & Permissions, supplier payments, manual journal entries, chart-of-accounts connections, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit, and the finance fixes: cost of goods sold on delivery, purchase VAT, manual goods receipts, returns and the balance sheet now post to the ledger). Permissions are now **one per endpoint** — every description says which one it needs. The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `AccountSeeder`, `RolePermissionSeeder`, `UnitSeeder`, `ProductUnitSeeder`, `HRDatabaseSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
+        "description": "Laravel rebuild of the VetPharma ERP per docs/../first.md. Base URL is `{{base_url}}` (defaults to `http://localhost:8000/api/v1` in the companion environment — the one exception is **Health check** in Auth, which uses `{{root_url}}` directly since it's unversioned and outside `/api/v1`).\n\n**Quick start:**\n1. Import the companion environment file (`VetPharma-ERP.postman_environment.json`) and select it.\n2. Run **Auth > Login** — it captures the bearer token into `{{token}}` automatically. Every other request already sends `Authorization: Bearer {{token}}`.\n3. `seed_email`/`seed_password` in the environment default to the Administrator seed account; change them (see docs/api/README.md's seed account table) to test role-specific behavior.\n4. Several \"create\" requests (warehouses, products, customers, sales orders, purchase orders, suppliers...) auto-save the created id into a collection variable (e.g. `{{warehouse_id}}`) so the next request in that folder can reference it without manual copy-paste.\n\n**Running the whole collection top to bottom** (Postman's \"Run collection\", or `newman run`): set a **~1.1s delay between requests**. The API's general rate limit is 60 requests/minute per user, and this collection has 525 requests — back-to-back with no delay, you'll get real `429`s partway through Admin. Verified end-to-end with `newman run VetPharma-ERP.postman_collection.json -e VetPharma-ERP-Local.postman_environment.json --delay-request 1100` against a freshly seeded database — 0 failures. Any single folder on its own (all well under 60 requests) is fine with no delay.\n\n**Exporting a list as CSV/Excel**: most list requests below have an `export` query param, disabled by default — enable it and set it to `csv` or `xlsx` to get a real file download instead of JSON (every matching row, not just one page). Requires `{resource}.export` specifically (`expenses.export`, `invoices.export`...), not just `{resource}.view` — see docs/api/README.md's \"Exporting a list\" section for which roles have it.\n\n**Change flags**: anything added or altered after the original collection is marked — **🆕 NEW** = a new endpoint or folder (HR, Recap, Manufacturing, Units, Roles & Permissions, supplier payments, manual journal entries, chart-of-accounts connections, deletes, imports, void invoice, product availability/life cycle...), **🔄 CHANGED** = an existing endpoint that now accepts or returns more (product packaging units and minimum price, purchase-order unit lines and free gifts, sales-order per-line warehouse / gift / unit, and the finance fixes: cost of goods sold on delivery, purchase VAT, manual goods receipts, returns and the balance sheet now post to the ledger). Permissions are now **one per endpoint** — every description says which one it needs. The flag is in the request name and the first line of its description. The flagged requests were added after the last full newman verification above, so run them once against a freshly migrated and seeded database (`php artisan migrate`, then `AccountSeeder`, `RolePermissionSeeder`, `UnitSeeder`, `ProductUnitSeeder`, `HRDatabaseSeeder`) before relying on a full unattended run; the import requests need a file attached and return 422 without one.\n\nFull request/response documentation with every error shape lives in `docs/api/*.md` — this collection is for exercising the API, not a replacement for reading those.",
         "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
     },
     "auth": {
@@ -873,7 +873,7 @@
                                         }
                                     ]
                                 },
-                                "description": "**🆕 — NEW**\n\nRequires `units.view`. The packaging unit names (Packet, Package, Carton by default — seeded by UnitSeeder). Supports `search` on name."
+                                "description": "**🆕 — NEW**\n\nRequires `inventory.view`, `purchasing.view` or `sales.view`. The packaging unit names (Packet, Package, Carton by default — seeded by UnitSeeder). Supports `search` on name."
                             }
                         },
                         {
@@ -1175,7 +1175,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `warehouses.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator."
+                                "description": "Requires `inventory.view`. Scoped to the caller's assigned warehouses (`user_warehouses`) unless they hold Owner/Auditor/Administrator."
                             }
                         },
                         {
@@ -1194,6 +1194,106 @@
                                     ]
                                 },
                                 "description": "Requires `warehouses.view`. Includes `batches_count` — the batches themselves are paged by List warehouse batches. 403 if this warehouse is not assigned to the caller."
+                            }
+                        },
+                        {
+                            "name": "🆕 List warehouse products",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}/products?page=1&per_page=15&below_minimum=0",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}",
+                                        "products"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "below_minimum",
+                                            "value": "0",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `warehouses.view`. The products held in the warehouse with their cartons and whether they are at or below their minimum (`below_minimum=1` keeps those). The list behind the overview card."
+                            }
+                        },
+                        {
+                            "name": "🆕 List warehouse returns",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}/returns?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}",
+                                        "returns"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `warehouses.incoming`. Goods customers sent back into this warehouse, newest first."
+                            }
+                        },
+                        {
+                            "name": "🆕 Enter warehouse opening stock",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/warehouses/{{warehouse_id}}/opening-stock",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "warehouses",
+                                        "{{warehouse_id}}",
+                                        "opening-stock"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `goods-receipts.create` and a warehouse the user works in. Receives many batches at once (all or nothing), booked against Opening Balance Equity.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"items\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"batch_no\": \"OPENING-1\",\n            \"qty_cartons\": 10,\n            \"cost_per_carton\": 20,\n            \"exp_date\": \"2028-01-31\"\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
                             }
                         },
                         {
@@ -1523,7 +1623,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `categories.view`."
+                                "description": "Requires `inventory.view`."
                             }
                         },
                         {
@@ -1692,6 +1792,30 @@
                     "name": "Products",
                     "item": [
                         {
+                            "name": "🆕 List brands in use",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/brands?search=ac",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "brands"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "search",
+                                            "value": "ac",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `products.view`. The brand names already used on products, for a type-ahead on the product form."
+                            }
+                        },
+                        {
                             "name": "List products",
                             "request": {
                                 "method": "GET",
@@ -1732,7 +1856,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `products.view`. Catalog-wide, not warehouse-scoped."
+                                "description": "Requires `inventory.view`. Catalog-wide, not warehouse-scoped."
                             }
                         },
                         {
@@ -2096,6 +2220,172 @@
                             }
                         }
                     }
+                },
+                {
+                    "name": "🆕 Stock requests",
+                    "item": [
+                        {
+                            "name": "Create stock request",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/stock-requests",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "stock-requests"
+                                    ]
+                                },
+                                "description": "Requires `stock-requests.create`. A warehouse asks another warehouse (`source: warehouse` + `from_warehouse_id`), Purchasing or Manufacturing for stock. Ask in `qty_cartons`, or in a packaging unit with `unit_id` + `qty` (rounded up to whole cartons). Saves the id into `{{stock_request_id}}`.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"source\": \"purchasing\",\n    \"product_id\": \"{{product_id}}\",\n    \"qty_cartons\": 5,\n    \"needed_by\": \"2026-12-01\",\n    \"notes\": \"Running low\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            },
+                            "event": [
+                                {
+                                    "listen": "test",
+                                    "script": {
+                                        "type": "text/javascript",
+                                        "exec": [
+                                            "if (pm.response.code >= 200 && pm.response.code < 300) {",
+                                            "    const json = pm.response.json();",
+                                            "    const value = json?.data?.id;",
+                                            "    if (value) { pm.collectionVariables.set('stock_request_id', value); }",
+                                            "}"
+                                        ]
+                                    }
+                                }
+                            ]
+                        },
+                        {
+                            "name": "List stock requests",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/stock-requests?page=1&per_page=15",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "stock-requests"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "15",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "Requires `stock-requests.view`. The requests for or from the warehouses the user works in, plus those addressed to Purchasing or Manufacturing for people who can raise those documents."
+                            }
+                        },
+                        {
+                            "name": "Grant stock request",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/stock-requests/{{stock_request_id}}/approve",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "stock-requests",
+                                        "{{stock_request_id}}",
+                                        "approve"
+                                    ]
+                                },
+                                "description": "Requires `stock-requests.approve`. A warehouse request is transferred (earliest expiry first); a Purchasing request becomes a draft purchase order (optional `supplier_id`); a Manufacturing request becomes a draft production order (optional `bom_id`).",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"supplier_id\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Reject stock request",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/stock-requests/{{stock_request_id}}/reject",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "stock-requests",
+                                        "{{stock_request_id}}",
+                                        "reject"
+                                    ]
+                                },
+                                "description": "Requires `stock-requests.reject`. A reason is required.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"reason\": \"Held for a customer order\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "Cancel stock request",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/stock-requests/{{stock_request_id}}/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "stock-requests",
+                                        "{{stock_request_id}}",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "Requires `stock-requests.cancel`. The person who asked, or anyone who may grant it, withdraws an open request."
+                            }
+                        }
+                    ],
+                    "description": "**🆕 — NEW**"
                 },
                 {
                     "name": "Transfers",
@@ -2537,7 +2827,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `customers.view`. A Sales Rep sees only their own customers."
+                                "description": "Requires `crm.view`. A Sales Rep sees only their own customers."
                             }
                         },
                         {
@@ -3790,7 +4080,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `calls.create`. Record a call with the customer and what was said. `rep_id` defaults to the caller; a manager may log it for someone on their team. The customer's owner and managers are notified.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"message\": \"Asked for a quote on 20 cartons; will confirm Thursday.\",\n    \"subject\": \"Quote request\",\n    \"direction\": \"inbound\",\n    \"outcome\": \"answered\",\n    \"duration_seconds\": 240,\n    \"next_follow_up\": \"2026-10-24\"\n}",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"message\": \"Asked for a quote on 20 cartons; will confirm Thursday.\",\n    \"subject\": \"Quote request\",\n    \"direction\": \"inbound\",\n    \"outcome\": \"answered\",\n    \"duration_seconds\": 240,\n    \"next_follow_up\": \"2026-11-13\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -4138,7 +4428,7 @@
                                         }
                                     ]
                                 },
-                                "description": "Requires `suppliers.view`. Lists the suppliers of the company."
+                                "description": "Lists the suppliers of the company."
                             }
                         },
                         {
@@ -5502,6 +5792,75 @@
                             ]
                         },
                         {
+                            "name": "🆕 Next sales order number (preview)",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/next-number",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "next-number"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales-orders.create`. The number the next order will get (`SO-000124`), for a form to show while it is open. It is not reserved: the real number is assigned when the order is saved."
+                            }
+                        },
+                        {
+                            "name": "🆕 Duplicate sales order",
+                            "request": {
+                                "method": "POST",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/sales-orders/{{sales_order_id}}/duplicate",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "sales-orders",
+                                        "{{sales_order_id}}",
+                                        "duplicate"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales-orders.create`. A new draft with the same customer, terms and lines (a repeat order), dated today. Stock, credit limit and minimum prices are checked again (422 `shortfalls` if the stock is gone). 201 with the new order."
+                            }
+                        },
+                        {
+                            "name": "🆕 Quick sale (from invoices)",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/quick-sale",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "quick-sale"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `sales-orders.quick-deliver`. The same call as Create sales order and deliver it, offered on the invoices screen: order, stock, invoice, journal entry and a delivered delivery in one step.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"customer_id\": \"{{customer_id}}\",\n    \"warehouse_id\": \"{{warehouse_id}}\",\n    \"pay_type\": \"cash\",\n    \"lines\": [\n        {\n            \"product_id\": \"{{product_id}}\",\n            \"qty\": 1,\n            \"unit\": \"Carton\",\n            \"unit_price\": 65\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
                             "name": "🆕 Update sales order",
                             "request": {
                                 "method": "PUT",
@@ -6029,6 +6388,39 @@
                             }
                         },
                         {
+                            "name": "🆕 Cancel delivery",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/deliveries/{{delivery_id}}/cancel",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "deliveries",
+                                        "{{delivery_id}}",
+                                        "cancel"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `deliveries.cancel` (Administrator, Warehouse Manager, Accountant). Undoes the sale: the stock goes back into its batches, the cost of goods sold and the invoice are reversed, the customer balance comes down, and the order and delivery become `cancelled`. 422 if money was collected, goods were returned, or it is already cancelled.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"reason\": \"Customer refused the goods\"\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
                             "name": "Download delivery invoice",
                             "request": {
                                 "method": "GET",
@@ -6143,6 +6535,39 @@
                             ]
                         },
                         {
+                            "name": "🆕 Record collection by customer",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/customers/{{customer_id}}/collections",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "customers",
+                                        "{{customer_id}}",
+                                        "collections"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `collections.create`. One payment from a customer, spread over his open invoices oldest due date first; one collection per invoice paid. `payment_date` left out is today. 422 if the amount is more than he owes.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"amount\": 450,\n    \"method\": \"Cash\",\n    \"reference\": null,\n    \"payment_date\": null,\n    \"notes\": null\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
                             "name": "Get collection",
                             "request": {
                                 "method": "GET",
@@ -6254,6 +6679,70 @@
                                     }
                                 }
                             ]
+                        },
+                        {
+                            "name": "🆕 Create return from an invoice",
+                            "request": {
+                                "method": "POST",
+                                "header": [
+                                    {
+                                        "key": "Content-Type",
+                                        "value": "application/json"
+                                    }
+                                ],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{invoice_id}}/returns",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "returns"
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `returns.create`. Tick the invoice lines and how many of each come back (`lines[].line_id` from List invoice lines). The credit (line price, discount share, VAT) is worked out, limited to what is left to return, applied to the invoice balance and the customer balance; with `restocked: true` the goods go back into the batch the order took them from.",
+                                "body": {
+                                    "mode": "raw",
+                                    "raw": "{\n    \"type\": \"Sales Return\",\n    \"restocked\": true,\n    \"reason\": \"Wrong pack\",\n    \"lines\": [\n        {\n            \"line_id\": \"{{sales_order_line_id}}\",\n            \"qty\": 1\n        }\n    ]\n}",
+                                    "options": {
+                                        "raw": {
+                                            "language": "json"
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        {
+                            "name": "🆕 List returns of an invoice",
+                            "request": {
+                                "method": "GET",
+                                "header": [],
+                                "url": {
+                                    "raw": "{{base_url}}/invoices/{{invoice_id}}/returns?page=1&per_page=10",
+                                    "host": [
+                                        "{{base_url}}"
+                                    ],
+                                    "path": [
+                                        "invoices",
+                                        "{{invoice_id}}",
+                                        "returns"
+                                    ],
+                                    "query": [
+                                        {
+                                            "key": "page",
+                                            "value": "1",
+                                            "disabled": true
+                                        },
+                                        {
+                                            "key": "per_page",
+                                            "value": "10",
+                                            "disabled": true
+                                        }
+                                    ]
+                                },
+                                "description": "**🆕 — NEW**\n\nRequires `returns.view`. The returns made against one invoice."
+                            }
                         },
                         {
                             "name": "Get return",
@@ -6882,7 +7371,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `asset-categories.create`. How a kind of asset is booked and depreciated by default. Account codes must exist in the chart.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Lab equipment 140207\",\n    \"asset_account_code\": \"1510\",\n    \"accumulated_account_code\": \"1590\",\n    \"expense_account_code\": \"6500\",\n    \"method\": \"straight_line\",\n    \"duration_periods\": 12,\n    \"period_months\": 1,\n    \"prorata\": false,\n    \"salvage_pct\": 0\n}",
+                                    "raw": "{\n    \"name\": \"Lab equipment 140238\",\n    \"asset_account_code\": \"1510\",\n    \"accumulated_account_code\": \"1590\",\n    \"expense_account_code\": \"6500\",\n    \"method\": \"straight_line\",\n    \"duration_periods\": 12,\n    \"period_months\": 1,\n    \"prorata\": false,\n    \"salvage_pct\": 0\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -7264,7 +7753,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `fixed-assets.depreciate`. Everything due on or before the date for every running asset of the company. Safe to repeat.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"date\": \"2026-10-21\"\n}",
+                                    "raw": "{\n    \"date\": \"2026-11-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -7348,7 +7837,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"date\": \"2026-10-21\"\n}",
+                                    "raw": "{\n    \"date\": \"2026-11-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -7425,7 +7914,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `fixed-assets.dispose`. Approve-level permission. Books depreciation due to the date, drops later periods, clears cost and accumulated depreciation and books the gain (4400) or loss (6700).",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"date\": \"2026-10-21\",\n    \"sale_value\": 5000,\n    \"proceeds_account_code\": \"1110\",\n    \"reason\": \"Upgraded\"\n}",
+                                    "raw": "{\n    \"date\": \"2026-11-10\",\n    \"sale_value\": 5000,\n    \"proceeds_account_code\": \"1110\",\n    \"reason\": \"Upgraded\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -7749,7 +8238,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `loans.pay-installment`. Instalments go in order. Borrowed: Dr 2400 + Dr 6600 / Cr bank.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"payment_date\": \"2026-10-21\"\n}",
+                                    "raw": "{\n    \"payment_date\": \"2026-11-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -14561,7 +15050,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Trial day 140207\",\n    \"sequence\": 45\n}",
+                                    "raw": "{\n    \"name\": \"Trial day 140238\",\n    \"sequence\": 45\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -14640,7 +15129,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `applicants.create`. Enters the first stage; the recruiter defaults to the job's recruiter.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Salma Hassan\",\n    \"email\": \"salma.140207@example.com\",\n    \"phone\": \"0100 555 1234\",\n    \"job_position_id\": \"{{job_position_id}}\",\n    \"source\": \"LinkedIn\",\n    \"expected_salary\": 9000,\n    \"priority\": 2\n}",
+                                    "raw": "{\n    \"name\": \"Salma Hassan\",\n    \"email\": \"salma.140238@example.com\",\n    \"phone\": \"0100 555 1234\",\n    \"job_position_id\": \"{{job_position_id}}\",\n    \"source\": \"LinkedIn\",\n    \"expected_salary\": 9000,\n    \"priority\": 2\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -14918,7 +15407,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"applicant_id\": \"{{applicant_id}}\",\n    \"interviewer_id\": \"{{user_id}}\",\n    \"scheduled_at\": \"2026-10-23T14:02:07\",\n    \"duration_minutes\": 45,\n    \"mode\": \"video\"\n}",
+                                    "raw": "{\n    \"applicant_id\": \"{{applicant_id}}\",\n    \"interviewer_id\": \"{{user_id}}\",\n    \"scheduled_at\": \"2026-11-12T14:02:38\",\n    \"duration_minutes\": 45,\n    \"mode\": \"video\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15043,7 +15532,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"offer_status\": \"sent\",\n    \"proposed_salary\": 9500,\n    \"offer_valid_until\": \"2026-11-04\"\n}",
+                                    "raw": "{\n    \"offer_status\": \"sent\",\n    \"proposed_salary\": 9500,\n    \"offer_valid_until\": \"2026-11-24\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15077,7 +15566,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `applicants.hire`. Approve-level permission. Creates the employee (code generated unless given), marks the applicant hired, counts the hire on the job and closes it when the vacancies are filled.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"hire_date\": \"2026-11-20\"\n}",
+                                    "raw": "{\n    \"hire_date\": \"2026-12-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15220,7 +15709,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"license_plate\": \"PM-140207\",\n    \"brand\": \"Toyota\",\n    \"model\": \"Hilux\",\n    \"model_year\": 2024,\n    \"vehicle_type\": \"truck\",\n    \"fuel_type\": \"diesel\",\n    \"odometer\": 10000,\n    \"acquisition_date\": \"2026-01-10\"\n}",
+                                    "raw": "{\n    \"license_plate\": \"PM-140238\",\n    \"brand\": \"Toyota\",\n    \"model\": \"Hilux\",\n    \"model_year\": 2024,\n    \"vehicle_type\": \"truck\",\n    \"fuel_type\": \"diesel\",\n    \"odometer\": 10000,\n    \"acquisition_date\": \"2026-01-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15363,7 +15852,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `vehicles.assign-driver`. `employee_id: null` takes the vehicle away. The previous driver's turn ends the day before.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"employee_id\": \"{{employee_id}}\",\n    \"date\": \"2026-10-21\"\n}",
+                                    "raw": "{\n    \"employee_id\": \"{{employee_id}}\",\n    \"date\": \"2026-11-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15413,7 +15902,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `vehicle-odometer-logs.create`. Must fit between the readings before and after it.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"value\": 10500,\n    \"logged_on\": \"2026-10-21\"\n}",
+                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"value\": 10500,\n    \"logged_on\": \"2026-11-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15478,7 +15967,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `vehicle-fuel-logs.create`. Give the litres and either the price per litre or the amount; the other is worked out.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"fueled_on\": \"2026-10-21\",\n    \"liters\": 40,\n    \"price_per_liter\": 12.5,\n    \"odometer\": 10600\n}",
+                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"fueled_on\": \"2026-11-10\",\n    \"liters\": 40,\n    \"price_per_liter\": 12.5,\n    \"odometer\": 10600\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15626,7 +16115,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"service_type_id\": \"{{service_type_id}}\",\n    \"service_date\": \"2026-10-26\",\n    \"description\": \"10k service\"\n}",
+                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"service_type_id\": \"{{service_type_id}}\",\n    \"service_date\": \"2026-11-15\",\n    \"description\": \"10k service\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15674,7 +16163,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"cost\": 850,\n    \"odometer\": 10700,\n    \"next_due_date\": \"2027-04-21\",\n    \"next_due_odometer\": 15700\n}",
+                                    "raw": "{\n    \"cost\": 850,\n    \"odometer\": 10700,\n    \"next_due_date\": \"2027-05-10\",\n    \"next_due_odometer\": 15700\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15754,7 +16243,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"type\": \"insurance\",\n    \"vendor_name\": \"Misr Insurance\",\n    \"starts_on\": \"2026-10-21\",\n    \"expires_on\": \"2027-10-21\",\n    \"cost\": 3650,\n    \"frequency\": \"yearly\",\n    \"reminder_days\": 30\n}",
+                                    "raw": "{\n    \"vehicle_id\": \"{{vehicle_id}}\",\n    \"type\": \"insurance\",\n    \"vendor_name\": \"Misr Insurance\",\n    \"starts_on\": \"2026-11-10\",\n    \"expires_on\": \"2027-11-10\",\n    \"cost\": 3650,\n    \"frequency\": \"yearly\",\n    \"reminder_days\": 30\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -16014,6 +16503,116 @@
                             ]
                         },
                         "description": "Requires `stock-analytics.view`. Per-product stock across every warehouse — paginated by product, not by row."
+                    }
+                },
+                {
+                    "name": "🆕 Overview (every department)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/analytics/overview?period=month&modules=sales%2Cinventory",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analytics",
+                                "overview"
+                            ],
+                            "query": [
+                                {
+                                    "key": "period",
+                                    "value": "month",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "modules",
+                                    "value": "sales,inventory",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nOpen to every signed-in user. The company at a glance, built from every department dashboard the user may open; each headline number may carry a `link` ({path, query}) to the list behind it."
+                    }
+                },
+                {
+                    "name": "🆕 Stock snapshot",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/analytics/stock-snapshot?as_of=2026-11-10&warehouse_id=%7B%7Bwarehouse_id%7D%7D&below_minimum=0&export=csv",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "analytics",
+                                "stock-snapshot"
+                            ],
+                            "query": [
+                                {
+                                    "key": "as_of",
+                                    "value": "2026-11-10",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "warehouse_id",
+                                    "value": "{{warehouse_id}}",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "below_minimum",
+                                    "value": "0",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `stock-snapshot.view` (`stock-snapshot.export` for the file). Stock by product, warehouse and batch on a day, with value (Administrator only), an at-or-below-minimum flag, and who produced the report."
+                    }
+                },
+                {
+                    "name": "🆕 Sales breakdown",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/reports/sales-breakdown?group_by=customer&start_date=2026-11-01&end_date=2026-11-30&export=csv",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "reports",
+                                "sales-breakdown"
+                            ],
+                            "query": [
+                                {
+                                    "key": "group_by",
+                                    "value": "customer",
+                                    "disabled": false
+                                },
+                                {
+                                    "key": "start_date",
+                                    "value": "2026-11-01",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "end_date",
+                                    "value": "2026-11-30",
+                                    "disabled": true
+                                },
+                                {
+                                    "key": "export",
+                                    "value": "csv",
+                                    "disabled": true
+                                }
+                            ]
+                        },
+                        "description": "**🆕 — NEW**\n\nRequires `sales-report.view` (`sales-report.export` for the file). Sales grouped by customer, item, rep, category, subclass, brand or supplier; only invoiced or delivered orders count."
                     }
                 },
                 {

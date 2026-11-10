@@ -28,7 +28,7 @@ class StorePurchaseOrderRequest extends FormRequest
             'order_date' => ['sometimes', 'date'],
 
             'lines' => ['required', 'array', 'min:1'],
-            'lines.*.product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
+            'lines.*.product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)->where('active', true)],
             // Order either in cartons (qty_cartons) or in any of the product's packaging units
             // (unit_id + qty); the latter must come to whole cartons. Costs are optional and
             // only a user with pricing access may send them — otherwise the order goes to
@@ -44,5 +44,13 @@ class StorePurchaseOrderRequest extends FormRequest
     public function after(): array
     {
         return [$this->costsOnlyFromPricers()];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['lines.*.product_id.exists' => 'This product is inactive or does not exist, so it cannot be used.'];
     }
 }

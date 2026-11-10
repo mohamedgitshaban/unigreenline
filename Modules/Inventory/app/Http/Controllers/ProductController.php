@@ -18,6 +18,8 @@ use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\ProductResource;
 use Modules\Inventory\Imports\ProductImport;
 use Modules\Inventory\Models\Product;
+use Modules\Inventory\Services\ManualGoodsReceiptService;
+use Modules\Inventory\Services\ProductCodeGenerator;
 use Modules\Inventory\Services\ProductUnitService;
 
 class ProductController extends Controller
@@ -36,6 +38,8 @@ class ProductController extends Controller
     public function __construct(
         private readonly AuditLogService $auditLog,
         private readonly ProductUnitService $productUnits,
+        private readonly ProductCodeGenerator $codes,
+        private readonly ManualGoodsReceiptService $receipts,
     ) {}
 
     public function index(Request $request)
@@ -105,18 +109,29 @@ class ProductController extends Controller
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
         $levels = $data['units'] ?? null;
-        unset($data['units']);
+        $openingStock = $data['opening_stock'] ?? null;
+        unset($data['units'], $data['opening_stock']);
+
+        $data['sku'] = filled($data['sku'] ?? null) ? $data['sku'] : $this->codes->next($data['tenant_id']);
 
         if ($levels !== null) {
             $data['carton_qty'] = $this->productUnits->cartonQty($levels);
             $data['pack_unit'] ??= $this->productUnits->smallestUnitName($levels);
         }
 
-        $product = DB::transaction(function () use ($data, $levels) {
+        $product = DB::transaction(function () use ($data, $levels, $openingStock, $request) {
             $product = Product::create($data);
 
             if ($levels !== null) {
                 $this->productUnits->sync($product, $levels);
+            }
+
+            if ($openingStock !== null) {
+                $this->receipts->receive(
+                    $openingStock + ['tenant_id' => $product->tenant_id, 'product_id' => $product->id],
+                    ['actor_id' => $request->user()->id, 'actor_name' => $request->user()->name, 'ip_address' => $request->ip()],
+                    'Opening stock',
+                );
             }
 
             return $product;
@@ -239,5 +254,26 @@ class ProductController extends Controller
                 'nearest_expiry' => substr((string) $row->nearest_expiry, 0, 10),
             ])->values(),
         ]]);
+    }
+
+    /**
+     * The brand names already used on products, for a type-ahead on the product form so the same brand is not
+     * typed three different ways (GET /brands, `?search=` narrows).
+     */
+    public function brands(Request $request)
+    {
+        $this->authorize('viewAny', Product::class);
+
+        $validated = $request->validate(['search' => ['sometimes', 'nullable', 'string', 'max:255']]);
+
+        $brands = Product::query()
+            ->where('tenant_id', $request->user()->tenant_id)
+            ->whereNotNull('brand')->where('brand', '!=', '')
+            ->when(filled($validated['search'] ?? null), fn ($query) => $query->where('brand', 'like', '%'.addcslashes($validated['search'], '\\%_').'%'))
+            ->distinct()->orderBy('brand')
+            ->limit($request->integer('per_page', 15))
+            ->pluck('brand');
+
+        return response()->json(['data' => $brands->map(fn (string $brand) => ['name' => $brand])->values()]);
     }
 }

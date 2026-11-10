@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Inventory\Http\Requests\StoreProductCategoryRequest;
 use Modules\Inventory\Http\Requests\UpdateProductCategoryRequest;
@@ -15,13 +16,19 @@ use Modules\Inventory\Models\ProductCategory;
 
 class ProductCategoryController extends Controller
 {
-    use Exportable, Filterable, ManagesRecords, Sortable;
+    use Exportable, Filterable, ManagesRecords, ServesLookups, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', ProductCategory::class);
 
         $query = ProductCategory::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, $query);
+        }
+
+        $query->with('parent')->withCount('children');
 
         $this->applyFilters($request, $query, ['name', 'code', 'description']);
 
@@ -45,6 +52,7 @@ class ProductCategoryController extends Controller
     {
         $category = ProductCategory::query()
             ->where('tenant_id', $request->user()->tenant_id)
+            ->with('parent')->withCount('children')
             ->findOrFail($id);
 
         $this->authorize('view', $category);
@@ -58,14 +66,14 @@ class ProductCategoryController extends Controller
         $data['tenant_id'] = $request->user()->tenant_id;
         $category = ProductCategory::create($data);
 
-        return new ProductCategoryResource($category);
+        return new ProductCategoryResource($category->load('parent')->loadCount('children'));
     }
 
     public function update(UpdateProductCategoryRequest $request, ProductCategory $category)
     {
         $category->update($request->validated());
 
-        return new ProductCategoryResource($category);
+        return new ProductCategoryResource($category->load('parent')->loadCount('children'));
     }
 
     public function destroy(Request $request, ProductCategory $category)

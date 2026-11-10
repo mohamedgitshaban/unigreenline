@@ -25,7 +25,7 @@ class FefoStockService
      * line draws only from regular stock, so gifts stay reserved for gift lines.
      *
      * @param  array<int, array{product_id: string, warehouse_id: string, cartons_needed: int, gift?: bool}>  $lines
-     * @return array<int, array{product_id: string, warehouse_id: string, needed: int, available: int}>
+     * @return array<int, array{product_id: string, warehouse_id: string, gift: bool, needed: int, available: int}>
      */
     public function checkAvailability(array $lines): array
     {
@@ -38,6 +38,7 @@ class FefoStockService
                 $shortfalls[] = [
                     'product_id' => $group['product_id'],
                     'warehouse_id' => $group['warehouse_id'],
+                    'gift' => $group['gift'],
                     'needed' => $group['needed'],
                     'available' => $available,
                 ];
@@ -133,9 +134,34 @@ class FefoStockService
     }
 
     /**
+     * The active warehouse an order line should draw from when the user did not pick one: the first (by id) that
+     * can cover the whole quantity, otherwise the one holding the most so the shortfall names a real warehouse.
+     * Null when the company has no active warehouse.
+     */
+    public function suggestWarehouse(string $tenantId, string $productId, int $cartonsNeeded, bool $gift = false): ?string
+    {
+        $best = null;
+        $bestAvailable = -1;
+
+        foreach (Warehouse::query()->where('tenant_id', $tenantId)->where('status', 'active')->orderBy('id')->pluck('id') as $warehouseId) {
+            $available = $this->availableCartons($productId, $warehouseId, $gift);
+
+            if ($available >= $cartonsNeeded) {
+                return $warehouseId;
+            }
+
+            if ($available > $bestAvailable) {
+                [$best, $bestAvailable] = [$warehouseId, $available];
+            }
+        }
+
+        return $best;
+    }
+
+    /**
      * Cartons anyone may take: on hand, less what documents have reserved.
      */
-    private function availableCartons(string $productId, string $warehouseId, bool $gift = false): int
+    public function availableCartons(string $productId, string $warehouseId, bool $gift = false): int
     {
         return (int) InventoryBatch::query()
             ->where('product_id', $productId)

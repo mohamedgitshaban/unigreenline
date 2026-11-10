@@ -17,6 +17,7 @@ use Modules\Sales\Http\Requests\UploadDeliveryInvoiceRequest;
 use Modules\Sales\Http\Resources\DeliveryResource;
 use Modules\Sales\Models\Delivery;
 use Modules\Sales\Printing\SalesDocuments;
+use Modules\Sales\Services\CancelDeliveryService;
 
 class DeliveryController extends Controller
 {
@@ -71,7 +72,7 @@ class DeliveryController extends Controller
 
         $query->with(self::RELATIONS);
 
-        $this->applyFilters($request, $query, ['id', 'driver', 'notes', 'so_id', 'invoice_id', 'customer.name']);
+        $this->applyFilters($request, $query, ['id', 'number', 'driver', 'notes', 'so_id', 'invoice_id', 'customer.name']);
 
         $this->applySorting($request, $query);
 
@@ -180,5 +181,26 @@ class DeliveryController extends Controller
         abort_if($delivery->invoice_data === null || ! Storage::exists($delivery->invoice_data), 404, 'This delivery has no invoice file.');
 
         return Storage::download($delivery->invoice_data, "delivery-invoice-{$delivery->id}.".pathinfo($delivery->invoice_data, PATHINFO_EXTENSION));
+    }
+
+    /**
+     * Cancels a delivery whose goods have left the warehouse: the stock goes back, the cost of goods sold and the
+     * invoice are reversed, and the customer's balance comes down (POST /deliveries/{id}/cancel).
+     */
+    public function cancel(Request $request, Delivery $delivery, CancelDeliveryService $cancelDelivery)
+    {
+        abort_unless($delivery->tenant_id === $request->user()->tenant_id, 404);
+
+        $this->authorize('view', $delivery);
+
+        $data = $request->validate(['reason' => ['nullable', 'string', 'max:500']]);
+
+        $cancelled = $cancelDelivery->cancel($delivery, $data['reason'] ?? null, [
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return new DeliveryResource($cancelled);
     }
 }

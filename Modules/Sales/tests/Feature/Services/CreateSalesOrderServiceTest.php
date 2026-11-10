@@ -38,19 +38,21 @@ class CreateSalesOrderServiceTest extends TestCase
         $this->assertSame('666.90', $order->total);
     }
 
-    public function test_free_qty_does_not_add_revenue_but_consumes_stock(): void
+    public function test_free_qty_does_not_add_revenue_and_is_drawn_from_gift_stock(): void
     {
         [$tenant, $customer, $rep, $warehouse] = $this->arrange();
         $product = Product::factory()->recycle($tenant)->create(['carton_qty' => 20]);
-        $batch = InventoryBatch::factory()->recycle([$tenant, $product, $warehouse])->withQtyCartons(15)->create();
+        $regular = InventoryBatch::factory()->recycle([$tenant, $product, $warehouse])->withQtyCartons(10)->create();
+        $gift = InventoryBatch::factory()->recycle([$tenant, $product, $warehouse])->withQtyCartons(5)->create(['is_free_gift' => true, 'cost_per_carton' => 0, 'batch_no' => 'GIFT-1']);
 
-        // 10 paid + 5 free = 15 cartons needed, exactly what's available.
+        // 10 paid cartons come from regular stock, 5 free cartons from gift stock: exactly what is available of each.
         $order = $this->service()->create($this->orderData($tenant, $customer, $rep, $warehouse, [
             ['product_id' => $product->id, 'qty' => 10, 'unit' => 'Carton', 'unit_price' => 65, 'free_qty' => 5],
         ]));
 
         $this->assertSame('650.00', $order->subtotal); // free units contribute no revenue
-        $this->assertSame(15, $batch->fresh()->qty_cartons); // not yet deducted at creation time
+        $this->assertSame(10, $regular->fresh()->qty_cartons); // not yet deducted at creation time
+        $this->assertSame(5, $gift->fresh()->qty_cartons);
     }
 
     public function test_pack_unit_line_rounds_up_to_whole_cartons_for_the_stock_check(): void

@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use LogicException;
+use Modules\Core\Models\Concerns\HasDocumentNumber;
 use Modules\Core\Models\Tenant;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Database\Factories\InvoiceFactory;
@@ -18,10 +19,18 @@ use Modules\Sales\Database\Factories\InvoiceFactory;
  * app-level guard; the DB-level grant revocation described in the spec is a
  * deployment concern, not something a migration can express.
  */
-#[Fillable(['tenant_id', 'so_id', 'customer_id', 'issued_date', 'due_date', 'subtotal', 'tax_amount', 'total', 'paid', 'balance', 'status'])]
+#[Fillable(['tenant_id', 'so_id', 'customer_id', 'issued_date', 'due_date', 'subtotal', 'tax_amount', 'shipping_amount', 'total', 'paid', 'returned_total', 'balance', 'status'])]
 class Invoice extends Model
 {
-    use HasFactory, HasUlids;
+    use HasDocumentNumber, HasFactory, HasUlids;
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function documentSequence(): array
+    {
+        return ['invoice', 'INV-'];
+    }
 
     protected function casts(): array
     {
@@ -30,6 +39,8 @@ class Invoice extends Model
             'due_date' => 'date',
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
+            'shipping_amount' => 'decimal:2',
+            'returned_total' => 'decimal:2',
             'total' => 'decimal:2',
             'paid' => 'decimal:2',
             'balance' => 'decimal:2',

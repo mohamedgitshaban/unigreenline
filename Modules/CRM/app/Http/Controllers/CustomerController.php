@@ -11,6 +11,7 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
@@ -27,7 +28,7 @@ use Modules\Sales\Models\SalesOrder;
 
 class CustomerController extends Controller
 {
-    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, ServesLookups, Sortable;
 
     private const RELATIONS = [
         'salesRep',
@@ -45,6 +46,11 @@ class CustomerController extends Controller
             ->where('tenant_id', $request->user()->tenant_id);
 
         $this->scope->constrain($query, $request->user(), 'sales_rep_id');
+
+        // A dropdown of customers needs only their names, and only the ones this user may see.
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, $query);
+        }
 
         $this->withRelationsAndCounts($query, $request->user());
 

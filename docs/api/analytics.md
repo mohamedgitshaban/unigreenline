@@ -25,10 +25,57 @@ The KPI cards from spec §8.
   }
 }
 ```
-- `monthly_sales`: sum of sales order totals with `order_date` in the current calendar month.
+- `monthly_sales`: sum of sales order totals with `order_date` in the current calendar month. 🔄 Cancelled orders are no longer counted (the same as on the sales dashboard).
 - `collected_amount`: sum of collections with `payment_date` in the current calendar month.
 - `outstanding_ar`: sum of invoice `balance` across `outstanding`/`partial`/`overdue`.
 - `critical_expiry_count`: batches with `qty_cartons > 0` expiring within **30 days** (not spec-defined — a chosen default, same threshold the expiry-alert job below uses).
+
+🔄 The response also has `links`: for each card, where the data behind it can be read, as `{ "path": "/api/v1/invoices", "query": { "filter[status]": "overdue" } }` — send the query to that path to list what was counted.
+`pending_deliveries` → `/deliveries`, `outstanding_ar` and `overdue_amount` → `/invoices`, `monthly_sales` → `/sales-orders`, `collected_amount` → `/collections`, `active_customers` → `/customers`,
+`inventory_value` → `/analytics/stock-snapshot`, `critical_expiry_count` → `/analytics/expiry`.
+
+## `GET /api/v1/analytics/overview` 🆕 NEW
+
+**Open to every signed-in user.** The company at a glance, built from every department's dashboard (see [dashboards.md](./dashboards.md)) and served from the Analytics
+module so a client reads one place. A user only gets the departments they may open and the features inside them; the rest are left out. Same `period` / `from` / `to` query as a
+department dashboard, plus `modules=sales,inventory` to narrow it.
+
+```json
+{ "data": { "generated_at": "...", "period": { "from": "2026-11-01", "to": "2026-11-30", "label": "month", "days": 30, "previous": { } },
+  "scope": { "data_scope": "all", "people": null },
+  "modules": [ { "module": "sales", "title": "Sales", "description": "...", "features": [ ], "kpis": [ ], "charts": [ ], "tables": [ ] } ] } }
+```
+
+Every headline number may carry a `link` (`{ path, query }`) to the list behind it: sales orders, invoices, collections, deliveries and the stock figures have one.
+
+## `GET /api/v1/analytics/stock-snapshot` 🆕 NEW
+
+Requires `stock-snapshot.view` (Administrator, Owner, Auditor, Warehouse Manager); `?export=csv|xlsx` needs `stock-snapshot.export`. **Stock by product, warehouse and batch** on a day: `?as_of=2026-10-31`
+(default today; a past day is worked out from the stock ledger), `?warehouse_id=`, `?product_id=`, `?below_minimum=1`, `?per_page=` (default 50, max 500), `?page=`.
+
+```json
+{ "data": [ { "product": { "id": "01m…", "name": "Tonic", "sku": "PRD-00004", "brand": "Acme" }, "warehouse": { "id": "01m…", "name": "Main" },
+    "batch_no": "T-1", "exp_date": "2027-06-30", "qty_cartons": 4, "is_free_gift": false, "value": "200.00",
+    "min_stock_cartons": 10, "reorder_level": 5, "at_or_below_minimum": true } ],
+  "report": { "as_of": "2026-11-10", "generated_at": "2026-11-10T10:00:00+00:00", "generated_by": { "id": "01m…", "name": "Rana" },
+    "totals": { "cartons": 27, "value": "1380.00", "rows": 3 } },
+  "meta": { "current_page": 1, "per_page": 50, "total": 3, "last_page": 1 } }
+```
+
+`value` and `totals.value` are **Administrator only** (`null` for everyone else), like every cost figure. `at_or_below_minimum` compares the product's regular stock in that warehouse with its
+`min_stock_cartons`. A user limited to some warehouses only sees those. Only batches with stock appear.
+
+## `GET /api/v1/reports/sales-breakdown` 🆕 NEW
+
+Requires `sales-report.view` (Administrator, Owner, Auditor, Sales Manager, Accountant); `?export=csv|xlsx` needs `sales-report.export`. **Sales grouped** by `group_by` = `customer`, `item`, `rep`,
+`category` (a sub-class rolls up into its class), `subclass`, `brand` or `supplier`; `?start_date=`, `?end_date=`, `?warehouse_id=` narrow it.
+
+```json
+{ "data": { "group_by": "customer", "from": "2026-11-01", "to": "2026-11-30",
+  "rows": [ { "key": "01m…", "name": "Nile Clinic", "orders": 1, "lines": 2, "amount": "800.00" } ], "total_amount": "1200.00" } }
+```
+
+Only orders that were **invoiced or delivered** count. `amount` is the line price after the line discount, before the invoice discount and VAT. A user limited to their team only sees their team's orders.
 
 ## `GET /api/v1/analytics/expiry`
 
@@ -144,6 +191,11 @@ entry. Paid invoices and ones not yet due are left alone.
 Daily. Drafts a write-off recap per warehouse for every batch past its expiry
 date (batches already on a draft are skipped). Drafts only — nothing is deducted
 or posted until someone approves; see [recap.md](./recap.md).
+
+### `php artisan inventory:generate-low-stock-alerts` 🆕 NEW
+
+Daily. A company-wide notification (`low_stock_alert`) for each active product whose stock, summed over every warehouse (gift stock excluded), has fallen below its `min_stock_cartons`; it mentions the product's
+`lead_time_days` when set. A product is announced again only after its last alert has been read.
 
 ### `php artisan inventory:generate-expiry-alerts`
 

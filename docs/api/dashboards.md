@@ -27,6 +27,7 @@ All of them answer in the same shape, so one client component can draw any depar
 }
 ```
 
+- 🆕 `kpis[].link` is `{ "path": "/api/v1/invoices", "query": { "filter[status]": "overdue" } }` or `null`: where the data behind the number can be read, so a click can open it. Sales orders, invoices, collections, deliveries and the stock figures carry one; the same applies in `GET /analytics/overview`.
 - `kpis[].unit` is `count`, `currency`, `percent`, `cartons`, `days` or `hours`. `previous` / `change_pct` / `trend` (`up`, `down`, `flat`) compare with the period of the same length right before; they are `null` for figures with nothing to compare (a balance today).
 - `charts[].type` is `line`, `bar`, `area`, `pie` or `donut`; every chart is one series of `{label, value}` points.
 - `features[].available` is `false` for a feature the caller may not open (its figures are left out). Every widget carries its `feature` key so a client can group them.

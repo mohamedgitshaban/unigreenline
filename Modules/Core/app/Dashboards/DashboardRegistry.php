@@ -2,6 +2,8 @@
 
 namespace Modules\Core\Dashboards;
 
+use Modules\Core\Models\User;
+
 /**
  * Every department's dashboard and the features (sections) inside it. A module registers its own in its
  * service provider's boot():
@@ -52,5 +54,37 @@ class DashboardRegistry
     public function sectionsOf(string $module): array
     {
         return $this->sections[$module] ?? [];
+    }
+
+    /**
+     * One department's dashboard for a user: the features they may open and the headline numbers, charts and
+     * tables those features produce for the period. `$wantedFeatures` narrows it to some features.
+     *
+     * @param  array<int, string>|null  $wantedFeatures
+     * @return array{features: array<int, array{key: string, label: string, available: bool}>, kpis: array<int, array<string, mixed>>, charts: array<int, array<string, mixed>>, tables: array<int, array<string, mixed>>}
+     */
+    public function build(User $user, string $module, DashboardPeriod $period, ?array $wantedFeatures = null): array
+    {
+        $features = [];
+        $widgets = ['kpis' => [], 'charts' => [], 'tables' => []];
+
+        foreach ($this->sectionsOf($module) as $section) {
+            $allowed = $section->permission() === null || $user->can($section->permission());
+            $features[] = ['key' => $section->key(), 'label' => $section->label(), 'available' => $allowed];
+
+            if (! $allowed || ($wantedFeatures !== null && ! in_array($section->key(), $wantedFeatures, true))) {
+                continue;
+            }
+
+            $built = $section->build($user, $period);
+
+            foreach (array_keys($widgets) as $kind) {
+                foreach ($built[$kind] ?? [] as $widget) {
+                    $widgets[$kind][] = ['feature' => $section->key()] + $widget;
+                }
+            }
+        }
+
+        return ['features' => $features, ...$widgets];
     }
 }

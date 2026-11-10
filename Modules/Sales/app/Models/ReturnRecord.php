@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Models\Concerns\HasDocumentNumber;
 use Modules\Core\Models\Tenant;
 use Modules\CRM\Models\Customer;
 use Modules\Inventory\Models\Product;
@@ -19,12 +20,20 @@ use Modules\Sales\Database\Factories\ReturnRecordFactory;
  * be used as a PHP class name. Maps to the "returns" table (spec §4.11).
  */
 #[Fillable([
-    'tenant_id', 'invoice_id', 'customer_id', 'supplier_id', 'product_id', 'warehouse_id',
-    'batch_no', 'type', 'qty', 'unit', 'amount', 'restocked', 'reason', 'status', 'return_date',
+    'tenant_id', 'invoice_id', 'so_line_id', 'customer_id', 'supplier_id', 'product_id', 'warehouse_id',
+    'batch_no', 'type', 'qty', 'unit', 'amount', 'tax_amount', 'restocked', 'reason', 'status', 'return_date',
 ])]
 class ReturnRecord extends Model
 {
-    use HasFactory, HasUlids;
+    use HasDocumentNumber, HasFactory, HasUlids;
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function documentSequence(): array
+    {
+        return ['return', 'RET-'];
+    }
 
     public const UPDATED_AT = null;
 
@@ -39,6 +48,7 @@ class ReturnRecord extends Model
         return [
             'qty' => 'integer',
             'amount' => 'decimal:2',
+            'tax_amount' => 'decimal:2',
             'restocked' => 'boolean',
             'return_date' => 'date',
         ];

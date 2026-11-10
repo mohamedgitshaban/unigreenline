@@ -13,7 +13,7 @@ use Modules\Inventory\Models\Unit;
  */
 class UnitSeeder extends Seeder
 {
-    public const NAMES = ['Packet', 'Package', 'Carton'];
+    public const NAMES = ['Packet', 'Package', 'Carton', 'Bottle'];
 
     public function run(): void
     {

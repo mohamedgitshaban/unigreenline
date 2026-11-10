@@ -4,6 +4,7 @@ namespace Modules\Inventory\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 use Modules\Inventory\Models\Warehouse;
 
 class GoodsReceiptRequest extends FormRequest
@@ -22,7 +23,7 @@ class GoodsReceiptRequest extends FormRequest
         return [
             'product_id' => [
                 'required', 'string',
-                Rule::exists('products', 'id')->where('tenant_id', $tenantId),
+                Rule::exists('products', 'id')->where('tenant_id', $tenantId)->where('active', true),
             ],
             'warehouse_id' => [
                 'required', 'string',
@@ -37,6 +38,31 @@ class GoodsReceiptRequest extends FormRequest
             'exp_date' => ['required', 'date'],
             'mfg_date' => ['nullable', 'date', 'before_or_equal:exp_date'],
             'rcv_date' => ['nullable', 'date'],
+            // Cartons of this delivery that arrived damaged, or must be destroyed. They are received with the rest and
+            // a draft write-off is raised for them.
+            'damaged_cartons' => ['sometimes', 'integer', 'min:0'],
+            'destroyed_cartons' => ['sometimes', 'integer', 'min:0'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['product_id.exists' => 'This product is inactive or does not exist, so it cannot be used.'];
+    }
+
+    public function after(): array
+    {
+        return [
+            function (Validator $validator) {
+                $bad = (int) $this->input('damaged_cartons', 0) + (int) $this->input('destroyed_cartons', 0);
+
+                if (! $validator->errors()->hasAny(['qty_cartons', 'damaged_cartons', 'destroyed_cartons']) && $bad > (int) $this->input('qty_cartons')) {
+                    $validator->errors()->add('damaged_cartons', 'More cartons are marked damaged or destroyed than were received.');
+                }
+            },
         ];
     }
 }

@@ -43,6 +43,8 @@ class UpdateSettingRequest extends FormRequest
             $rules[$column] = ['sometimes', 'nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'];
         }
 
+        $rules['shipping_cost_paid_by_company'] = ['sometimes', 'boolean'];
+
         return $rules;
     }
 

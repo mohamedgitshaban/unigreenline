@@ -15,6 +15,8 @@ class ReturnRecordResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'number' => $this->number,
+            'so_line_id' => $this->so_line_id,
             'invoice' => InvoiceResource::make($this->invoice),
             'customer' => CustomerResource::make($this->customer),
             'supplier' => SupplierResource::make($this->supplier),
@@ -25,6 +27,7 @@ class ReturnRecordResource extends JsonResource
             'qty' => $this->qty,
             'unit' => $this->unit,
             'amount' => $this->amount,
+            'tax_amount' => $this->tax_amount,
             'restocked' => $this->restocked,
             'reason' => $this->reason,
             'status' => $this->status,

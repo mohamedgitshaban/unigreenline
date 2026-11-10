@@ -147,7 +147,7 @@ class UnitsAndPackagingTest extends TestCase
         $this->seed(UnitSeeder::class);
         $this->seed(ProductUnitSeeder::class);
 
-        $this->assertSame(['Carton', 'Package', 'Packet'], Unit::query()->orderBy('name')->pluck('name')->all());
+        $this->assertSame(['Bottle', 'Carton', 'Package', 'Packet'], Unit::query()->orderBy('name')->pluck('name')->all());
         $levels = $product->units()->with('unit')->get();
         $this->assertSame(['Packet', 'Carton'], $levels->pluck('unit.name')->all());
         $this->assertSame([1, 24], $levels->pluck('base_qty')->all());

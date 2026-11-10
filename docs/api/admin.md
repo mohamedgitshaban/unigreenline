@@ -367,10 +367,16 @@ until then every field reads as `null`.
     "favicon_url": "https://erp.example.com/storage/branding/01m.../d4e5f6.ico",
     "primary_color": "#1A7F37",
     "secondary_color": "#0B3D91",
-    "accent_color": null
+    "accent_color": null,
+    "shipping_cost_paid_by_company": true
   }
 }
 ```
+
+🆕 `shipping_cost_paid_by_company` (boolean, default **`true`**): whether the cost of shipping an order is the company's own cost
+(`true`: it is recorded on the order but not added to what the customer pays) or is charged to the customer (`false`: it is added
+to the order total and booked as income on the invoice). The value in force when an order is created is stored on that order
+(`shipping_charged`), so changing the setting never alters an existing order.
 
 `*_path` is what you send back to change the image; `*_url` is a plain public URL
 for `<img src>` / `<link rel="icon">` (`null` when no image is set). Images are
@@ -414,7 +420,8 @@ any of these — a field left out stays as it is, `null` clears it.
   "favicon_path": "branding/01m.../d4e5f6.ico",
   "primary_color": "#1A7F37",
   "secondary_color": "#0B3D91",
-  "accent_color": "#FF8800"
+  "accent_color": "#FF8800",
+  "shipping_cost_paid_by_company": false
 }
 ```
 

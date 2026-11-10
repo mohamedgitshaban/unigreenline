@@ -42,9 +42,9 @@ class DeliveriesSection implements DashboardSection
 
         return [
             'kpis' => [
-                Widgets::kpi('pending_deliveries', 'Waiting to be delivered', (clone $pending)->count()),
+                Widgets::kpi('pending_deliveries', 'Waiting to be delivered', (clone $pending)->count(), null, 'count', null, Widgets::link('deliveries', ['filter[status][in]' => 'pending,preparing,out_for_delivery'])),
                 Widgets::kpi('delivered', 'Delivered', $deliveredIn($period), $deliveredIn($previous)),
-                Widgets::kpi('failed_deliveries', 'Failed deliveries', $deliveries()->where('status', 'failed')->count()),
+                Widgets::kpi('failed_deliveries', 'Failed deliveries', $deliveries()->where('status', 'failed')->count(), null, 'count', null, Widgets::link('deliveries', ['filter[status]' => 'failed'])),
             ],
             'charts' => [
                 Widgets::chart('deliveries_by_status', 'Open deliveries by status', 'donut', $byStatus->map(fn ($total, $status) => ['label' => $status, 'value' => (int) $total])->values()->all()),

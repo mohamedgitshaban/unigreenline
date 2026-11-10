@@ -414,6 +414,18 @@ $inventory = folder('Inventory', [
         req('GET', 'Get warehouse', '/warehouses/{{warehouse_id}}', [
             'description' => 'Includes `batches_count` — the batches themselves are paged by List warehouse batches. 403 if this warehouse is not assigned to the caller.',
         ]),
+        nw(req('GET', 'List warehouse products', '/warehouses/{{warehouse_id}}/products', [
+            'query' => ['page' => 1, 'per_page' => 15, 'below_minimum' => 0],
+            'description' => 'Requires `warehouses.view`. The products held in the warehouse with their cartons and whether they are at or below their minimum (`below_minimum=1` keeps those). The list behind the overview card.',
+        ])),
+        nw(req('GET', 'List warehouse returns', '/warehouses/{{warehouse_id}}/returns', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `warehouses.incoming`. Goods customers sent back into this warehouse, newest first.',
+        ])),
+        nw(req('POST', 'Enter warehouse opening stock', '/warehouses/{{warehouse_id}}/opening-stock', [
+            'description' => 'Requires `goods-receipts.create` and a warehouse the user works in. Receives many batches at once (all or nothing), booked against Opening Balance Equity.',
+            'body' => ['items' => [['product_id' => '{{product_id}}', 'batch_no' => 'OPENING-1', 'qty_cartons' => 10, 'cost_per_carton' => 20, 'exp_date' => '2028-01-31']]],
+        ])),
         req('GET', 'List warehouse batches', '/warehouses/{{warehouse_id}}/batches', [
             'query' => ['page' => 1, 'per_page' => 10, 'sort_by' => 'id', 'sort_dir' => 'desc'],
             'description' => 'Requires `inventory.view` + the warehouse assigned to the caller (403 otherwise). Each batch includes its `product`. Paginated (10 per page by default) — follow `links.next`. `sort_by=exp_date&sort_dir=asc` gives FEFO order.',
@@ -464,6 +476,10 @@ $inventory = folder('Inventory', [
         ...deleteFlow('category', '/categories', ['name' => 'Postman Delete Me Category', 'active' => true], 'deletable_category_id', '/categories/{id}', 'Requires `inventory.delete`. 204. **409** while any product uses the category — set `active: false` instead.'),
     ]),
     folder('Products', [
+        nw(req('GET', 'List brands in use', '/brands', [
+            'query' => ['search' => 'ac'],
+            'description' => 'Requires `products.view`. The brand names already used on products, for a type-ahead on the product form.',
+        ])),
         req('GET', 'List products', '/products', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
             'description' => 'Requires `inventory.view`. Catalog-wide, not warehouse-scoped.',
@@ -508,6 +524,28 @@ $inventory = folder('Inventory', [
         'description' => 'Requires `inventory.add` + destination warehouse visibility. `exp_date` is required — never fabricated. Re-receiving the same `batch_no` for the same product+warehouse tops up quantity instead of duplicating the row.',
         'body' => ['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'BATCH-001', 'qty_cartons' => 50, 'cost_per_carton' => 120.00, 'exp_date' => '2027-12-31', 'mfg_date' => null, 'rcv_date' => null],
     ]),
+    nw(folder('Stock requests', [
+        req('POST', 'Create stock request', '/stock-requests', [
+            'description' => 'Requires `stock-requests.create`. A warehouse asks another warehouse (`source: warehouse` + `from_warehouse_id`), Purchasing or Manufacturing for stock. Ask in `qty_cartons`, or in a packaging unit with `unit_id` + `qty` (rounded up to whole cartons). Saves the id into `{{stock_request_id}}`.',
+            'body' => ['warehouse_id' => '{{warehouse_id}}', 'source' => 'purchasing', 'product_id' => '{{product_id}}', 'qty_cartons' => 5, 'needed_by' => '2026-12-01', 'notes' => 'Running low'],
+            'tests' => saveId('stock_request_id'),
+        ]),
+        req('GET', 'List stock requests', '/stock-requests', [
+            'query' => ['page' => 1, 'per_page' => 15],
+            'description' => 'Requires `stock-requests.view`. The requests for or from the warehouses the user works in, plus those addressed to Purchasing or Manufacturing for people who can raise those documents.',
+        ]),
+        req('POST', 'Grant stock request', '/stock-requests/{{stock_request_id}}/approve', [
+            'description' => 'Requires `stock-requests.approve`. A warehouse request is transferred (earliest expiry first); a Purchasing request becomes a draft purchase order (optional `supplier_id`); a Manufacturing request becomes a draft production order (optional `bom_id`).',
+            'body' => ['supplier_id' => null],
+        ]),
+        req('POST', 'Reject stock request', '/stock-requests/{{stock_request_id}}/reject', [
+            'description' => 'Requires `stock-requests.reject`. A reason is required.',
+            'body' => ['reason' => 'Held for a customer order'],
+        ]),
+        req('POST', 'Cancel stock request', '/stock-requests/{{stock_request_id}}/cancel', [
+            'description' => 'Requires `stock-requests.cancel`. The person who asked, or anyone who may grant it, withdraws an open request.',
+        ]),
+    ])),
     folder('Transfers', [
         req('GET', 'List transfers', '/transfers', [
             'query' => ['page' => 1, 'per_page' => 15, 'sort_by' => 'id', 'sort_dir' => 'desc', 'export' => 'csv'],
@@ -574,6 +612,16 @@ $sales = folder('Sales', [
             'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65], ['product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'qty' => 1, 'unit' => 'Carton', 'is_gift' => true]]],
             'tests' => saveId('gift_sales_order_id'),
         ]), 'lines accept `warehouse_id`, `unit_id` and `is_gift`; `unit` and `unit_price` are optional when `unit_id` / `is_gift` are used; minimum selling price is enforced.'),
+        nw(req('GET', 'Next sales order number (preview)', '/sales-orders/next-number', [
+            'description' => 'Requires `sales-orders.create`. The number the next order will get (`SO-000124`), for a form to show while it is open. It is not reserved: the real number is assigned when the order is saved.',
+        ])),
+        nw(req('POST', 'Duplicate sales order', '/sales-orders/{{sales_order_id}}/duplicate', [
+            'description' => 'Requires `sales-orders.create`. A new draft with the same customer, terms and lines (a repeat order), dated today. Stock, credit limit and minimum prices are checked again (422 `shortfalls` if the stock is gone). 201 with the new order.',
+        ])),
+        nw(req('POST', 'Quick sale (from invoices)', '/invoices/quick-sale', [
+            'description' => 'Requires `sales-orders.quick-deliver`. The same call as Create sales order and deliver it, offered on the invoices screen: order, stock, invoice, journal entry and a delivered delivery in one step.',
+            'body' => ['customer_id' => '{{customer_id}}', 'warehouse_id' => '{{warehouse_id}}', 'pay_type' => 'cash', 'lines' => [['product_id' => '{{product_id}}', 'qty' => 1, 'unit' => 'Carton', 'unit_price' => 65]]],
+        ])),
         nw(req('PUT', 'Update sales order', '/sales-orders/{{gift_sales_order_id}}', [
             'description' => 'Requires `sales.edit` (+ ownership if Sales Rep). **Draft orders only** (else 422 "Only draft sales orders can be changed or deleted."). Header fields update in place; `lines`, if sent, **replace every line** and the order is re-priced and re-validated (credit limit, per-warehouse FEFO availability, minimum price). Audit-logged.',
             'body' => ['notes' => 'Updated from Postman'],
@@ -638,6 +686,10 @@ $sales = folder('Sales', [
             'description' => "Requires `sales.edit` (+ ownership if Sales Rep). For marking a delivery delivered directly, separately from its order's own status transition. `invoice_data` (optional) is the path from Upload delivery invoice; a new one replaces the previous file, which is deleted. Omit it to keep the current one.",
             'body' => ['invoice_data' => '{{delivery_invoice_data}}'],
         ]),
+        nw(req('POST', 'Cancel delivery', '/deliveries/{{delivery_id}}/cancel', [
+            'description' => 'Requires `deliveries.cancel` (Administrator, Warehouse Manager, Accountant). Undoes the sale: the stock goes back into its batches, the cost of goods sold and the invoice are reversed, the customer balance comes down, and the order and delivery become `cancelled`. 422 if money was collected, goods were returned, or it is already cancelled.',
+            'body' => ['reason' => 'Customer refused the goods'],
+        ])),
         req('GET', 'Download delivery invoice', '/deliveries/{{delivery_id}}/invoice', [
             'description' => 'Requires `sales.view` (+ ownership if Sales Rep). File download; 404 if the delivery has no invoice file, or belongs to another tenant.',
         ]),
@@ -652,6 +704,10 @@ $sales = folder('Sales', [
             'body' => ['invoice_id' => '{{invoice_id}}', 'amount' => 300, 'method' => 'Bank Transfer', 'reference' => null, 'payment_date' => '2026-09-18', 'notes' => null],
             'tests' => saveId('collection_id'),
         ]),
+        nw(req('POST', 'Record collection by customer', '/customers/{{customer_id}}/collections', [
+            'description' => 'Requires `collections.create`. One payment from a customer, spread over his open invoices oldest due date first; one collection per invoice paid. `payment_date` left out is today. 422 if the amount is more than he owes.',
+            'body' => ['amount' => 450, 'method' => 'Cash', 'reference' => null, 'payment_date' => null, 'notes' => null],
+        ])),
         req('GET', 'Get collection', '/collections/{{collection_id}}', [
             'description' => 'Requires `sales.view` or `accounting.view` (+ ownership if Sales Rep).',
         ]),
@@ -666,6 +722,14 @@ $sales = folder('Sales', [
             'body' => ['invoice_id' => null, 'customer_id' => '{{customer_id}}', 'supplier_id' => null, 'product_id' => '{{product_id}}', 'warehouse_id' => '{{warehouse_id}}', 'batch_no' => 'BATCH-001', 'type' => 'Sales Return', 'qty' => 3, 'unit' => 'Carton', 'amount' => 60, 'restocked' => true, 'reason' => null, 'return_date' => '2026-09-20'],
             'tests' => saveId('return_id'),
         ]),
+        nw(req('POST', 'Create return from an invoice', '/invoices/{{invoice_id}}/returns', [
+            'description' => 'Requires `returns.create`. Tick the invoice lines and how many of each come back (`lines[].line_id` from List invoice lines). The credit (line price, discount share, VAT) is worked out, limited to what is left to return, applied to the invoice balance and the customer balance; with `restocked: true` the goods go back into the batch the order took them from.',
+            'body' => ['type' => 'Sales Return', 'restocked' => true, 'reason' => 'Wrong pack', 'lines' => [['line_id' => '{{sales_order_line_id}}', 'qty' => 1]]],
+        ])),
+        nw(req('GET', 'List returns of an invoice', '/invoices/{{invoice_id}}/returns', [
+            'query' => ['page' => 1, 'per_page' => 10],
+            'description' => 'Requires `returns.view`. The returns made against one invoice.',
+        ])),
         req('GET', 'Get return', '/returns/{{return_id}}', [
             'description' => "Requires `sales.view` or `purchasing.view`. Includes nested invoice/customer/supplier/product/warehouse. 404 for another tenant's return.",
         ]),
@@ -1656,6 +1720,21 @@ $analytics = folder('Analytics', [
         'query' => ['page' => 1, 'per_page' => 15, 'export' => 'csv'],
         'description' => 'Requires `analytics.view`. Per-product stock across every warehouse — paginated by product, not by row.',
     ]),
+    nw(req('GET', 'Overview (every department)', '/analytics/overview', [
+        'query' => ['period' => 'month', 'modules' => 'sales,inventory'],
+        'requiredQuery' => [],
+        'description' => 'Open to every signed-in user. The company at a glance, built from every department dashboard the user may open; each headline number may carry a `link` ({path, query}) to the list behind it.',
+    ])),
+    nw(req('GET', 'Stock snapshot', '/analytics/stock-snapshot', [
+        'query' => ['as_of' => '2026-11-10', 'warehouse_id' => '{{warehouse_id}}', 'below_minimum' => 0, 'export' => 'csv'],
+        'requiredQuery' => [],
+        'description' => 'Requires `stock-snapshot.view` (`stock-snapshot.export` for the file). Stock by product, warehouse and batch on a day, with value (Administrator only), an at-or-below-minimum flag, and who produced the report.',
+    ])),
+    nw(req('GET', 'Sales breakdown', '/reports/sales-breakdown', [
+        'query' => ['group_by' => 'customer', 'start_date' => '2026-11-01', 'end_date' => '2026-11-30', 'export' => 'csv'],
+        'requiredQuery' => ['group_by'],
+        'description' => 'Requires `sales-report.view` (`sales-report.export` for the file). Sales grouped by customer, item, rep, category, subclass, brand or supplier; only invoiced or delivered orders count.',
+    ])),
     req('GET', 'Sales report (export)', '/reports/sales', [
         'query' => ['start_date' => '2026-09-01', 'end_date' => '2026-09-30', 'warehouse_id' => '{{warehouse_id}}', 'per_page' => 15],
         'description' => 'Requires `analytics.export` specifically (not just `view`). Same row shape as GET /sales-orders.',

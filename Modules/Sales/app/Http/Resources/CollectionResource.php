@@ -13,6 +13,7 @@ class CollectionResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'number' => $this->number,
             'invoice' => InvoiceResource::make($this->invoice),
             'customer' => CustomerResource::make($this->customer),
             'collected_by' => UserResource::make($this->collectedBy),

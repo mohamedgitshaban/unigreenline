@@ -197,7 +197,14 @@ class WarehouseActivityController extends Controller
             'status' => ['sometimes', 'string'],
             'purchase_order_id' => ['sometimes', 'string'],
             'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            // What is coming in: purchase orders (default) or production orders making stock for this warehouse.
+            'source' => ['sometimes', Rule::in(['purchase', 'production'])],
         ]);
+
+        if (($filters['source'] ?? 'purchase') === 'production') {
+            return $this->incomingProduction($request, $warehouse, $filters);
+        }
+
         $statuses = isset($filters['status']) ? array_filter(explode(',', $filters['status'])) : self::OPEN_PURCHASE_STATUSES;
 
         $orders = DB::table('purchase_orders as po')
@@ -264,9 +271,10 @@ class WarehouseActivityController extends Controller
             ))
             ->when($filters['sales_order_id'] ?? null, fn ($query, $orderId) => $query->where('so.id', $orderId))
             ->when($filters['search'] ?? null, fn ($query, $term) => $query->where('c.name', 'like', '%'.str_replace(['%', '_'], ['\%', '\_'], $term).'%'))
+            ->orderByRaw('so.delivery_date is null, so.delivery_date asc')
             ->orderBy('so.order_date')
             ->orderBy('so.id')
-            ->select(['so.id', 'so.status', 'so.order_date', 'so.stock_deducted', 'so.notes', 'so.warehouse_id', 'c.id as customer_id', 'c.name as customer_name', 'rep.id as rep_id', 'rep.name as rep_name'])
+            ->select(['so.id', 'so.number', 'so.status', 'so.order_date', 'so.delivery_date', 'so.stock_deducted', 'so.notes', 'so.warehouse_id', 'c.id as customer_id', 'c.name as customer_name', 'rep.id as rep_id', 'rep.name as rep_name'])
             ->paginate($request->integer('per_page', 15))
             ->withQueryString();
 
@@ -278,8 +286,13 @@ class WarehouseActivityController extends Controller
 
         $orderWarehouse = $orders->getCollection()->pluck('warehouse_id', 'id');
 
+        $invoices = DB::table('invoices')
+            ->whereIn('so_id', $orders->pluck('id'))
+            ->get(['id', 'number', 'so_id', 'status', 'total', 'balance'])
+            ->groupBy('so_id');
+
         return response()->json([
-            'data' => $orders->getCollection()->map(function ($order) use ($lines, $warehouse, $orderWarehouse) {
+            'data' => $orders->getCollection()->map(function ($order) use ($lines, $warehouse, $orderWarehouse, $invoices) {
                 $mine = ($lines[$order->id] ?? collect())
                     ->filter(fn ($line) => ($line->warehouse_id ?? $orderWarehouse[$order->id]) === $warehouse->id)
                     ->map(fn ($line) => [
@@ -289,14 +302,17 @@ class WarehouseActivityController extends Controller
                         'free_qty' => (int) $line->free_qty,
                         'is_gift' => (bool) $line->is_gift,
                         'batch_no' => $line->batch_no,
-                        'cartons' => CartonCalculator::cartonsNeeded((int) $line->qty, (int) $line->free_qty, $line->unit, (int) $line->carton_qty, $line->base_qty !== null ? (int) $line->base_qty : null),
+                        'cartons' => array_sum(CartonCalculator::stockNeeds((bool) $line->is_gift, (int) $line->qty, (int) $line->free_qty, $line->unit, (int) $line->carton_qty, $line->base_qty !== null ? (int) $line->base_qty : null)),
                     ])->values();
 
                 return [
                     'id' => $order->id,
                     'status' => $order->status,
                     'stage' => $order->status === 'invoiced' ? 'to_deliver' : 'to_prepare',
+                    'number' => $order->number,
+                    'invoice' => ($invoice = ($invoices[$order->id] ?? collect())->first()) ? ['id' => $invoice->id, 'number' => $invoice->number, 'status' => $invoice->status, 'total' => $invoice->total, 'balance' => $invoice->balance] : null,
                     'order_date' => $order->order_date,
+                    'delivery_date' => $order->delivery_date,
                     'stock_deducted' => (bool) $order->stock_deducted,
                     'notes' => $order->notes,
                     'customer' => ['id' => $order->customer_id, 'name' => $order->customer_name],
@@ -306,6 +322,130 @@ class WarehouseActivityController extends Controller
                 ];
             })->values(),
             'meta' => $this->pagination($orders),
+        ]);
+    }
+
+    /**
+     * Production orders still to make stock for the warehouse (GET /warehouses/{id}/incoming?source=production).
+     *
+     * @param  array<string, mixed>  $filters
+     */
+    private function incomingProduction(Request $request, Warehouse $warehouse, array $filters)
+    {
+        $orders = DB::table('production_orders as mo')
+            ->join('boms', 'boms.id', '=', 'mo.bom_id')
+            ->join('products as p', 'p.id', '=', 'boms.product_id')
+            ->where('mo.tenant_id', $warehouse->tenant_id)
+            ->where('mo.warehouse_id', $warehouse->id)
+            ->when(
+                isset($filters['status']),
+                fn ($query) => $query->whereIn('mo.status', array_filter(explode(',', $filters['status']))),
+                fn ($query) => $query->whereNotIn('mo.status', ['completed', 'cancelled']),
+            )
+            ->when($filters['search'] ?? null, fn ($query, $term) => $query->where('p.name', 'like', '%'.str_replace(['%', '_'], ['\\%', '\\_'], $term).'%'))
+            ->orderByRaw('mo.planned_finish is null, mo.planned_finish asc')
+            ->orderBy('mo.id')
+            ->select(['mo.id', 'mo.number', 'mo.status', 'mo.planned_finish', 'mo.output_qty_cartons', 'mo.produced_qty_cartons', 'p.id as product_id', 'p.name as product_name', 'p.sku'])
+            ->paginate($request->integer('per_page', 15))
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $orders->getCollection()->map(fn ($order) => [
+                'id' => $order->id,
+                'number' => $order->number,
+                'status' => $order->status,
+                'planned_finish' => $order->planned_finish,
+                'product' => ['id' => $order->product_id, 'name' => $order->product_name, 'sku' => $order->sku],
+                'total_cartons' => (int) $order->output_qty_cartons,
+                'produced_cartons' => (int) $order->produced_qty_cartons,
+            ])->values(),
+            'meta' => $this->pagination($orders),
+        ]);
+    }
+
+    /**
+     * The products held in the warehouse with how many cartons (GET /warehouses/{id}/products). `?below_minimum=1`
+     * keeps those at or below their minimum stock; `?search=` matches name, SKU and brand.
+     */
+    public function products(Request $request, string $id)
+    {
+        $warehouse = $this->warehouse($request, $id);
+
+        $filters = $request->validate([
+            'search' => ['sometimes', 'nullable', 'string', 'max:255'],
+            'below_minimum' => ['sometimes', 'boolean'],
+        ]);
+
+        $stock = DB::table('inventory_batches')
+            ->where('warehouse_id', $warehouse->id)->where('qty_cartons', '>', 0)
+            ->groupBy('product_id')
+            ->selectRaw('product_id, sum(qty_cartons) as cartons, sum(reserved_cartons) as reserved');
+
+        $products = DB::table('products as p')
+            ->joinSub($stock, 's', 's.product_id', '=', 'p.id')
+            ->where('p.tenant_id', $warehouse->tenant_id)
+            ->when($filters['search'] ?? null, function ($query, $term) {
+                $pattern = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $term).'%';
+
+                $query->where(fn ($q) => $q->where('p.name', 'like', $pattern)->orWhere('p.sku', 'like', $pattern)->orWhere('p.brand', 'like', $pattern));
+            })
+            ->when($request->boolean('below_minimum'), fn ($query) => $query->whereRaw('p.min_stock_cartons > 0 and s.cartons <= p.min_stock_cartons'))
+            ->orderBy('p.name')
+            ->select(['p.id', 'p.name', 'p.sku', 'p.brand', 'p.min_stock_cartons', 's.cartons', 's.reserved'])
+            ->paginate($request->integer('per_page', 15))
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $products->getCollection()->map(fn ($product) => [
+                'id' => $product->id,
+                'name' => $product->name,
+                'sku' => $product->sku,
+                'brand' => $product->brand,
+                'cartons' => (int) $product->cartons,
+                'reserved_cartons' => (int) $product->reserved,
+                'min_stock_cartons' => (int) $product->min_stock_cartons,
+                'at_or_below_minimum' => $product->min_stock_cartons > 0 && $product->cartons <= $product->min_stock_cartons,
+            ])->values(),
+            'meta' => $this->pagination($products),
+        ]);
+    }
+
+    /**
+     * Goods customers sent back into this warehouse (GET /warehouses/{id}/returns), newest first: what came back,
+     * on which invoice, and whether it went back into stock or was written off.
+     */
+    public function returns(Request $request, string $id)
+    {
+        $warehouse = $this->warehouse($request, $id);
+
+        $returns = DB::table('returns as r')
+            ->leftJoin('products as p', 'p.id', '=', 'r.product_id')
+            ->leftJoin('customers as c', 'c.id', '=', 'r.customer_id')
+            ->leftJoin('invoices as i', 'i.id', '=', 'r.invoice_id')
+            ->where('r.tenant_id', $warehouse->tenant_id)
+            ->where('r.warehouse_id', $warehouse->id)
+            ->where('r.type', '!=', 'Purchase Return')
+            ->orderByDesc('r.id')
+            ->select(['r.id', 'r.number', 'r.type', 'r.qty', 'r.unit', 'r.restocked', 'r.return_date', 'r.batch_no', 'r.reason', 'p.id as product_id', 'p.name as product_name', 'c.id as customer_id', 'c.name as customer_name', 'i.id as invoice_id', 'i.number as invoice_number'])
+            ->paginate($request->integer('per_page', 15))
+            ->withQueryString();
+
+        return response()->json([
+            'data' => $returns->getCollection()->map(fn ($return) => [
+                'id' => $return->id,
+                'number' => $return->number,
+                'type' => $return->type,
+                'qty' => (int) $return->qty,
+                'unit' => $return->unit,
+                'restocked' => (bool) $return->restocked,
+                'return_date' => $return->return_date,
+                'batch_no' => $return->batch_no,
+                'reason' => $return->reason,
+                'product' => $return->product_id ? ['id' => $return->product_id, 'name' => $return->product_name] : null,
+                'customer' => $return->customer_id ? ['id' => $return->customer_id, 'name' => $return->customer_name] : null,
+                'invoice' => $return->invoice_id ? ['id' => $return->invoice_id, 'number' => $return->invoice_number] : null,
+            ])->values(),
+            'meta' => $this->pagination($returns),
         ]);
     }
 

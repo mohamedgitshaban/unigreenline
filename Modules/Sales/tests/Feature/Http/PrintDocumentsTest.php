@@ -69,7 +69,7 @@ class PrintDocumentsTest extends TestCase
         $this->assertStringContainsString('text/html', $response->headers->get('Content-Type'));
         $response->assertSee('Nile Vet Supplies')
             ->assertSee('Invoice')
-            ->assertSee($this->invoice->id)
+            ->assertSee($this->invoice->number)
             ->assertSee('Green Valley Clinic')
             ->assertSee('Giza')
             ->assertSee('Ivermectin 1% (IVM-01)')

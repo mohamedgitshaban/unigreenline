@@ -4,6 +4,8 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
@@ -12,12 +14,16 @@ use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Models\User;
 use Modules\Core\Services\AuditLogService;
+use Modules\Inventory\Console\Commands\GenerateExpiryAlerts;
+use Modules\Inventory\Http\Requests\StoreWarehouseOpeningStockRequest;
 use Modules\Inventory\Http\Requests\StoreWarehouseRequest;
 use Modules\Inventory\Http\Requests\UpdateWarehouseRequest;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
 use Modules\Inventory\Http\Resources\WarehouseResource;
 use Modules\Inventory\Imports\WarehouseImport;
+use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Inventory\Services\ManualGoodsReceiptService;
 
 class WarehouseController extends Controller
 {
@@ -91,6 +97,22 @@ class WarehouseController extends Controller
         ]);
 
         $this->applyFilters($request, $query, ['batch_no', 'product.name', 'product.sku']);
+
+        // The batches behind the warehouse overview's alert figures.
+        $alert = $request->validate(['alert' => ['sometimes', Rule::in(['expired', 'expiring', 'low_stock'])]])['alert'] ?? null;
+
+        if ($alert !== null) {
+            $query->where('inventory_batches.qty_cartons', '>', 0);
+
+            match ($alert) {
+                'expired' => $query->whereDate('inventory_batches.exp_date', '<', today()),
+                'expiring' => $query->whereDate('inventory_batches.exp_date', '>=', today())->whereDate('inventory_batches.exp_date', '<=', today()->addDays(GenerateExpiryAlerts::CRITICAL_EXPIRY_DAYS)),
+                'low_stock' => $query->whereIn('inventory_batches.product_id', Product::query()
+                    ->where('tenant_id', $warehouse->tenant_id)->where('min_stock_cartons', '>', 0)
+                    ->whereRaw('coalesce((select sum(qty_cartons) from inventory_batches b where b.product_id = products.id and b.warehouse_id = ?), 0) <= min_stock_cartons', [$warehouse->id])
+                    ->select('id')),
+            };
+        }
 
         $this->applySorting($request, $query);
 
@@ -186,5 +208,24 @@ class WarehouseController extends Controller
         $this->authorize('create', Warehouse::class);
 
         return $this->templateResponse(new WarehouseImport($request->user()), 'warehouses');
+    }
+
+    /**
+     * Enters the stock a warehouse starts with, batch by batch (POST /warehouses/{id}/opening-stock). Each line is
+     * received like a manual goods receipt, with its value booked against Opening Balance Equity.
+     */
+    public function openingStock(StoreWarehouseOpeningStockRequest $request, string $id, ManualGoodsReceiptService $receipts)
+    {
+        $warehouse = Warehouse::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
+
+        abort_unless($warehouse->isVisibleTo($request->user()), 403);
+
+        $batches = DB::transaction(fn () => collect($request->validated('items'))->map(fn (array $item) => $receipts->receive(
+            $item + ['tenant_id' => $warehouse->tenant_id, 'warehouse_id' => $warehouse->id],
+            ['actor_id' => $request->user()->id, 'actor_name' => $request->user()->name, 'ip_address' => $request->ip()],
+            'Opening stock',
+        ))->each->load('product'));
+
+        return InventoryBatchResource::collection($batches)->response()->setStatusCode(201);
     }
 }

@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Modules\Core\Models\Concerns\HasDocumentNumber;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\Core\Support\DataScope;
@@ -20,12 +21,20 @@ use Modules\Sales\Database\Factories\SalesOrderFactory;
 
 #[Fillable([
     'tenant_id', 'customer_id', 'sales_rep_id', 'warehouse_id', 'status', 'pay_type',
-    'grace_period', 'due_date', 'invoice_discount', 'subtotal', 'tax_amount', 'total',
-    'stock_deducted', 'notes', 'order_date',
+    'grace_period', 'due_date', 'invoice_discount', 'invoice_discount_pct', 'shipping_cost', 'shipping_charged',
+    'subtotal', 'tax_amount', 'total', 'stock_deducted', 'notes', 'order_date', 'delivery_date',
 ])]
 class SalesOrder extends Model
 {
-    use HasFactory, HasUlids;
+    use HasDocumentNumber, HasFactory, HasUlids;
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function documentSequence(): array
+    {
+        return ['sales_order', 'SO-'];
+    }
 
     protected function casts(): array
     {
@@ -33,6 +42,10 @@ class SalesOrder extends Model
             'grace_period' => 'integer',
             'due_date' => 'date',
             'invoice_discount' => 'decimal:2',
+            'invoice_discount_pct' => 'decimal:2',
+            'shipping_cost' => 'decimal:2',
+            'shipping_charged' => 'boolean',
+            'delivery_date' => 'date',
             'subtotal' => 'decimal:2',
             'tax_amount' => 'decimal:2',
             'total' => 'decimal:2',

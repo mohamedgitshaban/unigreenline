@@ -28,4 +28,23 @@ class CartonCalculator
             ? $unitsNeeded
             : (int) ceil($unitsNeeded / $productCartonQty);
     }
+
+    /**
+     * What a line takes from each kind of stock. An ordinary line pays for `qty` out of regular stock and its
+     * free quantity comes out of gift stock; a gift line takes everything from gift stock. Paid and free
+     * quantities round up to whole cartons separately, since they come from different batches.
+     *
+     * @return array{regular: int, gift: int}
+     */
+    public static function stockNeeds(bool $isGift, int $qty, int $freeQty, string $unit, int $productCartonQty, ?int $baseQty = null): array
+    {
+        if ($isGift) {
+            return ['regular' => 0, 'gift' => self::cartonsNeeded($qty, $freeQty, $unit, $productCartonQty, $baseQty)];
+        }
+
+        return [
+            'regular' => self::cartonsNeeded($qty, 0, $unit, $productCartonQty, $baseQty),
+            'gift' => $freeQty > 0 ? self::cartonsNeeded($freeQty, 0, $unit, $productCartonQty, $baseQty) : 0,
+        ];
+    }
 }

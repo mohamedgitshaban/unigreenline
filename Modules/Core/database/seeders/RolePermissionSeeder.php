@@ -38,17 +38,20 @@ class RolePermissionSeeder extends Seeder
         'Owner' => ['modules' => '*', 'capabilities' => ['view', 'approve', 'print', 'export', 'audit'], 'except' => ['expenses.approve'], 'grant' => ['manufacturing-settings.update', 'settings.update']],
         // Runs a sales team: CRM as well as sales, so they can see their reps' customers, visits and calls and hand customers out.
         // Can also ask production to make what an open sales order needs, and see how that is going.
-        'Sales Manager' => ['modules' => ['sales', 'crm'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['production-orders.view', 'production-orders.from-sales-order']],
+        'Sales Manager' => ['modules' => ['sales', 'crm'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['production-orders.view', 'production-orders.from-sales-order', 'sales-report.view']],
         // Spec §2 groups "Own orders/customers only" as one scope for Sales
         // Rep — crm.* is included here (not just sales.*) so a rep can
         // manage their own customers, not only their own orders.
         'Sales Rep' => ['modules' => ['sales', 'crm'], 'capabilities' => ['view', 'add', 'edit', 'print']],
-        'Warehouse Manager' => ['modules' => ['inventory', 'manufacturing', 'recap'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export']],
+        // Cancels a delivery whose goods came back, which puts the stock back in the warehouse.
+        'Warehouse Manager' => ['modules' => ['inventory', 'manufacturing', 'recap'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print', 'export'], 'grant' => ['deliveries.view', 'deliveries.cancel', 'stock-snapshot.view', 'stock-snapshot.export']],
         'Warehouse Employee' => ['modules' => ['inventory', 'manufacturing'], 'capabilities' => ['view', 'add', 'edit']],
         // Approving an expense posts it to the journal, so the accountant
         // approves/rejects expenses — but still not accounting.approve.
         'Accountant' => ['modules' => ['accounting', 'expenses'], 'capabilities' => ['view', 'add', 'edit', 'print', 'export'], 'extra' => ['expenses.approve', 'recap.view'], 'grant' => [
             'payroll-runs.view', 'payslips.view',
+            // Cancels a delivery whose goods came back, which reverses the invoice and the cost of the sale.
+            'deliveries.view', 'deliveries.cancel', 'sales-report.view',
             // What production cost, for the books.
             'production-orders.view', 'production-orders.costs', 'production-orders.history', 'manufacturing-reports.view', 'manufacturing-reports.export',
             'manufacturing-cost-reports.view', 'manufacturing-cost-reports.export',
@@ -56,6 +59,8 @@ class RolePermissionSeeder extends Seeder
         'Customer Service' => ['modules' => ['crm'], 'capabilities' => ['view', 'add', 'edit']],
         // Purchasing records expenses but can't approve them.
         'Purchasing' => ['modules' => ['purchasing'], 'capabilities' => ['view', 'add', 'edit', 'approve', 'print'], 'extra' => ['expenses.view', 'expenses.add', 'expenses.edit'], 'grant' => [
+            // Warehouses ask Purchasing for stock; Purchasing answers by raising the purchase order.
+            'stock-requests.view', 'stock-requests.approve', 'stock-requests.reject',
             // Planning proposes what to buy; purchasing turns it into purchase orders.
             'mrp-runs.view', 'mrp-requirements.view', 'mrp-shortages.view', 'mrp-suggestions.view', 'mrp-suggestions.convert', 'mrp-suggestions.dismiss', 'mrp-suggestions.export',
         ]],

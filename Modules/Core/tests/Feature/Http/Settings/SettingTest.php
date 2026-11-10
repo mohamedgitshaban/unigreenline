@@ -85,7 +85,7 @@ class SettingTest extends TestCase
             ->assertJsonPath('data.primary_color', '#1A7F37');
     }
 
-    public function test_returns_every_field_as_null_before_anything_is_saved_without_creating_a_row(): void
+    public function test_returns_empty_branding_and_the_default_shipping_setting_before_anything_is_saved_without_creating_a_row(): void
     {
         $this->actingAsRole('Sales Rep');
 
@@ -101,9 +101,24 @@ class SettingTest extends TestCase
                 'primary_color' => null,
                 'secondary_color' => null,
                 'accent_color' => null,
+                'shipping_cost_paid_by_company' => true,
             ]]);
 
         $this->assertDatabaseCount('tenant_settings', 0);
+    }
+
+    public function test_the_shipping_setting_is_changed_by_a_role_that_may_update_settings_and_must_be_a_boolean(): void
+    {
+        $this->actingAsRole('Owner');
+
+        $this->putJson('/api/v1/settings', ['shipping_cost_paid_by_company' => false])
+            ->assertOk()
+            ->assertJsonPath('data.shipping_cost_paid_by_company', false);
+        $this->assertDatabaseHas('tenant_settings', ['tenant_id' => $this->tenant->id, 'shipping_cost_paid_by_company' => 0]);
+
+        $this->putJson('/api/v1/settings', ['shipping_cost_paid_by_company' => 'maybe'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('shipping_cost_paid_by_company');
     }
 
     public function test_returns_the_saved_settings_of_the_users_own_company_with_image_urls(): void

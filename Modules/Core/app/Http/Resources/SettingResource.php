@@ -23,6 +23,7 @@ class SettingResource extends JsonResource
             'primary_color' => $this->primary_color,
             'secondary_color' => $this->secondary_color,
             'accent_color' => $this->accent_color,
+            'shipping_cost_paid_by_company' => $this->shipping_cost_paid_by_company,
         ];
     }
 }

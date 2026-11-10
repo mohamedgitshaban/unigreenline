@@ -62,13 +62,13 @@ class StockSection implements DashboardSection
 
         return [
             'kpis' => array_values(array_filter([
-                Widgets::kpi('cartons_on_hand', 'Cartons on hand', (int) $totals->cartons, null, 'cartons'),
+                Widgets::kpi('cartons_on_hand', 'Cartons on hand', (int) $totals->cartons, null, 'cartons', null, Widgets::link('analytics/stock-snapshot')),
                 Widgets::kpi('available_cartons', 'Cartons available (not reserved)', (int) $totals->cartons - (int) $totals->reserved, null, 'cartons'),
-                Widgets::kpi('products_in_stock', 'Products in stock', (int) $totals->products),
+                Widgets::kpi('products_in_stock', 'Products in stock', (int) $totals->products, null, 'count', null, Widgets::link('analytics/stock-snapshot')),
                 $user->hasRole('Administrator') ? Widgets::kpi('stock_value', 'Stock value', (float) $value, null, 'currency') : null,
-                Widgets::kpi('low_stock_products', 'Products below minimum stock', (clone $low)->get()->count()),
-                Widgets::kpi('expired_batches', 'Expired batches still in stock', $batches()->whereDate('exp_date', '<', $today)->count()),
-                Widgets::kpi('expiring_batches', 'Batches expiring within 30 days', $batches()->whereDate('exp_date', '>=', $today)->whereDate('exp_date', '<=', $today->copy()->addDays(30))->count()),
+                Widgets::kpi('low_stock_products', 'Products below minimum stock', (clone $low)->get()->count(), null, 'count', null, Widgets::link('analytics/stock-snapshot', ['below_minimum' => '1'])),
+                Widgets::kpi('expired_batches', 'Expired batches still in stock', $batches()->whereDate('exp_date', '<', $today)->count(), null, 'count', null, Widgets::link('analytics/expiry')),
+                Widgets::kpi('expiring_batches', 'Batches expiring within 30 days', $batches()->whereDate('exp_date', '>=', $today)->whereDate('exp_date', '<=', $today->copy()->addDays(30))->count(), null, 'count', null, Widgets::link('analytics/expiry')),
             ])),
             'charts' => [
                 Widgets::chart('stock_by_warehouse', 'Cartons per warehouse', 'bar', $byWarehouse->map(fn ($row) => ['label' => $row->name, 'value' => (int) $row->cartons])->all(), 'cartons'),

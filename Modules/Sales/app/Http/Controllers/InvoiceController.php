@@ -58,7 +58,7 @@ class InvoiceController extends Controller
 
         $query->with(self::RELATIONS)->withCount('collections')->addSelect(['lines_count' => self::linesCount()]);
 
-        $this->applyFilters($request, $query, ['id', 'so_id', 'customer.name']);
+        $this->applyFilters($request, $query, ['id', 'number', 'so_id', 'customer.name']);
 
         $this->applySorting($request, $query);
 

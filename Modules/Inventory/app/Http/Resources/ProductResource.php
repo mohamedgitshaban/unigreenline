@@ -32,12 +32,15 @@ class ProductResource extends JsonResource
             'tax_pct' => $this->tax_pct,
             'min_stock_cartons' => $this->min_stock_cartons,
             'reorder_level' => $this->reorder_level,
+            'lead_time_days' => $this->lead_time_days,
             'active' => $this->active,
             'units' => $this->whenLoaded('units', fn () => $this->units->map(fn ($level) => [
                 'unit_id' => $level->unit_id,
                 'name' => $level->unit?->name,
                 'contains' => $level->contains,
                 'base_qty' => $level->base_qty,
+                // The price of one of this unit: the pack price times how many packs it holds.
+                'selling_price' => number_format((float) $this->pack_selling_price * $level->base_qty, 2, '.', ''),
             ])->values()),
             // Paginated at GET /products/{id}/batches.
             'batches_count' => $this->whenCounted('batches'),

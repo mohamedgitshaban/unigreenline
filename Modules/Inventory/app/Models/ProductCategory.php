@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Modules\Core\Models\Tenant;
 use Modules\Inventory\Database\Factories\ProductCategoryFactory;
 
-#[Fillable(['tenant_id', 'name', 'code', 'description', 'active'])]
+#[Fillable(['tenant_id', 'parent_id', 'name', 'code', 'description', 'active'])]
 class ProductCategory extends Model
 {
     use HasFactory, HasUlids;
@@ -31,6 +31,19 @@ class ProductCategory extends Model
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
+    }
+
+    /**
+     * The class this sub-class sits under (null for a top-level class).
+     */
+    public function parent(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_id');
+    }
+
+    public function children(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_id');
     }
 
     public function products(): HasMany

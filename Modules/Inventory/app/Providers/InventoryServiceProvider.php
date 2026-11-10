@@ -11,18 +11,21 @@ use Modules\Core\Dashboards\DashboardRegistry;
 use Modules\Core\Notifications\ChangeNotificationRegistry;
 use Modules\Core\Notifications\WatchedEntity;
 use Modules\Inventory\Console\Commands\GenerateExpiryAlerts;
+use Modules\Inventory\Console\Commands\GenerateLowStockAlerts;
 use Modules\Inventory\Dashboards\FlowSection;
 use Modules\Inventory\Dashboards\MovementsSection;
 use Modules\Inventory\Dashboards\StockSection;
 use Modules\Inventory\Models\InventoryBatch;
 use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\ProductCategory;
+use Modules\Inventory\Models\StockRequest;
 use Modules\Inventory\Models\Transfer;
 use Modules\Inventory\Models\Unit;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Observers\InventoryBatchObserver;
 use Modules\Inventory\Policies\ProductCategoryPolicy;
 use Modules\Inventory\Policies\ProductPolicy;
+use Modules\Inventory\Policies\StockRequestPolicy;
 use Modules\Inventory\Policies\TransferPolicy;
 use Modules\Inventory\Policies\UnitPolicy;
 use Modules\Inventory\Policies\WarehousePolicy;
@@ -48,6 +51,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
      */
     protected array $commands = [
         GenerateExpiryAlerts::class,
+        GenerateLowStockAlerts::class,
     ];
 
     /**
@@ -66,6 +70,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
     protected function configureSchedules(Schedule $schedule): void
     {
         $schedule->command(GenerateExpiryAlerts::class)->daily();
+        $schedule->command(GenerateLowStockAlerts::class)->daily();
     }
 
     public function boot(): void
@@ -74,6 +79,7 @@ class InventoryServiceProvider extends ModuleServiceProvider
 
         Gate::policy(Warehouse::class, WarehousePolicy::class);
         Gate::policy(Product::class, ProductPolicy::class);
+        Gate::policy(StockRequest::class, StockRequestPolicy::class);
         Gate::policy(Unit::class, UnitPolicy::class);
         Gate::policy(ProductCategory::class, ProductCategoryPolicy::class);
         Gate::policy(Transfer::class, TransferPolicy::class);

@@ -20,7 +20,7 @@ class StoreTransferRequest extends FormRequest
         $tenantId = $this->user()->tenant_id;
 
         return [
-            'product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)],
+            'product_id' => ['required', 'string', Rule::exists('products', 'id')->where('tenant_id', $tenantId)->where('active', true)],
             'from_warehouse_id' => ['required', 'string', 'different:to_warehouse_id', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
             'to_warehouse_id' => ['required', 'string', Rule::exists('warehouses', 'id')->where('tenant_id', $tenantId)],
             'batch_no' => ['required', 'string', 'max:255'],
@@ -47,5 +47,13 @@ class StoreTransferRequest extends FormRequest
                 }
             },
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function messages(): array
+    {
+        return ['product_id.exists' => 'This product is inactive or does not exist, so it cannot be used.'];
     }
 }

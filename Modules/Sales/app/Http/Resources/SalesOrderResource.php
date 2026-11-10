@@ -14,6 +14,7 @@ class SalesOrderResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'number' => $this->number,
             'customer' => CustomerResource::make($this->customer),
             'sales_rep' => UserResource::make($this->salesRep),
             'warehouse' => WarehouseResource::make($this->warehouse),
@@ -22,12 +23,16 @@ class SalesOrderResource extends JsonResource
             'grace_period' => $this->grace_period,
             'due_date' => $this->due_date?->toDateString(),
             'invoice_discount' => $this->invoice_discount,
+            'invoice_discount_pct' => $this->invoice_discount_pct,
+            'shipping_cost' => $this->shipping_cost,
+            'shipping_charged' => $this->shipping_charged,
             'subtotal' => $this->subtotal,
             'tax_amount' => $this->tax_amount,
             'total' => $this->total,
             'stock_deducted' => $this->stock_deducted,
             'notes' => $this->notes,
             'order_date' => $this->order_date->toDateString(),
+            'delivery_date' => $this->delivery_date?->toDateString(),
             // Paginated at GET /sales-orders/{id}/lines and /sales-orders/{id}/invoices.
             'lines_count' => $this->whenCounted('lines'),
             'invoices_count' => $this->whenCounted('invoices'),

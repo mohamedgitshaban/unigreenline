@@ -4,6 +4,11 @@
 > accepts or returns more. Added in this update: per-line warehouse, free-gift
 > lines, ordering in packaging units, **minimum selling price**, edit/delete of
 > draft sales orders, **invoice void**, and **invoice import**.
+>
+> **Latest update:** 🆕 readable **document numbers**, 🆕 **collect by customer**,
+> 🆕 **returns from an invoice**, 🆕 **cancel a delivery** (stock and cost come back),
+> 🆕 **duplicate an order**, 🔄 free quantity drawn from **gift stock**, 🔄 order header
+> (customer's rep, cash vs credit terms, delivery date, shipping, discount %, optional line warehouse).
 
 **Ownership scoping**: a `Sales Rep` only sees/creates their own orders
 (`sales_rep_id`), and only sees invoices/deliveries/collections tied back to
@@ -24,6 +29,20 @@ spec §2's role table) can view invoices and record collections — recording
 a payment is their job. They cannot see or touch sales orders themselves.
 
 ---
+
+## Document numbers 🆕 NEW
+
+Orders, invoices, deliveries, collections and returns each carry a readable `number`, counting up without gaps per company:
+`SO-000123`, `INV-000123`, `DLV-000123`, `COL-000123`, `RET-000123`. It is assigned when the document is first saved, shows in every
+resource and printed document, and `?search=` finds a document by it. The invoice has its own sequence (it is created from the order
+when it is invoiced or delivered), so `SO-000042` does not become `INV-000042`. Existing documents were numbered oldest first.
+
+`GET /api/v1/sales-orders/next-number` (`sales-orders.create`) answers `{ "data": { "number": "SO-000124" } }` for a form to show
+while it is open. It does **not** reserve the number: the real one is assigned when the order is saved, so an abandoned form
+leaves no gap.
+
+> 🔄 `GET /sales-orders?search=` used to fail with a server error (it searched columns that do not exist). It now matches the
+> number, notes, customer, sales rep and warehouse names.
 
 ## `GET /api/v1/sales-orders`
 
@@ -75,6 +94,27 @@ over their `credit_limit` — **before writing anything**.
   ]
 }
 ```
+- 🔄 **Header changes.**
+  - `sales_rep_id` omitted: the order goes to the **customer's own sales rep** when the caller may hand orders to them
+    (their own team, or everyone for a user who sees everything); otherwise to the caller.
+  - `grace_period` only means something on **credit**. A `cash` order is stored with `grace_period: 0` and no `due_date`
+    (editing an order to cash clears them).
+  - `delivery_date` (optional date): when the customer wants the goods. The delivery keeps its own actual date.
+  - `shipping_cost` (optional, ≥ 0). Whether it is **added to the total** depends on the company setting
+    `shipping_cost_paid_by_company` (`GET/PUT /settings`, default `true` = the company's own cost, not charged). With it `false`
+    the cost is added to `total`, fixed on the order at creation (`shipping_charged: true`), and the invoice books it as income
+    (Cr 4200 Other Income) outside the VAT base.
+  - `invoice_discount_pct` (optional, 0-100): the invoice discount as a percentage of the subtotal; the amount is returned in
+    `invoice_discount`. Send either this or `invoice_discount`, not both (422).
+  - `warehouse_id` (optional): the warehouse lines draw from when a line does not name its own. A line with **no** warehouse and
+    no order warehouse is taken from the active warehouse that holds the stock.
+- 🔄 **Free quantity comes from gift stock.** `free_qty` on an ordinary line is no longer taken from regular stock: the paid
+  `qty` is taken from regular stock and the `free_qty` from **free-gift stock**, each rounded up to whole cartons separately
+  (10 paid + 2 free packs of a 12-pack carton = 1 regular + 1 gift carton). If gift stock is short the order is refused (422
+  `shortfalls`, with `gift: true`) and the warehouse manager and the order's owner get a `gift_stock_short` notification.
+  A product with no gift stock cannot be sold with a free quantity. Explicit `is_gift` lines work as before.
+- 🔄 **Shortfalls name what is short**: each entry in `shortfalls` also carries `product_name`, `sku`, `warehouse_name` and `gift`.
+- Only **active** products can be ordered (an inactive product is a 422 on `lines.N.product_id`).
 - `lines.N.warehouse_id` 🆕 (optional): draw this line from a different
   warehouse than the order's `warehouse_id` (the default). One order can be fed
   from several warehouses — stock is validated, and later deducted, **per line
@@ -202,6 +242,17 @@ bad file path — **nothing is saved**: no order, no stock movement, no invoice.
 `delivered`: `status: "delivered"`, `invoices_count: 1` and the `delivery`
 object (`status: "delivered"`, `driver`, `delivery_date`, ...). Use
 `GET /sales-orders/{id}/invoices` for the invoice id.
+
+## `POST /api/v1/sales-orders/{id}/duplicate` 🆕 NEW
+
+Requires `sales-orders.create`. A new **draft** with the same customer, terms and lines as an existing order (a repeat order), dated
+today and with its own number. Stock, credit limit and minimum prices are checked again exactly as on create, so it can be refused
+with the usual 422 `shortfalls`. **201** — the new order. A sales rep can only copy an order they may see.
+
+## `POST /api/v1/invoices/quick-sale` 🆕 NEW
+
+The same call as `POST /sales-orders/deliver` (permission `sales-orders.quick-deliver`), offered where the user looks for it — on
+the invoices screen. Creates the order, deducts the stock, creates the invoice and its journal entry and a delivered delivery in one step.
 
 ## `PUT /api/v1/sales-orders/{id}` 🆕 NEW
 
@@ -332,7 +383,10 @@ Invoices are never hard-deleted; this is their "delete". Requires `invoices.void
   imported invoices; floored at 0).
 
 **422** if the invoice is already void, or if any money was collected against it
-(`paid > 0` / collections exist — deal with those first). **200** — the invoice.
+(`paid > 0` / collections exist — deal with those first). 🔄 **422** too when the invoice's goods have already left the warehouse
+(its order has had stock deducted): voiding alone would leave the stock deducted and the cost of goods sold booked, so such an invoice
+is undone by [cancelling its delivery](#post-apiv1deliveriesidcancel--new) instead. Imported invoices (no order) are still voided here.
+**200** — the invoice.
 Another tenant's invoice is **404**.
 
 ### `POST /api/v1/invoices/import` 🆕 NEW
@@ -418,9 +472,36 @@ Requires `deliveries.view` (+ ownership if Sales Rep). Downloads the delivered
 invoice file (`delivery-invoice-{id}.jpg` etc.) — what `invoice_url` points
 at. **404** — no file attached, or the delivery belongs to another account.
 
+### `POST /api/v1/deliveries/{id}/cancel` 🆕 NEW
+
+Requires `deliveries.cancel` (Administrator, Warehouse Manager, Accountant — not sales roles). Optional body `{ "reason": "..." }`.
+Cancels a delivery whose goods have left the warehouse and undoes the sale in one step:
+
+1. each batch the order took gets its cartons back (read off the stock ledger; a `sale_cancel` movement is written);
+2. the cost of goods sold is reversed (Dr Inventory 1300 / Cr Cost of Goods Sold 5100, at the unit cost recorded then);
+3. the invoice is voided (revenue and VAT reversed) and the customer's balance comes down;
+4. the order becomes `cancelled`, the delivery `cancelled`, and `stock_deducted` is cleared.
+
+**422** — already cancelled; the stock has not left the warehouse; **money was collected** against the invoice (reverse the
+collections first); **goods were returned** against it. Another company's delivery is **404**. **200** — the delivery.
+
 ---
 
 ## Collections
+
+### `POST /api/v1/customers/{id}/collections` 🆕 NEW
+
+Requires `collections.create`. **One payment from a customer**, spread over his open invoices (outstanding, partial, overdue),
+**oldest due date first** (invoices with no due date after the dated ones). Each invoice touched gets its own collection, so receipts, the
+journal entry and the aging report work as for a single-invoice payment.
+
+```json
+{ "amount": 450, "method": "Cash", "reference": null, "payment_date": null, "notes": null }
+```
+
+`payment_date` left out is **today** (the day it is entered); send it for a back-dated receipt. **201** — the collections created,
+in the order they were paid. **422** — an `amount` larger than what the customer owes (`The amount is more than this customer owes
+(600.00).`) and nothing changes; a payment is never kept as credit on account. Another company's customer is **404**.
 
 ### `GET /api/v1/collections`
 
@@ -508,12 +589,45 @@ genuinely differ, so read it carefully:
   doesn't exist, the request fails rather than guessing an expiry.
 
 **201** — the created return, `status: "completed"`.
+
+> 🔄 A return now also has a `number` (`RET-000123`), a `tax_amount` (the VAT credited back; `0` unless it was made from an invoice)
+> and an `so_line_id` (the invoice line it was made against, if any).
 **422** — the required fields for the type's stock movement are missing,
 the source batch doesn't have enough stock (Purchase Return), or no
 matching batch exists to restock into.
 **403** — e.g. `Customer Service`, which lacks `returns.create`.
 
 ---
+
+## Returns from an invoice 🆕 NEW
+
+Pick the invoice, tick its lines and say how many come back; everything else is worked out from the invoice.
+
+### `POST /api/v1/invoices/{id}/returns`
+
+Requires `returns.create`.
+
+```json
+{
+  "type": "Sales Return", "restocked": true, "reason": "Wrong pack", "return_date": null,
+  "lines": [ { "line_id": "01m...", "qty": 1, "batch_no": null } ]
+}
+```
+
+`type`: `Sales Return`, `Damaged`, `Expired Return` or `Wrong Item`. `lines[].line_id` is the id of one of the invoice's lines
+(`GET /invoices/{id}/lines`) and `qty` counts that line's own unit. One return record is made per line.
+
+- **The credit** is what the customer paid for those units: line price after the line discount, less the line's share of the invoice
+  discount (`amount`, net of tax), plus the VAT charged on them (`tax_amount`). Posted Dr Sales Revenue + Dr VAT Payable / Cr Receivable.
+- **Limits:** no more than the line's billed quantity minus what was already returned (**422** `lines.N.qty`, "Only 1 of this line can
+  still be returned."); a line from another invoice (**422** `lines.N.line_id`); a free-gift line cannot be returned; a void or imported invoice
+  has nothing to return against (**422** `invoice`).
+- **The invoice is updated:** `returned_total` rises by the credit and `balance` falls by it (status becomes `paid` when nothing is left
+  owed), so AR aging and the customer balance agree. The customer's balance drops by the same amount.
+- **Stock:** with `restocked: true` the goods go back into the batch the order took them from (the first one, unless the line names a
+  `batch_no`), with the cost reversed. With `false` (damaged, expired) nothing moves.
+
+**201** — the return records. `GET /api/v1/invoices/{id}/returns` (`returns.view`) lists an invoice's returns, paginated like every list.
 
 ## `GET /api/v1/reports/ar-aging`
 

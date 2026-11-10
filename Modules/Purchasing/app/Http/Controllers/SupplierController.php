@@ -9,6 +9,7 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\ImportsSpreadsheets;
 use Modules\Core\Http\Controllers\Concerns\ManagesRecords;
+use Modules\Core\Http\Controllers\Concerns\ServesLookups;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Purchasing\Http\Requests\StoreSupplierRequest;
 use Modules\Purchasing\Http\Requests\UpdateSupplierRequest;
@@ -19,13 +20,17 @@ use Modules\Purchasing\Models\Supplier;
 
 class SupplierController extends Controller
 {
-    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, Sortable;
+    use Exportable, Filterable, ImportsSpreadsheets, ManagesRecords, ServesLookups, Sortable;
 
     public function index(Request $request)
     {
         $this->authorize('viewAny', Supplier::class);
 
         $query = Supplier::query()->where('tenant_id', $request->user()->tenant_id);
+
+        if ($this->isLookupOnly($request)) {
+            return $this->lookupResponse($request, $query);
+        }
 
         $this->applyFilters($request, $query, ['name', 'contact', 'email', 'phone', 'country', 'city']);
 

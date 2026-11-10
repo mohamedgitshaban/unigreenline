@@ -12,6 +12,7 @@ class DeliveryResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'number' => $this->number,
             'sales_order' => SalesOrderResource::make($this->salesOrder),
             'invoice' => InvoiceResource::make($this->invoice),
             'customer' => CustomerResource::make($this->customer),

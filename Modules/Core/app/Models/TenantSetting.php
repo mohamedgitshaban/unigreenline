@@ -11,9 +11,9 @@ use Illuminate\Support\Facades\Storage;
 use Modules\Core\Database\Factories\TenantSettingFactory;
 
 /**
- * A company's own settings — for now its branding: logo, wide logo, favicon
- * and colours. Read through forTenant(); the row only exists once something
- * has been saved, until then every field reads as null.
+ * A company's own settings: its branding (logo, wide logo, favicon, colours) and whether shipping is its
+ * own cost. Read through forTenant(); the row only exists once something has been saved, until then every
+ * branding field reads as null and the shipping flag as true.
  *
  * Images live on the public disk, since a logo or favicon is shown to anyone
  * the company shows it to and the client needs a plain URL for `<img>` and
@@ -21,6 +21,7 @@ use Modules\Core\Database\Factories\TenantSettingFactory;
  */
 #[Fillable([
     'tenant_id', 'logo_path', 'wide_logo_path', 'favicon_path', 'primary_color', 'secondary_color', 'accent_color',
+    'shipping_cost_paid_by_company',
 ])]
 class TenantSetting extends Model
 {
@@ -36,6 +37,16 @@ class TenantSetting extends Model
      * @var list<string>
      */
     public const IMAGE_COLUMNS = ['logo_path', 'wide_logo_path', 'favicon_path'];
+
+    /**
+     * Mirrors the column's database default so a company that never saved settings reads the same value.
+     */
+    protected $attributes = ['shipping_cost_paid_by_company' => true];
+
+    protected function casts(): array
+    {
+        return ['shipping_cost_paid_by_company' => 'boolean'];
+    }
 
     public static function forTenant(string $tenantId): self
     {

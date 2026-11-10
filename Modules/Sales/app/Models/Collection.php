@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Models\Concerns\HasDocumentNumber;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\CRM\Models\Customer;
@@ -15,7 +16,15 @@ use Modules\Sales\Database\Factories\CollectionFactory;
 #[Fillable(['tenant_id', 'invoice_id', 'customer_id', 'collected_by', 'amount', 'method', 'reference', 'payment_date', 'notes'])]
 class Collection extends Model
 {
-    use HasFactory, HasUlids;
+    use HasDocumentNumber, HasFactory, HasUlids;
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function documentSequence(): array
+    {
+        return ['collection', 'COL-'];
+    }
 
     public const UPDATED_AT = null;
 

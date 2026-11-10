@@ -160,6 +160,26 @@ Requires `warehouses.incoming`. The **purchase orders on their way to this wareh
 
 By default every order not yet received or cancelled (`draft`, `sent`, `pending`, `pending_pricing`); `?status=received` (or a comma list) shows others, `?purchase_order_id=` one order, `?search=` the supplier name. Receiving the order itself is still `POST /purchase-orders/{id}/receive`.
 
+🆕 `?source=production` lists instead the **production orders still to make stock for this warehouse** (everything not completed or cancelled, soonest planned finish first): `id`, `number`, `status`, `planned_finish`, `product`, `total_cartons`, `produced_cartons`.
+
+### `GET /api/v1/warehouses/{id}/returns` 🆕 NEW
+
+Requires `warehouses.incoming`. Goods **customers sent back into this warehouse**, newest first (returns to a supplier are not listed): `number`, `type`, `qty`, `unit`, `restocked` (back into stock, or written off), `return_date`, `batch_no`, `reason`, `product`, `customer` and the `invoice` they were made against.
+
+### `GET /api/v1/warehouses/{id}/products` 🆕 NEW
+
+Requires `warehouses.view`. The **products held in this warehouse** with `cartons` and `reserved_cartons`, `min_stock_cartons` and `at_or_below_minimum`. `?below_minimum=1` keeps those at or below their minimum; `?search=` matches name, SKU and brand. This is the list behind the overview's "Products" card.
+
+### `POST /api/v1/warehouses/{id}/opening-stock` 🆕 NEW
+
+Requires `goods-receipts.create`, and the warehouse must be one the user works in. Enters the stock a warehouse starts with, batch by batch, in one call; every line is received like a manual goods receipt (stock ledger line, value booked Dr Inventory / Cr Opening Balance Equity). All or nothing.
+
+```json
+{ "items": [ { "product_id": "01m...", "batch_no": "OB-1", "qty_cartons": 10, "cost_per_carton": 20, "exp_date": "2028-01-31", "mfg_date": null } ] }
+```
+
+**201** — the batches. **422** on any bad line (nothing is entered). Only **active** products can be received.
+
 ### `GET /api/v1/warehouses/{id}/outgoing` 🆕 NEW
 
 Requires `warehouses.outgoing`. The **sales orders that will take stock out of this warehouse**, oldest first, showing only the lines for this warehouse (an order can draw from several), no prices:
@@ -171,7 +191,7 @@ Requires `warehouses.outgoing`. The **sales orders that will take stock out of t
   "meta": { … } }
 ```
 
-`stage` is `to_prepare` for a `draft` or `picking` order and `to_deliver` once `invoiced` and waiting to be handed over. `?status=`, `?sales_order_id=` and `?search=` (customer name) narrow it. The warehouse manager is also **notified** when such an order is created or moves on, with a link to this list.
+`stage` is `to_prepare` for a `draft` or `picking` order and `to_deliver` once `invoiced` and waiting to be handed over. 🔄 Each order also carries its `number`, the requested `delivery_date` (soonest first) and its `invoice` (`id`, `number`, `status`, `total`, `balance`, or `null` before it is invoiced); `cartons` now counts paid cartons and gift cartons separately rounded. `?status=delivered` lists what already left. `?status=`, `?sales_order_id=` and `?search=` (customer name) narrow it. The warehouse manager is also **notified** when such an order is created or moves on, with a link to this list.
 
 ### Stock movement ledger 🆕 NEW
 
@@ -245,6 +265,8 @@ themselves are paged by the endpoint below.
 **403** — warehouse exists but isn't assigned to this user.
 
 ## `GET /api/v1/warehouses/{id}/batches`
+
+🆕 `?alert=expired`, `?alert=expiring` (within 30 days) or `?alert=low_stock` (batches of products at or below their minimum here) narrow the list to what the overview's alert figures count.
 
 Same access as the warehouse show (**403** if it isn't assigned to this
 user). Paginated like every list (**10 per page by default**, `?per_page=`, `?page=`, follow `links.next`); `search`, `filter[...]` and `sort_by` work as described in the README. Each batch includes its `product`; `search` matches
@@ -370,6 +392,13 @@ warehouse name; sorting and `filter[...]` work as described in the README.
 
 ## `POST /api/v1/products` 🔄 CHANGED
 
+> 🔄 **`sku` is optional.** Left out, the next free code is assigned (`PRD-00001`, `PRD-00002` …; codes typed by hand are skipped). A code you
+> send is kept. **`lead_time_days`** (optional, days to get the product into the warehouse) is saved and returned.
+> **`opening_stock`** (optional) receives stock with the product, in the same call and all or nothing:
+> `{ "warehouse_id", "batch_no", "qty_cartons", "cost_per_carton", "exp_date", "mfg_date" }`. It needs `goods-receipts.create` and a warehouse the
+> user works in (422 on `opening_stock.warehouse_id` otherwise). It is optional on purpose: a product has to exist before a purchase order can be raised for it.
+> Product responses also show each unit's own `selling_price` (the pack price times how many packs the unit holds).
+
 Requires `products.create`. 🔄 New: `min_selling_price`, `units` (see
 [Units & product packaging](#units--product-packaging--new)).
 
@@ -412,6 +441,11 @@ server-side (`pack_price × carton_qty`), always present, always in sync:
 
 Requires `products.update`. All fields optional. 🔄 Also accepts
 `min_selling_price` and `units` (replaces the whole ladder).
+
+## `GET /api/v1/brands` 🆕 NEW
+
+Requires `products.view`. The brand names already used on products, for a type-ahead on the product form so one brand is not typed three ways:
+`{ "data": [ { "name": "Acme" } ] }`. `?search=` narrows it.
 
 ## `DELETE /api/v1/products/{id}` 🆕 NEW
 
@@ -469,6 +503,15 @@ Requires `categories.view`.
 
 Requires `categories.view`. **404** — the category belongs to another account.
 
+## Sub-classes 🆕 NEW
+
+A category can sit under another: **class → sub-class** (two levels, no more). Categories carry `parent_id`, a `parent` (`id`, `name`) and `children_count`.
+`POST`/`PUT /categories` accept `parent_id` (the parent must be a top-level class of the same company; **422** otherwise, and a class that has
+sub-classes cannot become one). `GET /categories?filter[parent_id]={id}` lists a class's sub-classes and `?filter[parent_id][null]=true` the
+top-level ones. A product is placed in a sub-class like any category. A class that still has sub-classes cannot be deleted (**409**).
+Category names stay unique per company, sub-classes included. Reports by class, sub-class, brand and supplier:
+[`GET /reports/sales-breakdown`](./analytics.md).
+
 ## `POST /api/v1/categories`
 
 Requires `categories.create`. Only `name` is required; unique per account.
@@ -512,6 +555,11 @@ being visible to this user.
 }
 ```
 `exp_date` is **required** — there is no fallback/fabricated expiry.
+
+🆕 **Damaged or destroyed on arrival.** Optional `damaged_cartons` and `destroyed_cartons` (together at most `qty_cartons`): the whole delivery is
+received into the batch, and a **draft write-off** (a [recap](./recap.md)) is raised for the damaged cartons (reason `damaged`) and another for
+those to be destroyed (reason `other`). The ids come back as `write_offs`. The manager approves them as usual; nothing is posted until then.
+Only **active** products can be received.
 Re-receiving the same `batch_no` for the same product+warehouse tops up that
 batch's quantity instead of creating a duplicate row; a different `batch_no`
 always creates a new one, even for the same product+warehouse.
@@ -563,6 +611,28 @@ accident, and a gift line can never eat paid stock. Transfers keep a batch's
 gift flag.
 
 ---
+
+## Stock requests 🆕 NEW
+
+A warehouse asks for stock: **from another warehouse** (becomes a transfer), **from Purchasing** (becomes a draft purchase order) or **from
+Manufacturing** (becomes a draft production order). Numbers run `SRQ-000001` …
+
+| Endpoint | Permission | |
+|---|---|---|
+| `GET /stock-requests`, `GET /stock-requests/{id}` | `stock-requests.view` | the requests for or from a warehouse the user works in (everything for Administrator / Owner / Auditor), plus those addressed to Purchasing or Manufacturing for people who can raise those documents |
+| `POST /stock-requests` | `stock-requests.create` | `{ "warehouse_id", "source": "warehouse" \| "purchasing" \| "manufacturing", "from_warehouse_id" (for `warehouse`), "product_id", "qty_cartons", "needed_by", "notes" }` — `warehouse_id` is the warehouse that needs the stock and must be one the user works in |
+| `POST /stock-requests/{id}/approve` | `stock-requests.approve` | grants it (below) |
+| `POST /stock-requests/{id}/reject` | `stock-requests.reject` | `{ "reason" }` (required) |
+| `POST /stock-requests/{id}/cancel` | `stock-requests.cancel` | the person who asked, or anyone who may grant it |
+
+Who may grant: for a warehouse request, anyone who works in the warehouse being asked; for Purchasing, someone who can create purchase orders; for
+Manufacturing, someone who can create production orders. Granting does the work:
+
+- **warehouse** — the cartons are transferred, earliest-expiring batches first, one transfer per batch used (`result` is the first). **422** `shortfalls` if the warehouse does not hold enough free cartons; the request stays open.
+- **purchasing** — a draft purchase order for the requesting warehouse, with the product's supplier (or `{ "supplier_id" }` in the body; **422** if there is none). It has no cost, so it waits for pricing like any order a buyer raises.
+- **manufacturing** — a draft production order from the best approved recipe for the product (or `{ "bom_id" }`; **422** if none).
+
+A granted request is `fulfilled` with `result: { type: transfer | purchase_order | production_order, id }`. Only an open request can be decided (**422** "This request is already …"). The manager of the warehouse being asked is notified when a request arrives, and the requester when it is granted or rejected.
 
 ## `GET /api/v1/transfers`
 

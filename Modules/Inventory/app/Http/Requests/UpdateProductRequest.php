@@ -45,6 +45,7 @@ class UpdateProductRequest extends FormRequest
             'tax_pct' => ['sometimes', 'numeric', 'min:0', 'max:100'],
             'min_stock_cartons' => ['sometimes', 'integer', 'min:0'],
             'reorder_level' => ['sometimes', 'integer', 'min:0'],
+            'lead_time_days' => ['nullable', 'integer', 'min:0', 'max:3650'],
             'active' => ['sometimes', 'boolean'],
         ];
     }

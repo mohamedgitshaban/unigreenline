@@ -8,6 +8,8 @@ use Modules\Core\Http\Controllers\Concerns\Exportable;
 use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Printing\DocumentPrinter;
+use Modules\Core\Services\DocumentNumberService;
+use Modules\Core\Support\DataScope;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Http\Requests\StoreAndDeliverSalesOrderRequest;
 use Modules\Sales\Http\Requests\StoreSalesOrderRequest;
@@ -48,6 +50,8 @@ class SalesOrderController extends Controller
         private readonly UpdateSalesOrderStatusService $updateStatus,
         private readonly UpdateSalesOrderService $updateOrder,
         private readonly DeleteSalesOrderService $deleteOrder,
+        private readonly DataScope $scope,
+        private readonly DocumentNumberService $numbers,
     ) {}
 
     public function index(Request $request)
@@ -60,7 +64,7 @@ class SalesOrderController extends Controller
 
         $query->with(self::RELATIONS)->withCount(['lines', 'invoices']);
 
-        $this->applyFilters($request, $query, ['id', 'notes', 'customer_name', 'salesRep_name', 'warehouse_name']);
+        $this->applyFilters($request, $query, ['id', 'number', 'notes', 'customer.name', 'salesRep.name', 'warehouse.name']);
 
         $this->applySorting($request, $query);
 
@@ -151,7 +155,7 @@ class SalesOrderController extends Controller
     {
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
-        $data['sales_rep_id'] ??= $request->user()->id;
+        $data['sales_rep_id'] ??= $this->defaultSalesRepId($request, $data['customer_id']);
         $data['actor_id'] = $request->user()->id;
         $data['actor_name'] = $request->user()->name;
         $data['ip_address'] = $request->ip();
@@ -235,7 +239,7 @@ class SalesOrderController extends Controller
     {
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
-        $data['sales_rep_id'] ??= $request->user()->id;
+        $data['sales_rep_id'] ??= $this->defaultSalesRepId($request, $data['customer_id']);
         $data['actor_id'] = $request->user()->id;
         $data['actor_name'] = $request->user()->name;
         $data['ip_address'] = $request->ip();
@@ -243,5 +247,75 @@ class SalesOrderController extends Controller
         $order = $createAndDeliver->handle($data, $this->actor($request));
 
         return (new SalesOrderResource($this->findForTenant($request, $order->id, withDelivery: true)))->response()->setStatusCode(201);
+    }
+
+    /**
+     * Who an order belongs to when the caller does not say: the customer's own sales rep, if the caller may hand
+     * orders to them, otherwise the caller.
+     */
+    private function defaultSalesRepId(Request $request, string $customerId): string
+    {
+        $customerRepId = Customer::query()->where('tenant_id', $request->user()->tenant_id)->whereKey($customerId)->value('sales_rep_id');
+
+        return $customerRepId !== null && $this->scope->canAssignTo($request->user(), $customerRepId)
+            ? $customerRepId
+            : $request->user()->id;
+    }
+
+    /**
+     * The number the next sales order will get, for a form to show while it is open. It is not reserved:
+     * the real number is assigned when the order is saved.
+     */
+    public function nextNumber(Request $request)
+    {
+        [$key, $prefix] = SalesOrder::documentSequence();
+
+        return response()->json(['data' => ['number' => $this->numbers->peek($request->user()->tenant_id, $key, $prefix)]]);
+    }
+
+    /**
+     * A new draft with the same customer and lines as an existing order (a repeat order), dated today.
+     * Stock, credit limit and minimum prices are checked again, exactly as on a normal create.
+     */
+    public function duplicate(Request $request, string $id)
+    {
+        $source = $this->findForTenant($request, $id);
+
+        $this->authorize('view', $source);
+        $this->authorize('create', SalesOrder::class);
+
+        $data = [
+            'tenant_id' => $source->tenant_id,
+            'customer_id' => $source->customer_id,
+            'sales_rep_id' => $this->defaultSalesRepId($request, $source->customer_id),
+            'pay_type' => $source->pay_type,
+            'grace_period' => $source->grace_period,
+            'shipping_cost' => (float) $source->shipping_cost,
+            'notes' => $source->notes,
+            'lines' => $source->lines()->get()->map(fn ($line) => [
+                'product_id' => $line->product_id,
+                'warehouse_id' => $line->warehouse_id,
+                'qty' => $line->qty,
+                'unit' => $line->unit,
+                'unit_id' => $line->unit_id,
+                'unit_price' => (float) $line->unit_price,
+                'discount_pct' => (float) $line->discount_pct,
+                'free_qty' => $line->free_qty,
+                'is_gift' => $line->is_gift,
+            ])->all(),
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ];
+
+        if ($source->invoice_discount_pct !== null) {
+            $data['invoice_discount_pct'] = (float) $source->invoice_discount_pct;
+        } else {
+            $data['invoice_discount'] = (float) $source->invoice_discount;
+        }
+
+        $order = $this->createSalesOrder->create($data);
+
+        return (new SalesOrderResource($this->findForTenant($request, $order->id)))->response()->setStatusCode(201);
     }
 }

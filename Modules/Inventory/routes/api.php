@@ -5,6 +5,7 @@ use Modules\Inventory\Http\Controllers\GoodsReceiptController;
 use Modules\Inventory\Http\Controllers\InventoryDashboardController;
 use Modules\Inventory\Http\Controllers\ProductCategoryController;
 use Modules\Inventory\Http\Controllers\ProductController;
+use Modules\Inventory\Http\Controllers\StockRequestController;
 use Modules\Inventory\Http\Controllers\TransferController;
 use Modules\Inventory\Http\Controllers\UnitController;
 use Modules\Inventory\Http\Controllers\WarehouseActivityController;
@@ -21,6 +22,9 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('warehouses/{id}/overview', [WarehouseActivityController::class, 'overview'])->can('warehouses.overview');
     Route::get('warehouses/{id}/movements', [WarehouseActivityController::class, 'movements'])->can('warehouses.movements')->exportable('warehouses.export');
     Route::get('warehouses/{id}/incoming', [WarehouseActivityController::class, 'incoming'])->can('warehouses.incoming');
+    Route::get('warehouses/{id}/returns', [WarehouseActivityController::class, 'returns'])->can('warehouses.incoming');
+    Route::get('warehouses/{id}/products', [WarehouseActivityController::class, 'products'])->can('warehouses.view');
+    Route::post('warehouses/{id}/opening-stock', [WarehouseController::class, 'openingStock'])->can('goods-receipts.create');
     Route::get('warehouses/{id}/outgoing', [WarehouseActivityController::class, 'outgoing'])->can('warehouses.outgoing');
     Route::get('warehouses/{id}/users', [WarehouseActivityController::class, 'users'])->can('warehouses.view');
     Route::put('warehouses/{id}/users', [WarehouseActivityController::class, 'assignUsers'])->can('warehouses.assign-users');
@@ -28,6 +32,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::delete('warehouses/{warehouse}', [WarehouseController::class, 'destroy'])->can('warehouses.delete');
 
     Route::get('products', [ProductController::class, 'index'])->canOrLookup('products.view')->exportable('products.export');
+    Route::get('brands', [ProductController::class, 'brands'])->can('products.view');
     Route::post('products/import', [ProductController::class, 'import'])->can('products.import');
     Route::get('products/import-template', [ProductController::class, 'importTemplate'])->can('products.import');
     Route::post('products', [ProductController::class, 'store'])->can('products.create');
@@ -38,7 +43,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::put('products/{product}', [ProductController::class, 'update'])->can('products.update');
     Route::delete('products/{product}', [ProductController::class, 'destroy'])->can('products.delete');
 
-    Route::get('categories', [ProductCategoryController::class, 'index'])->can('categories.view')->exportable('categories.export');
+    Route::get('categories', [ProductCategoryController::class, 'index'])->canOrLookup('categories.view')->exportable('categories.export');
     Route::post('categories', [ProductCategoryController::class, 'store'])->can('categories.create');
     Route::get('categories/{id}', [ProductCategoryController::class, 'show'])->can('categories.view');
     Route::put('categories/{category}', [ProductCategoryController::class, 'update'])->can('categories.update');
@@ -51,6 +56,13 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::delete('units/{unit}', [UnitController::class, 'destroy'])->can('units.delete');
 
     Route::post('inventory/grn', [GoodsReceiptController::class, 'store'])->can('goods-receipts.create');
+
+    Route::get('stock-requests', [StockRequestController::class, 'index'])->can('stock-requests.view');
+    Route::post('stock-requests', [StockRequestController::class, 'store'])->can('stock-requests.create');
+    Route::get('stock-requests/{id}', [StockRequestController::class, 'show'])->can('stock-requests.view');
+    Route::post('stock-requests/{id}/approve', [StockRequestController::class, 'approve'])->can('stock-requests.approve');
+    Route::post('stock-requests/{id}/reject', [StockRequestController::class, 'reject'])->can('stock-requests.reject');
+    Route::post('stock-requests/{id}/cancel', [StockRequestController::class, 'cancel'])->can('stock-requests.cancel');
 
     Route::get('transfers', [TransferController::class, 'index'])->can('transfers.view')->exportable('transfers.export');
     Route::post('transfers', [TransferController::class, 'store'])->can('transfers.create');

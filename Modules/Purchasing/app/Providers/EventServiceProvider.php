@@ -3,6 +3,8 @@
 namespace Modules\Purchasing\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Modules\Inventory\Events\StockRequestGranted;
+use Modules\Purchasing\Listeners\CreatePurchaseOrderFromStockRequest;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -11,7 +13,9 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        StockRequestGranted::class => [CreatePurchaseOrderFromStockRequest::class],
+    ];
 
     /**
      * Indicates if events should be discovered.

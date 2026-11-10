@@ -20,6 +20,8 @@ class StoreProductCategoryRequest extends FormRequest
                 'required', 'string', 'max:255',
                 Rule::unique('product_categories')->where('tenant_id', $this->user()->tenant_id),
             ],
+            // A sub-class sits under a top-level class; there are two levels and no more.
+            'parent_id' => ['nullable', 'string', Rule::exists('product_categories', 'id')->where('tenant_id', $this->user()->tenant_id)->whereNull('parent_id')],
             'code' => ['nullable', 'string', 'max:50'],
             'description' => ['nullable', 'string', 'max:1000'],
             'active' => ['sometimes', 'boolean'],

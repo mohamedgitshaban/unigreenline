@@ -16,7 +16,7 @@ use Modules\Purchasing\Models\Supplier;
 #[Fillable([
     'tenant_id', 'category_id', 'supplier_id', 'name', 'sku', 'brand', 'pack_unit',
     'carton_qty', 'pack_cost_price', 'pack_selling_price', 'min_selling_price', 'discount_pct', 'tax_pct',
-    'min_stock_cartons', 'reorder_level', 'active',
+    'min_stock_cartons', 'reorder_level', 'lead_time_days', 'active',
 ])]
 class Product extends Model
 {
@@ -44,6 +44,7 @@ class Product extends Model
             'tax_pct' => 'decimal:2',
             'min_stock_cartons' => 'integer',
             'reorder_level' => 'integer',
+            'lead_time_days' => 'integer',
             'active' => 'boolean',
         ];
     }

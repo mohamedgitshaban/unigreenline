@@ -3,6 +3,8 @@
 namespace Modules\Recap\Providers;
 
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
+use Modules\Inventory\Events\DamagedGoodsReceived;
+use Modules\Recap\Listeners\CreateRecapForDamagedReceipt;
 
 class EventServiceProvider extends ServiceProvider
 {
@@ -11,7 +13,9 @@ class EventServiceProvider extends ServiceProvider
      *
      * @var array<string, array<int, string>>
      */
-    protected $listen = [];
+    protected $listen = [
+        DamagedGoodsReceived::class => [CreateRecapForDamagedReceipt::class],
+    ];
 
     /**
      * Indicates if events should be discovered.

@@ -66,10 +66,10 @@ class InvoicesSection implements DashboardSection
 
         return [
             'kpis' => [
-                Widgets::kpi('billed', 'Invoiced', $billed, $billedBefore, 'currency'),
-                Widgets::kpi('collected', 'Collected', $collected, $collectedBefore, 'currency'),
-                Widgets::kpi('outstanding', 'Outstanding receivables', $outstanding, null, 'currency'),
-                Widgets::kpi('overdue', 'Overdue', $overdue, null, 'currency'),
+                Widgets::kpi('billed', 'Invoiced', $billed, $billedBefore, 'currency', null, Widgets::link('invoices', ['filter[issued_date][gte]' => $period->from->toDateString(), 'filter[issued_date][lte]' => $period->to->toDateString(), 'filter[status][ne]' => 'void'])),
+                Widgets::kpi('collected', 'Collected', $collected, $collectedBefore, 'currency', null, Widgets::link('collections', ['filter[payment_date][gte]' => $period->from->toDateString(), 'filter[payment_date][lte]' => $period->to->toDateString()])),
+                Widgets::kpi('outstanding', 'Outstanding receivables', $outstanding, null, 'currency', null, Widgets::link('invoices', ['filter[status][in]' => 'outstanding,partial,overdue'])),
+                Widgets::kpi('overdue', 'Overdue', $overdue, null, 'currency', null, Widgets::link('invoices', ['filter[status]' => 'overdue'])),
                 Widgets::kpi('collection_rate', 'Collected vs invoiced', $billed > 0 ? round($collected / $billed * 100, 1) : 0.0, null, 'percent'),
             ],
             'charts' => [

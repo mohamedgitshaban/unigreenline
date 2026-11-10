@@ -97,6 +97,7 @@ class FefoStockServiceTest extends TestCase
             $this->assertSame([[
                 'product_id' => $product->id,
                 'warehouse_id' => $warehouse->id,
+                'gift' => false,
                 'needed' => 16,
                 'available' => 15,
             ]], $e->shortfalls);

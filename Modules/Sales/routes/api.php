@@ -14,6 +14,9 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('sales-orders', [SalesOrderController::class, 'index'])->can('sales-orders.view')->exportable('sales-orders.export');
     Route::post('sales-orders', [SalesOrderController::class, 'store'])->can('sales-orders.create');
     Route::post('sales-orders/deliver', [SalesOrderController::class, 'storeAndDeliver'])->can('sales-orders.quick-deliver');
+    Route::post('invoices/quick-sale', [SalesOrderController::class, 'storeAndDeliver'])->can('sales-orders.quick-deliver');
+    Route::get('sales-orders/next-number', [SalesOrderController::class, 'nextNumber'])->can('sales-orders.create');
+    Route::post('sales-orders/{id}/duplicate', [SalesOrderController::class, 'duplicate'])->can('sales-orders.create');
     Route::get('sales-orders/{id}', [SalesOrderController::class, 'show'])->can('sales-orders.view');
     Route::get('sales-orders/{id}/print', [SalesOrderController::class, 'print'])->can('sales-orders.print');
     Route::get('sales-orders/{id}/lines', [SalesOrderController::class, 'lines'])->can('sales-orders.view');
@@ -29,6 +32,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('invoices/{id}/print', [InvoiceController::class, 'print'])->can('invoices.print');
     Route::get('invoices/{id}/lines', [InvoiceController::class, 'lines'])->can('invoices.view');
     Route::get('invoices/{id}/collections', [CollectionController::class, 'forInvoice'])->can('collections.view');
+    Route::get('invoices/{id}/returns', [ReturnController::class, 'forInvoice'])->can('returns.view');
+    Route::post('invoices/{id}/returns', [ReturnController::class, 'storeForInvoice'])->can('returns.create');
     Route::post('invoices/{id}/void', [InvoiceController::class, 'void'])->can('invoices.void');
 
     Route::get('deliveries', [DeliveryController::class, 'index'])->can('deliveries.view')->exportable('deliveries.export');
@@ -37,6 +42,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('deliveries/{id}/print', [DeliveryController::class, 'print'])->can('deliveries.print');
     Route::get('deliveries/{delivery}', [DeliveryController::class, 'show'])->can('deliveries.view');
     Route::put('deliveries/{delivery}/deliver', [DeliveryController::class, 'deliver'])->can('deliveries.deliver');
+    Route::post('deliveries/{delivery}/cancel', [DeliveryController::class, 'cancel'])->can('deliveries.cancel');
 
     Route::get('collections', [CollectionController::class, 'index'])->can('collections.view')->exportable('collections.export');
     Route::post('collections', [CollectionController::class, 'store'])->can('collections.create');
@@ -45,6 +51,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
 
     Route::get('customers/{id}/orders', [SalesOrderController::class, 'forCustomer'])->can('customers.view');
     Route::get('customers/{id}/invoices', [InvoiceController::class, 'forCustomer'])->can('customers.view');
+    Route::post('customers/{id}/collections', [CollectionController::class, 'storeForCustomer'])->can('collections.create');
 
     Route::get('returns', [ReturnController::class, 'index'])->can('returns.view')->exportable('returns.export');
     Route::post('returns', [ReturnController::class, 'store'])->can('returns.create');

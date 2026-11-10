@@ -41,6 +41,7 @@ class OrdersSection implements DashboardSection
             ->whereBetween('sales_orders.order_date', [$in->from->toDateString(), $in->to->toDateString()]);
 
         $previous = $period->previous();
+        $inPeriod = ['filter[order_date][gte]' => $period->from->toDateString(), 'filter[order_date][lte]' => $period->to->toDateString()];
         $now = (clone $orders($period))->selectRaw('count(*) as orders, coalesce(sum(total), 0) as value')->first();
         $before = (clone $orders($previous))->selectRaw('count(*) as orders, coalesce(sum(total), 0) as value')->first();
 
@@ -70,11 +71,11 @@ class OrdersSection implements DashboardSection
 
         return [
             'kpis' => [
-                Widgets::kpi('orders', 'Orders', (int) $now->orders, (int) $before->orders),
-                Widgets::kpi('sales', 'Sales value', (float) $now->value, (float) $before->value, 'currency'),
+                Widgets::kpi('orders', 'Orders', (int) $now->orders, (int) $before->orders, 'count', null, Widgets::link('sales-orders', $inPeriod + ['filter[status][ne]' => 'cancelled'])),
+                Widgets::kpi('sales', 'Sales value', (float) $now->value, (float) $before->value, 'currency', null, Widgets::link('sales-orders', $inPeriod + ['filter[status][ne]' => 'cancelled'])),
                 Widgets::kpi('average_order', 'Average order', $now->orders > 0 ? (float) $now->value / $now->orders : 0.0, $before->orders > 0 ? (float) $before->value / $before->orders : 0.0, 'currency'),
-                Widgets::kpi('open_orders', 'Open orders (draft or picking)', $openOrders),
-                Widgets::kpi('delivered_orders', 'Delivered orders', $delivered),
+                Widgets::kpi('open_orders', 'Open orders (draft or picking)', $openOrders, null, 'count', null, Widgets::link('sales-orders', ['filter[status][in]' => 'draft,picking'])),
+                Widgets::kpi('delivered_orders', 'Delivered orders', $delivered, null, 'count', null, Widgets::link('sales-orders', $inPeriod + ['filter[status]' => 'delivered'])),
             ],
             'charts' => [
                 Widgets::chart('sales_by_day', 'Sales per day', 'line', Widgets::daily($period, $byDay), 'currency'),

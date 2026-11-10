@@ -9,7 +9,7 @@ use Modules\Purchasing\Http\Controllers\SupplierPaymentController;
 
 Route::middleware(['auth:sanctum'])->prefix('v1')->group(function () {
     Route::get('dashboards/purchasing', [PurchasingDashboardController::class, 'show'])->defaults('module', 'purchasing')->can('purchasing-dashboard.view');
-    Route::get('suppliers', [SupplierController::class, 'index'])->can('suppliers.view')->exportable('suppliers.export');
+    Route::get('suppliers', [SupplierController::class, 'index'])->canOrLookup('suppliers.view')->exportable('suppliers.export');
     Route::post('suppliers/import', [SupplierController::class, 'import'])->can('suppliers.import');
     Route::get('suppliers/import-template', [SupplierController::class, 'importTemplate'])->can('suppliers.import');
     Route::post('suppliers', [SupplierController::class, 'store'])->can('suppliers.create');

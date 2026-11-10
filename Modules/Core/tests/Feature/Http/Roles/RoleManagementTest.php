@@ -113,7 +113,7 @@ class RoleManagementTest extends TestCase
 
         $this->getJson('/api/v1/roles')->assertOk()->assertJsonCount(12, 'data');
         $response = $this->getJson('/api/v1/permissions')->assertOk()->assertJsonPath('resources.sales.collections.0', 'collections.create');
-        $this->assertSame(['POST /api/v1/collections'], $response->json('endpoints')['collections.create']);
+        $this->assertSame(['POST /api/v1/collections', 'POST /api/v1/customers/{id}/collections'], $response->json('endpoints')['collections.create']);
         $this->assertContains('expenses.view', $response->json('data.expenses'));
     }
 

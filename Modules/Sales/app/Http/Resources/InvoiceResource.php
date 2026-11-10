@@ -12,14 +12,17 @@ class InvoiceResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'number' => $this->number,
             'sales_order' => SalesOrderResource::make($this->salesOrder),
             'customer' => CustomerResource::make($this->customer),
             'issued_date' => $this->issued_date->toDateString(),
             'due_date' => $this->due_date?->toDateString(),
             'subtotal' => $this->subtotal,
             'tax_amount' => $this->tax_amount,
+            'shipping_amount' => $this->shipping_amount,
             'total' => $this->total,
             'paid' => $this->paid,
+            'returned_total' => $this->returned_total,
             'balance' => $this->balance,
             'status' => $this->status,
             // Invoices have no line items of their own — they mirror the

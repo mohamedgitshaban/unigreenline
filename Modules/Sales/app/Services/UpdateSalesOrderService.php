@@ -39,19 +39,34 @@ class UpdateSalesOrderService
             $lines = $data['lines'] ?? null;
             unset($data['lines']);
 
-            $fields = $data + $locked->only(['customer_id', 'warehouse_id', 'pay_type', 'invoice_discount']);
+            // A warehouse sent as null means 'no change', not 'no warehouse'.
+            if (array_key_exists('warehouse_id', $data) && $data['warehouse_id'] === null) {
+                unset($data['warehouse_id']);
+            }
+
+            $fields = $data + $locked->only(['customer_id', 'warehouse_id', 'pay_type', 'invoice_discount', 'invoice_discount_pct', 'shipping_cost']);
+            $discountPct = isset($fields['invoice_discount_pct']) ? (float) $fields['invoice_discount_pct'] : null;
             $discount = (float) $fields['invoice_discount'];
+            // A flat discount sent now replaces a stored percentage, and the other way round.
+            if (array_key_exists('invoice_discount', $data) && ! array_key_exists('invoice_discount_pct', $data)) {
+                $discountPct = null;
+            } elseif (array_key_exists('invoice_discount_pct', $data) && ! array_key_exists('invoice_discount', $data)) {
+                $discount = 0.0;
+            }
+            $shipping = $locked->shipping_charged ? round((float) $fields['shipping_cost'], 2) : 0.0;
 
             if ($lines !== null) {
-                $priced = $this->pricing->price($lines, $discount);
-                $computedLines = $priced['lines'];
+                $priced = $this->pricing->price($lines, $discount, $discountPct, $shipping);
+                $computedLines = $this->pricing->withWarehouses($priced['lines'], $locked->tenant_id, $fields['warehouse_id']);
             } else {
                 $computedLines = $this->existingLinesAsPriced($locked);
+                $subtotal = (float) $locked->subtotal;
                 $priced = [
-                    'subtotal' => (float) $locked->subtotal,
+                    'subtotal' => $subtotal,
                     'tax' => (float) $locked->tax_amount,
-                    'total' => round((float) $locked->subtotal + (float) $locked->tax_amount - $discount, 2),
+                    'discount' => $discountPct !== null ? round($subtotal * $discountPct / 100, 2) : $discount,
                 ];
+                $priced['total'] = round($subtotal + $priced['tax'] - $priced['discount'] + $shipping, 2);
             }
 
             $this->pricing->assertCanFulfil(
@@ -59,12 +74,20 @@ class UpdateSalesOrderService
                 $fields['pay_type'],
                 $priced['total'],
                 $computedLines,
-                $fields['warehouse_id'],
+                $computedLines[0]['warehouse_id'] ?? $fields['warehouse_id'],
+                $locked->sales_rep_id,
             );
 
-            $changes = $data + ['subtotal' => $priced['subtotal'], 'tax_amount' => $priced['tax'], 'total' => $priced['total']];
+            $changes = array_merge($data, [
+                'subtotal' => $priced['subtotal'], 'tax_amount' => $priced['tax'], 'total' => $priced['total'],
+                'invoice_discount' => $priced['discount'], 'invoice_discount_pct' => $discountPct,
+            ]);
 
-            if (array_key_exists('grace_period', $data)) {
+            if ($fields['pay_type'] === 'cash') {
+                // A cash order is due at once, so a grace period has no meaning on it.
+                $changes['grace_period'] = 0;
+                $changes['due_date'] = null;
+            } elseif (array_key_exists('grace_period', $data)) {
                 $changes['due_date'] = now()->addDays($data['grace_period'])->toDateString();
             }
 
@@ -116,17 +139,21 @@ class UpdateSalesOrderService
      * Existing lines in the shape the availability check wants, for edits
      * that only touch the header (e.g. switching warehouse).
      *
-     * @return array<int, array{product_id: string, cartons_needed: int}>
+     * @return array<int, array{product_id: string, warehouse_id: ?string, regular_cartons: int, gift_cartons: int}>
      */
     private function existingLinesAsPriced(SalesOrder $order): array
     {
-        return $order->lines()->with('product')->get()->map(fn ($line) => [
-            'product_id' => $line->product_id,
-            'warehouse_id' => $line->warehouse_id,
-            'gift' => (bool) $line->is_gift,
-            'cartons_needed' => CartonCalculator::cartonsNeeded(
-                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty, $line->base_qty
-            ),
-        ])->all();
+        return $order->lines()->with('product')->get()->map(function ($line) {
+            $needs = CartonCalculator::stockNeeds(
+                (bool) $line->is_gift, $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty, $line->base_qty
+            );
+
+            return [
+                'product_id' => $line->product_id,
+                'warehouse_id' => $line->warehouse_id,
+                'regular_cartons' => $needs['regular'],
+                'gift_cartons' => $needs['gift'],
+            ];
+        })->all();
     }
 }

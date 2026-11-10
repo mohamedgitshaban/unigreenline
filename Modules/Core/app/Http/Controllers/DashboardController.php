@@ -49,25 +49,7 @@ class DashboardController extends Controller
         $period = DashboardPeriod::fromRequest($request);
         $wanted = $request->filled('features') ? array_filter(explode(',', (string) $request->query('features'))) : null;
 
-        $features = [];
-        $widgets = ['kpis' => [], 'charts' => [], 'tables' => []];
-
-        foreach ($this->registry->sectionsOf($module) as $section) {
-            $allowed = $section->permission() === null || $user->can($section->permission());
-            $features[] = ['key' => $section->key(), 'label' => $section->label(), 'available' => $allowed];
-
-            if (! $allowed || ($wanted !== null && ! in_array($section->key(), $wanted, true))) {
-                continue;
-            }
-
-            $built = $section->build($user, $period);
-
-            foreach (array_keys($widgets) as $kind) {
-                foreach ($built[$kind] ?? [] as $widget) {
-                    $widgets[$kind][] = ['feature' => $section->key()] + $widget;
-                }
-            }
-        }
+        $built = $this->registry->build($user, $module, $period, $wanted);
 
         return response()->json(['data' => [
             'module' => $dashboard->module,
@@ -78,8 +60,7 @@ class DashboardController extends Controller
                 'data_scope' => $this->scope->effective($user),
                 'people' => $this->scope->isTeamScoped($user) ? count($this->scope->visibleUserIds($user)) : null,
             ],
-            'features' => $features,
-            ...$widgets,
+            ...$built,
         ]]);
     }
 }

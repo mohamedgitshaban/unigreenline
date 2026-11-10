@@ -24,6 +24,7 @@ class EveryEndpointIsGuardedTest extends TestCase
         'POST api/v1/discarded-actions',
         'GET api/v1/team',
         'GET api/v1/dashboards',
+        'GET api/v1/analytics/overview',
     ];
 
     public function test_every_api_endpoint_declares_the_permission_that_guards_it(): void

@@ -75,6 +75,9 @@ class LegacyPermissionMap
         'manufacturing-settings.update' => 'manage',
         // Changes the company's logo and colours for everyone: never given by the grid, only granted by name.
         'settings.update' => 'manage',
+        // Undoes a sale (stock back, cost and invoice reversed): never given by the grid, only granted by name to the
+        // people who run the warehouse and the books.
+        'deliveries.cancel' => 'manage',
     ];
 
     /**

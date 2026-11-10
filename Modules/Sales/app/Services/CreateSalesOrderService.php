@@ -5,15 +5,18 @@ namespace Modules\Sales\Services;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Modules\Core\Models\Notification;
+use Modules\Core\Models\TenantSetting;
 use Modules\Core\Services\AuditLogService;
 use Modules\CRM\Models\Customer;
 use Modules\Inventory\Exceptions\InsufficientStockException;
 use Modules\Inventory\Models\Product;
+use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Services\FefoStockService;
 use Modules\Inventory\Services\UnitConverter;
 use Modules\Sales\Exceptions\CreditLimitExceededException;
 use Modules\Sales\Models\SalesOrder;
 use Modules\Sales\Support\CartonCalculator;
+use Modules\Sales\Support\StockLines;
 
 /**
  * Creates a sales order after validating (spec §5.6, §6):
@@ -37,22 +40,36 @@ class CreateSalesOrderService
     /**
      * @param  array{
      *     tenant_id: string, customer_id: string, sales_rep_id: string,
-     *     pay_type: string, grace_period?: int, invoice_discount?: float, notes?: ?string, order_date?: string,
+     *     pay_type: string, grace_period?: int, invoice_discount?: float, invoice_discount_pct?: float, shipping_cost?: float,
+     *     warehouse_id?: ?string, notes?: ?string, order_date?: string, delivery_date?: ?string,
      *     actor_id?: ?string, actor_name?: ?string, ip_address?: ?string,
-     *     lines: array<int, array{product_id: string, warehouse_id: string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>,
+     *     lines: array<int, array{product_id: string, warehouse_id?: ?string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>,
      * }  $data
      */
     public function create(array $data): SalesOrder
     {
         $customer = Customer::findOrFail($data['customer_id']);
-        ['lines' => $computedLines, 'subtotal' => $subtotal, 'tax' => $taxAmount, 'discount' => $invoiceDiscount, 'total' => $total] = $this->price($data['lines'], $data['invoice_discount'] ?? 0);
+        $isCredit = $data['pay_type'] === 'credit';
+        $shippingCharged = $this->shippingIsCharged($data['tenant_id']);
+        $shippingCost = round((float) ($data['shipping_cost'] ?? 0), 2);
+
+        [
+            'lines' => $computedLines, 'subtotal' => $subtotal, 'tax' => $taxAmount, 'discount' => $invoiceDiscount, 'total' => $total,
+        ] = $this->price(
+            $data['lines'],
+            (float) ($data['invoice_discount'] ?? 0),
+            isset($data['invoice_discount_pct']) ? (float) $data['invoice_discount_pct'] : null,
+            $shippingCharged ? $shippingCost : 0.0,
+        );
+
+        $computedLines = $this->withWarehouses($computedLines, $data['tenant_id'], $data['warehouse_id'] ?? null);
 
         // The order's own warehouse is the first line's; every line carries its own.
         $warehouseId = $computedLines[0]['warehouse_id'];
 
-        $this->assertCanFulfil($customer, $data['pay_type'], $total, $computedLines, $warehouseId);
+        $this->assertCanFulfil($customer, $data['pay_type'], $total, $computedLines, $warehouseId, $data['sales_rep_id'] ?? null);
 
-        return DB::transaction(function () use ($data, $customer, $computedLines, $warehouseId, $subtotal, $taxAmount, $invoiceDiscount, $total) {
+        return DB::transaction(function () use ($data, $customer, $computedLines, $warehouseId, $subtotal, $taxAmount, $invoiceDiscount, $total, $isCredit, $shippingCost, $shippingCharged) {
             $order = SalesOrder::create([
                 'tenant_id' => $data['tenant_id'],
                 'customer_id' => $customer->id,
@@ -60,17 +77,22 @@ class CreateSalesOrderService
                 'warehouse_id' => $warehouseId,
                 'status' => 'draft',
                 'pay_type' => $data['pay_type'],
-                'grace_period' => $data['grace_period'] ?? 0,
-                'due_date' => isset($data['grace_period'])
+                // A grace period only means something on credit; a cash order is due at once.
+                'grace_period' => $isCredit ? ($data['grace_period'] ?? 0) : 0,
+                'due_date' => $isCredit && isset($data['grace_period'])
                     ? now()->addDays($data['grace_period'])->toDateString()
                     : null,
                 'invoice_discount' => $invoiceDiscount,
+                'invoice_discount_pct' => $data['invoice_discount_pct'] ?? null,
+                'shipping_cost' => $shippingCost,
+                'shipping_charged' => $shippingCharged,
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxAmount,
                 'total' => $total,
                 'stock_deducted' => false,
                 'notes' => $data['notes'] ?? null,
                 'order_date' => $data['order_date'] ?? now()->toDateString(),
+                'delivery_date' => $data['delivery_date'] ?? null,
             ]);
 
             foreach ($computedLines as $line) {
@@ -125,12 +147,14 @@ class CreateSalesOrderService
     }
 
     /**
-     * Prices every line and totals the order.
+     * Prices every line and totals the order. The invoice discount is either a flat amount or, when
+     * `$discountPct` is given, that percentage of the subtotal. Shipping is added only when the company
+     * charges it to the customer (the caller passes 0 otherwise).
      *
      * @param  array<int, array{product_id: string, batch_no?: ?string, qty: int, unit: string, unit_price: float, discount_pct?: float, free_qty?: int}>  $lines
-     * @return array{lines: array<int, array<string, mixed>>, subtotal: float, tax: float, discount: float, total: float}
+     * @return array{lines: array<int, array<string, mixed>>, subtotal: float, tax: float, discount: float, shipping: float, total: float}
      */
-    public function price(array $lines, float $invoiceDiscount = 0): array
+    public function price(array $lines, float $invoiceDiscount = 0, ?float $discountPct = null, float $shipping = 0): array
     {
         $products = Product::query()->with('units')->whereIn('id', array_column($lines, 'product_id'))->get()->keyBy('id');
 
@@ -142,40 +166,109 @@ class CreateSalesOrderService
 
         $subtotal = round(array_sum(array_column($computedLines, 'subtotal')), 2);
         $tax = round(array_sum(array_column($computedLines, 'tax')), 2);
+        $discount = $discountPct !== null ? round($subtotal * $discountPct / 100, 2) : $invoiceDiscount;
 
         return [
             'lines' => $computedLines,
             'subtotal' => $subtotal,
             'tax' => $tax,
-            'discount' => $invoiceDiscount,
-            'total' => round($subtotal + $tax - $invoiceDiscount, 2),
+            'discount' => $discount,
+            'shipping' => $shipping,
+            'total' => round($subtotal + $tax - $discount + $shipping, 2),
         ];
     }
 
     /**
+     * Whether shipping is added to what the customer pays: the company setting says it is the company's own
+     * cost (the default) or a charge to the customer.
+     */
+    public function shippingIsCharged(string $tenantId): bool
+    {
+        return ! TenantSetting::forTenant($tenantId)->shipping_cost_paid_by_company;
+    }
+
+    /**
+     * Fills in the warehouse of any line that did not name one: the order's own warehouse when given,
+     * otherwise whichever active warehouse holds the stock.
+     *
+     * @param  array<int, array<string, mixed>>  $lines
+     * @return array<int, array<string, mixed>>
+     */
+    public function withWarehouses(array $lines, string $tenantId, ?string $defaultWarehouseId): array
+    {
+        foreach ($lines as $index => $line) {
+            if ($line['warehouse_id'] !== null) {
+                continue;
+            }
+
+            $warehouseId = $defaultWarehouseId ?? $this->fefoStock->suggestWarehouse(
+                $tenantId,
+                $line['product_id'],
+                $line['is_gift'] ? $line['gift_cartons'] : $line['regular_cartons'],
+                $line['is_gift'],
+            );
+
+            if ($warehouseId === null) {
+                throw ValidationException::withMessages(["lines.{$index}.warehouse_id" => 'No active warehouse is available to take this line from.']);
+            }
+
+            $lines[$index]['warehouse_id'] = $warehouseId;
+        }
+
+        return $lines;
+    }
+
+    /**
      * Credit-limit and FEFO stock-availability checks shared by create and
-     * update; neither writes anything.
+     * update; neither writes anything except the alert below. When gift stock is
+     * what ran short, the warehouse manager and the order's owner are told.
      *
      * @param  array<int, array<string, mixed>>  $computedLines
      */
-    public function assertCanFulfil(Customer $customer, string $payType, float $total, array $computedLines, string $warehouseId): void
+    public function assertCanFulfil(Customer $customer, string $payType, float $total, array $computedLines, string $warehouseId, ?string $ownerId = null): void
     {
         if ($payType === 'credit') {
             $this->enforceCreditLimit($customer, $total);
         }
 
-        $shortfalls = $this->fefoStock->checkAvailability(array_map(
-            fn (array $line) => [
-                'product_id' => $line['product_id'],
-                'warehouse_id' => $line['warehouse_id'] ?? $warehouseId,
-                'cartons_needed' => $line['cartons_needed'],
-                'gift' => $line['gift'] ?? $line['is_gift'] ?? false,
-            ],
-            $computedLines
-        ));
+        $shortfalls = $this->fefoStock->checkAvailability(StockLines::fromComputed($computedLines, $warehouseId));
 
         if ($shortfalls !== []) {
+            $this->alertGiftShortage($customer->tenant_id, $shortfalls, $ownerId);
+
             throw new InsufficientStockException($shortfalls);
+        }
+    }
+
+    /**
+     * @param  array<int, array{product_id: string, warehouse_id: string, gift?: bool, needed: int, available: int}>  $shortfalls
+     */
+    private function alertGiftShortage(string $tenantId, array $shortfalls, ?string $ownerId): void
+    {
+        foreach (array_filter($shortfalls, fn (array $shortfall) => $shortfall['gift'] ?? false) as $shortfall) {
+            $product = Product::query()->find($shortfall['product_id']);
+            $warehouse = Warehouse::query()->find($shortfall['warehouse_id']);
+
+            foreach (array_unique(array_filter([$warehouse?->manager_id, $ownerId])) as $userId) {
+                $alreadyTold = Notification::query()->where('user_id', $userId)->where('type', 'gift_stock_short')
+                    ->where('link_id', $shortfall['product_id'])->where('unread', true)->exists();
+
+                if ($alreadyTold) {
+                    continue;
+                }
+
+                Notification::create([
+                    'tenant_id' => $tenantId,
+                    'user_id' => $userId,
+                    'type' => 'gift_stock_short',
+                    'title' => 'Gift stock ran out',
+                    'body' => "An order needed {$shortfall['needed']} gift carton(s) of ".($product?->name ?? 'a product').' from '.($warehouse?->name ?? 'a warehouse')." but only {$shortfall['available']} are left.",
+                    'link_module' => 'inventory',
+                    'link_entity' => 'products',
+                    'link_id' => $shortfall['product_id'],
+                    'unread' => true,
+                ]);
+            }
         }
     }
 
@@ -219,9 +312,7 @@ class CreateSalesOrderService
         $subtotal = round($line['qty'] * $unitPrice * (1 - $discountPct / 100), 2);
         $tax = round($subtotal * (float) $product->tax_pct / 100, 2);
 
-        $cartonsNeeded = CartonCalculator::cartonsNeeded(
-            $line['qty'], $freeQty, $unit, $product->carton_qty, $explicitBase
-        );
+        $needs = CartonCalculator::stockNeeds($isGift, $line['qty'], $freeQty, $unit, $product->carton_qty, $explicitBase);
 
         return [
             'product_id' => $line['product_id'],
@@ -237,7 +328,9 @@ class CreateSalesOrderService
             'is_gift' => $isGift,
             'subtotal' => $subtotal,
             'tax' => $tax,
-            'cartons_needed' => $cartonsNeeded,
+            'regular_cartons' => $needs['regular'],
+            'gift_cartons' => $needs['gift'],
+            'cartons_needed' => $needs['regular'] + $needs['gift'],
         ];
     }
 

@@ -9,12 +9,15 @@ use Modules\Core\Http\Controllers\Concerns\Filterable;
 use Modules\Core\Http\Controllers\Concerns\Sortable;
 use Modules\Core\Printing\DocumentPrinter;
 use Modules\Core\Support\DataScope;
+use Modules\CRM\Models\Customer;
 use Modules\Sales\Http\Requests\StoreCollectionRequest;
+use Modules\Sales\Http\Requests\StoreCustomerCollectionRequest;
 use Modules\Sales\Http\Resources\CollectionResource;
 use Modules\Sales\Models\Collection;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Printing\SalesDocuments;
 use Modules\Sales\Services\CreateCollectionService;
+use Modules\Sales\Services\CreateCustomerCollectionService;
 
 class CollectionController extends Controller
 {
@@ -60,7 +63,7 @@ class CollectionController extends Controller
 
         $query->with(self::RELATIONS);
 
-        $this->applyFilters($request, $query, ['id', 'reference', 'notes', 'invoice_id', 'customer.name']);
+        $this->applyFilters($request, $query, ['id', 'number', 'reference', 'notes', 'invoice_id', 'customer.name']);
 
         $this->applySorting($request, $query);
 
@@ -138,5 +141,25 @@ class CollectionController extends Controller
         $this->authorize('view', $collection);
 
         return $printer->respond($request, $documents->collection($collection));
+    }
+
+    /**
+     * One payment from a customer, spread over his open invoices oldest first (POST /customers/{id}/collections).
+     * Returns the collections created, one per invoice paid.
+     */
+    public function storeForCustomer(StoreCustomerCollectionRequest $request, string $id, CreateCustomerCollectionService $collectForCustomer)
+    {
+        $customer = Customer::query()->where('tenant_id', $request->user()->tenant_id)->findOrFail($id);
+
+        $this->authorize('view', $customer);
+
+        $collections = $collectForCustomer->create($customer, $request->validated() + [
+            'collected_by' => $request->user()->id,
+            'actor_id' => $request->user()->id,
+            'actor_name' => $request->user()->name,
+            'ip_address' => $request->ip(),
+        ]);
+
+        return CollectionResource::collection(collect($collections)->map->load(self::RELATIONS))->response()->setStatusCode(201);
     }
 }

@@ -7,9 +7,12 @@ use Laravel\Sanctum\Sanctum;
 use Modules\Core\Database\Seeders\RolePermissionSeeder;
 use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
+use Modules\CRM\Models\Customer;
 use Modules\Inventory\Models\Product;
+use Modules\Inventory\Models\ProductCategory;
 use Modules\Inventory\Models\Unit;
 use Modules\Inventory\Models\Warehouse;
+use Modules\Purchasing\Models\Supplier;
 use Tests\TestCase;
 
 /**
@@ -155,5 +158,52 @@ class LookupListsTest extends TestCase
         $response->assertOk()->assertJsonPath('data.*.name', ['Packet']);
         $this->assertFalse($user->can('units.view'));
         $this->assertSame(['id', 'name'], array_keys($response->json('data.0')));
+    }
+
+    public function test_customer_lookup_returns_only_id_and_name_without_customers_view(): void
+    {
+        $user = $this->actingAsRole('Warehouse Employee');
+        Customer::factory()->recycle($this->tenant)->create(['name' => 'Nile Clinic']);
+        Customer::factory()->recycle($this->tenant)->create(['name' => 'Delta Farms']);
+        Customer::factory()->create(['name' => 'Other tenant customer']);
+
+        $response = $this->getJson('/api/v1/customers');
+
+        $response->assertOk()->assertJsonPath('data.*.name', ['Delta Farms', 'Nile Clinic']);
+        $this->assertFalse($user->can('customers.view'));
+        $this->assertSame(['id', 'name'], array_keys($response->json('data.0')));
+    }
+
+    public function test_customer_lookup_only_names_the_customers_the_user_may_see(): void
+    {
+        $user = $this->actingAsRole('Warehouse Employee');
+        $user->update(['data_scope' => 'team']);
+        $mine = Customer::factory()->recycle($this->tenant)->create(['name' => 'Mine', 'sales_rep_id' => $user->id]);
+        Customer::factory()->recycle($this->tenant)->create(['name' => 'Somebody else']);
+
+        $this->getJson('/api/v1/customers?search=m')->assertOk()->assertJsonPath('data.*.id', [$mine->id]);
+    }
+
+    public function test_user_with_customers_view_still_gets_the_full_customer(): void
+    {
+        $this->actingAsRole('Sales Manager');
+        Customer::factory()->recycle($this->tenant)->create(['city' => 'Giza']);
+
+        $this->getJson('/api/v1/customers')->assertOk()->assertJsonPath('data.0.city', 'Giza');
+    }
+
+    public function test_supplier_and_category_lookups_return_only_id_and_name_without_their_view_rights(): void
+    {
+        $user = $this->actingAsRole('Sales Rep');
+        Supplier::factory()->recycle($this->tenant)->create(['name' => 'EgyVet']);
+        ProductCategory::factory()->recycle($this->tenant)->create(['name' => 'Vaccines']);
+
+        $suppliers = $this->getJson('/api/v1/suppliers')->assertOk()->assertJsonPath('data.*.name', ['EgyVet']);
+        $categories = $this->getJson('/api/v1/categories')->assertOk()->assertJsonPath('data.*.name', ['Vaccines']);
+
+        $this->assertFalse($user->can('suppliers.view'));
+        $this->assertFalse($user->can('categories.view'));
+        $this->assertSame(['id', 'name'], array_keys($suppliers->json('data.0')));
+        $this->assertSame(['id', 'name'], array_keys($categories->json('data.0')));
     }
 }

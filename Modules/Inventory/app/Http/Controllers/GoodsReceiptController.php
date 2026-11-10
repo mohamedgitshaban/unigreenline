@@ -4,65 +4,40 @@ namespace Modules\Inventory\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\DB;
-use Modules\Accounting\Services\JournalPostingService;
-use Modules\Core\Services\AuditLogService;
+use Illuminate\Support\Facades\Event;
+use Modules\Inventory\Events\DamagedGoodsReceived;
 use Modules\Inventory\Http\Requests\GoodsReceiptRequest;
 use Modules\Inventory\Http\Resources\InventoryBatchResource;
-use Modules\Inventory\Services\GoodsReceiptService;
-use Modules\Inventory\Support\StockMovementContext;
+use Modules\Inventory\Services\ManualGoodsReceiptService;
 
 class GoodsReceiptController extends Controller
 {
-    public function __construct(
-        private readonly GoodsReceiptService $goodsReceipt,
-        private readonly AuditLogService $auditLog,
-        private readonly JournalPostingService $journalPosting,
-    ) {}
+    public function __construct(private readonly ManualGoodsReceiptService $receipts) {}
 
     public function store(GoodsReceiptRequest $request)
     {
         $data = $request->validated();
         $data['tenant_id'] = $request->user()->tenant_id;
+        $damaged = (int) ($data['damaged_cartons'] ?? 0);
+        $destroyed = (int) ($data['destroyed_cartons'] ?? 0);
+        unset($data['damaged_cartons'], $data['destroyed_cartons']);
 
-        $batch = DB::transaction(function () use ($data, $request) {
-            $batch = StockMovementContext::run(['type' => 'goods_receipt', 'user_id' => $request->user()->id], fn () => $this->goodsReceipt->receive($data));
+        $actor = ['actor_id' => $request->user()->id, 'actor_name' => $request->user()->name, 'ip_address' => $request->ip()];
 
-            // Stock that arrives without a purchase order has no supplier to owe, so its value
-            // goes in against Opening Balance Equity: Dr Inventory / Cr Opening Balance Equity.
-            $value = round($data['qty_cartons'] * (float) $data['cost_per_carton'], 2);
+        [$batch, $writeOffs] = DB::transaction(function () use ($data, $actor, $damaged, $destroyed) {
+            $batch = $this->receipts->receive($data, $actor);
+            $event = new DamagedGoodsReceived($batch, $damaged, $destroyed, $actor);
 
-            if ($value > 0) {
-                $this->journalPosting->post(
-                    $data['tenant_id'],
-                    $batch->id,
-                    "Manual goods receipt, batch {$batch->batch_no}",
-                    [
-                        ['account_code' => '1300', 'debit' => $value],
-                        ['account_code' => '3300', 'credit' => $value],
-                    ],
-                    $request->user()->id,
-                );
+            // Damaged or destroyed goods are received like the rest, then written off by a draft the manager approves.
+            if ($damaged > 0 || $destroyed > 0) {
+                Event::dispatch($event);
             }
 
-            $this->auditLog->record([
-                'module' => 'inventory',
-                'entity_type' => 'InventoryBatch',
-                'entity_id' => $batch->id,
-                'operation' => 'INSERT',
-                'user_id' => $request->user()->id,
-                'user_name' => $request->user()->name,
-                'tenant_id' => $request->user()->tenant_id,
-                'warehouse_id' => $batch->warehouse_id,
-                'new_values' => [
-                    'batch_no' => $batch->batch_no,
-                    'qty_cartons_received' => $data['qty_cartons'],
-                ],
-                'ip_address' => $request->ip(),
-            ]);
-
-            return $batch;
+            return [$batch, $event->recapIds];
         });
 
-        return (new InventoryBatchResource($batch->load(['product', 'warehouse'])))->response()->setStatusCode(201);
+        return (new InventoryBatchResource($batch->load(['product', 'warehouse'])))
+            ->additional(['write_offs' => $writeOffs])
+            ->response()->setStatusCode(201);
     }
 }

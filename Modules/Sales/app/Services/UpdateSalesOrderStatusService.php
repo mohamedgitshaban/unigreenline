@@ -11,7 +11,7 @@ use Modules\Sales\Exceptions\InvalidStatusTransitionException;
 use Modules\Sales\Models\Delivery;
 use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\SalesOrder;
-use Modules\Sales\Support\CartonCalculator;
+use Modules\Sales\Support\StockLines;
 
 /**
  * Drives the sales order status lifecycle (spec §5.1, §5.4, §6):
@@ -89,14 +89,7 @@ class UpdateSalesOrderStatusService
             return;
         }
 
-        $lines = $order->lines()->with('product')->get()->map(fn ($line) => [
-            'product_id' => $line->product_id,
-            'warehouse_id' => $line->warehouse_id ?? $order->warehouse_id,
-            'gift' => (bool) $line->is_gift,
-            'cartons_needed' => CartonCalculator::cartonsNeeded(
-                $line->qty, $line->free_qty, $line->unit, $line->product->carton_qty, $line->base_qty
-            ),
-        ])->all();
+        $lines = StockLines::fromOrderLines($order->lines()->with('product')->get(), $order->warehouse_id);
 
         $deductions = $this->fefoStock->deduct($lines, ['type' => 'sale', 'reference_type' => 'sales_order', 'reference_id' => $order->id]);
 
@@ -151,6 +144,7 @@ class UpdateSalesOrderStatusService
             'due_date' => $order->due_date,
             'subtotal' => $order->subtotal,
             'tax_amount' => $order->tax_amount,
+            'shipping_amount' => $order->shipping_charged ? $order->shipping_cost : 0,
             'total' => $order->total,
             'paid' => 0,
             'balance' => $order->total,
@@ -169,6 +163,8 @@ class UpdateSalesOrderStatusService
             ['account_code' => '1200', 'debit' => (float) $invoice->total],
             ['account_code' => '4100', 'credit' => $netRevenue],
             ['account_code' => '2300', 'credit' => (float) $invoice->tax_amount],
+            // Shipping charged to the customer is income of its own, outside the VAT base.
+            ['account_code' => '4200', 'credit' => (float) $invoice->shipping_amount],
         ], fn (array $line) => ($line['debit'] ?? 0) > 0 || ($line['credit'] ?? 0) > 0));
 
         if ($lines !== []) {

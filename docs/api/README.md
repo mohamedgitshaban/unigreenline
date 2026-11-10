@@ -41,6 +41,9 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **Recruitment and Fleet** inside HR → [hr.md](./hr.md#recruitment--new)
 > - 🆕 **Notifications for changes** to records, with a link to the record → [Change notifications](#change-notifications--new)
 > - 🆕 **Dashboards for every department** and a way to add one for the next → [dashboards.md](./dashboards.md)
+> - 🆕 **Readable document numbers** (`SO-`, `INV-`, `DLV-`, `COL-`, `RET-`), **collect by customer**, **returns from an invoice**, **cancel a delivery** (stock and cost come back), **duplicate an order**, free quantity from **gift stock** → [sales.md](./sales.md)
+> - 🆕 **Stock requests** between warehouses, Purchasing and Manufacturing, **opening stock** (on a product and on a warehouse), **sub-classes** under product categories, automatic product codes, damaged goods on receipt → [inventory.md](./inventory.md)
+> - 🆕 **Overview** served by Analytics, **stock snapshot** by batch, **sales breakdown** by customer / item / rep / class / brand / supplier, links on dashboard numbers → [analytics.md](./analytics.md)
 
 Base URL: `/api/v1` (plus `GET /api/health`, unversioned).
 
@@ -64,6 +67,14 @@ All responses are JSON. Validation errors return `422` with:
   }
 }
 ```
+
+🆕 A database or other unexpected server error answers `500` with a short message and a `reference`, never the SQL, host or table names:
+
+```json
+{ "message": "Something went wrong. Please try again, and give this reference to support if it keeps happening.", "reference": "01m..." }
+```
+
+(Only a developer calling from the server itself with `APP_DEBUG=true` still sees the full error. Keep `APP_DEBUG=false` on every deployed server.)
 
 Unauthenticated requests return `401`:
 

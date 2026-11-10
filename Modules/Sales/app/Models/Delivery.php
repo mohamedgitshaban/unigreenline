@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Modules\Core\Models\Concerns\HasDocumentNumber;
 use Modules\Core\Models\Tenant;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Database\Factories\DeliveryFactory;
@@ -14,7 +15,15 @@ use Modules\Sales\Database\Factories\DeliveryFactory;
 #[Fillable(['tenant_id', 'so_id', 'invoice_id', 'customer_id', 'driver', 'delivery_date', 'status', 'delivered_at', 'notes', 'invoice_data'])]
 class Delivery extends Model
 {
-    use HasFactory, HasUlids;
+    use HasDocumentNumber, HasFactory, HasUlids;
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function documentSequence(): array
+    {
+        return ['delivery', 'DLV-'];
+    }
 
     protected function casts(): array
     {

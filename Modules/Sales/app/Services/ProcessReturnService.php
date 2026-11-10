@@ -14,6 +14,7 @@ use Modules\Inventory\Models\Warehouse;
 use Modules\Inventory\Support\StockMovementContext;
 use Modules\Purchasing\Models\Supplier;
 use Modules\Sales\Exceptions\ReturnBatchNotFoundException;
+use Modules\Sales\Models\Invoice;
 use Modules\Sales\Models\ReturnRecord;
 use Modules\Sales\Support\CartonCalculator;
 
@@ -42,6 +43,7 @@ class ProcessReturnService
      *     tenant_id: string, invoice_id?: ?string, customer_id?: ?string, supplier_id?: ?string,
      *     product_id?: ?string, warehouse_id?: ?string, batch_no?: ?string, type: string,
      *     qty: int, unit: string, amount: float, restocked?: bool, reason?: ?string, return_date?: ?string,
+     *     so_line_id?: ?string, tax_amount?: float, apply_to_invoice?: bool,
      *     actor_id?: ?string, actor_name?: ?string, ip_address?: ?string,
      * }  $data
      */
@@ -64,6 +66,7 @@ class ProcessReturnService
             $return->fill([
                 'tenant_id' => $data['tenant_id'],
                 'invoice_id' => $data['invoice_id'] ?? null,
+                'so_line_id' => $data['so_line_id'] ?? null,
                 'customer_id' => $data['customer_id'] ?? null,
                 'supplier_id' => $data['supplier_id'] ?? null,
                 'product_id' => $data['product_id'] ?? null,
@@ -73,6 +76,7 @@ class ProcessReturnService
                 'qty' => $data['qty'],
                 'unit' => $data['unit'],
                 'amount' => $data['amount'],
+                'tax_amount' => $data['tax_amount'] ?? 0,
                 'restocked' => $restocked,
                 'reason' => $data['reason'] ?? null,
                 'status' => 'completed',
@@ -124,9 +128,14 @@ class ProcessReturnService
                 Supplier::query()->whereKey($return->supplier_id)->increment('balance', $amount);
             }
         } else {
+            // A return made from an invoice also gives back the VAT that was charged on those units.
+            $tax = round((float) ($data['tax_amount'] ?? 0), 2);
+            $credit = round($amount + $tax, 2);
+
             $lines = [
                 ['account_code' => '4100', 'debit' => $amount],
-                ['account_code' => '1200', 'credit' => $amount],
+                ['account_code' => '2300', 'debit' => $tax],
+                ['account_code' => '1200', 'credit' => $credit],
             ];
 
             if ($stockValue > 0) {
@@ -134,9 +143,13 @@ class ProcessReturnService
                 $lines[] = ['account_code' => '5100', 'credit' => round($stockValue, 2)];
             }
 
-            if ($amount > 0 && $return->customer_id !== null) {
+            if ($credit > 0 && $return->customer_id !== null) {
                 $customer = Customer::query()->find($return->customer_id);
-                $customer?->forceFill(['balance' => max(0, (float) $customer->balance - $amount)])->save();
+                $customer?->forceFill(['balance' => max(0, (float) $customer->balance - $credit)])->save();
+            }
+
+            if ($credit > 0 && ($data['apply_to_invoice'] ?? false) && $return->invoice_id !== null) {
+                $this->applyToInvoice($return->invoice_id, $credit);
             }
         }
 
@@ -234,5 +247,25 @@ class ProcessReturnService
         Warehouse::find($data['warehouse_id'])?->recalculateStockValue();
 
         return $cartons * (float) $batch->cost_per_carton;
+    }
+
+    /**
+     * A return made from an invoice lowers what is still owed on it and adds to what has been returned against it.
+     */
+    private function applyToInvoice(string $invoiceId, float $credit): void
+    {
+        $invoice = Invoice::query()->whereKey($invoiceId)->lockForUpdate()->first();
+
+        if ($invoice === null) {
+            return;
+        }
+
+        $balance = max(0, round((float) $invoice->balance - $credit, 2));
+
+        $invoice->update([
+            'returned_total' => round((float) $invoice->returned_total + $credit, 2),
+            'balance' => $balance,
+            'status' => $balance <= 0 && $invoice->status !== 'void' ? 'paid' : $invoice->status,
+        ]);
     }
 }

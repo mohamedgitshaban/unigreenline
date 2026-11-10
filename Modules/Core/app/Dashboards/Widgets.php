@@ -11,9 +11,10 @@ final class Widgets
      * A headline number, optionally with the same number for the previous period to show the change.
      *
      * @param  'count'|'currency'|'percent'|'cartons'|'days'|'hours'  $unit
+     * @param  array{path: string, query: array<string, string>}|null  $link  The list behind the number (see link()), so a click can open it.
      * @return array<string, mixed>
      */
-    public static function kpi(string $key, string $label, int|float $value, int|float|null $previous = null, string $unit = 'count', ?string $hint = null): array
+    public static function kpi(string $key, string $label, int|float $value, int|float|null $previous = null, string $unit = 'count', ?string $hint = null, ?array $link = null): array
     {
         $change = null;
         $trend = null;
@@ -32,7 +33,20 @@ final class Widgets
             'trend' => $trend,
             'unit' => $unit,
             'hint' => $hint,
+            'link' => $link,
         ];
+    }
+
+    /**
+     * Where the data behind a number can be read: an API path and the query that narrows it to what was counted
+     * (the same `filter[...]` and `search` every list accepts).
+     *
+     * @param  array<string, string>  $query
+     * @return array{path: string, query: array<string, string>}
+     */
+    public static function link(string $path, array $query = []): array
+    {
+        return ['path' => '/api/v1/'.ltrim($path, '/'), 'query' => $query];
     }
 
     /**
