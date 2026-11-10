@@ -22,6 +22,9 @@ use Throwable;
  */
 class SpreadsheetImportService
 {
+    /** How many row errors the failure message spells out before pointing at the `errors` list. */
+    private const MESSAGE_ERROR_LIMIT = 5;
+
     public function __construct(private readonly AuditLogService $auditLog) {}
 
     /**
@@ -55,7 +58,10 @@ class SpreadsheetImportService
             }
 
             if ($errors !== []) {
-                throw new ImportFailedException('The file has '.count($errors).' invalid row(s). Nothing was imported.', $errors);
+                throw new ImportFailedException(
+                    'The file has '.count($errors).' invalid row(s). Nothing was imported. '.$this->describeErrors($errors),
+                    $errors,
+                );
             }
 
             $this->auditLog->record([
@@ -77,6 +83,31 @@ class SpreadsheetImportService
         }
 
         return $counts;
+    }
+
+    /**
+     * One-line summary of the first few row errors, so a client that only
+     * shows `message` still tells the user which row failed and why. The full
+     * list stays in the response's `errors`.
+     *
+     * @param  array<int, array{row: int, errors: array<string, array<int, string>>}>  $errors
+     */
+    private function describeErrors(array $errors): string
+    {
+        $details = [];
+
+        foreach ($errors as $error) {
+            foreach ($error['errors'] as $column => $messages) {
+                foreach ($messages as $message) {
+                    $details[] = "Row {$error['row']} ({$column}): {$message}";
+                }
+            }
+        }
+
+        $summary = implode(' ', array_slice($details, 0, self::MESSAGE_ERROR_LIMIT));
+        $remaining = count($details) - self::MESSAGE_ERROR_LIMIT;
+
+        return $remaining > 0 ? "{$summary} ...and {$remaining} more error(s); see the errors list." : $summary;
     }
 
     /**

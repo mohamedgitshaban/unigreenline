@@ -106,6 +106,45 @@ class InventoryDeleteImportTest extends TestCase
         $this->assertSame(0, Product::query()->count());
     }
 
+    public function test_failed_import_returns_422_with_each_failing_row_column_and_reason_in_the_message(): void
+    {
+        $this->actingAsRole('Administrator');
+        ProductCategory::factory()->recycle($this->tenant)->create(['name' => 'Antibiotics']);
+        $csv = "SKU,Name,Category,Supplier,Pack Unit,Carton Qty,Pack Cost Price,Pack Selling Price\n"
+            ."A-1,Ok,Antibiotics,,Bottle,1,1,2\n"
+            ."A-2,No cat,Mystery,,Bottle,1,1,2\n"
+            ."A-3,No supplier,Antibiotics,Acme Pharma,Bottle,1,1,2\n";
+
+        $this->postJson('/api/v1/products/import', ['file' => UploadedFile::fake()->createWithContent('products.csv', $csv)])
+            ->assertUnprocessable()
+            ->assertJsonPath('message', 'The file has 2 invalid row(s). Nothing was imported. '
+                .'Row 3 (category): No product category named or coded "Mystery". '
+                .'Row 4 (supplier): No supplier named "Acme Pharma".');
+
+        $this->assertSame(0, Product::query()->count());
+    }
+
+    public function test_failed_import_message_spells_out_five_errors_and_counts_the_rest(): void
+    {
+        $this->actingAsRole('Administrator');
+        $csv = "SKU,Name,Category,Pack Unit,Carton Qty,Pack Cost Price,Pack Selling Price\n";
+
+        foreach (range(1, 7) as $number) {
+            $csv .= "A-{$number},Row {$number},Mystery,Bottle,1,1,2\n";
+        }
+
+        $this->postJson('/api/v1/products/import', ['file' => UploadedFile::fake()->createWithContent('products.csv', $csv)])
+            ->assertUnprocessable()
+            ->assertJsonCount(7, 'errors')
+            ->assertJsonPath('message', 'The file has 7 invalid row(s). Nothing was imported. '
+                .'Row 2 (category): No product category named or coded "Mystery". '
+                .'Row 3 (category): No product category named or coded "Mystery". '
+                .'Row 4 (category): No product category named or coded "Mystery". '
+                .'Row 5 (category): No product category named or coded "Mystery". '
+                .'Row 6 (category): No product category named or coded "Mystery". '
+                .'...and 2 more error(s); see the errors list.');
+    }
+
     public function test_imports_warehouses_with_a_manager_by_email(): void
     {
         $this->actingAsRole('Administrator');

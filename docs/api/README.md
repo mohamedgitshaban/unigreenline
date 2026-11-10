@@ -204,7 +204,7 @@ Bulk-load data from an Excel/CSV file:
 
 ```json
 {
-  "message": "The file has 2 invalid row(s). Nothing was imported.",
+  "message": "The file has 2 invalid row(s). Nothing was imported. Row 3 (type): The selected type is invalid. Row 3 (email): The email field must be a valid email address. Row 5 (category): No product category named or coded \"Mystery\".",
   "created": 0, "updated": 0, "skipped": 0,
   "errors": [
     { "row": 3, "errors": { "type": ["The selected type is invalid."], "email": ["The email field must be a valid email address."] } },
@@ -213,7 +213,10 @@ Bulk-load data from an Excel/CSV file:
 }
 ```
 
-  `row` is the spreadsheet row number (row 1 = headings). Status **422**; a
+  `row` is the spreadsheet row number (row 1 = headings). The `message` also
+  spells out the first 5 row errors as `Row N (column): reason`, followed by
+  "...and X more error(s)" when there are more; `errors` always has them all.
+  Status **422**; a
   missing required column or an unreadable / empty file is also 422 (with
   `errors: []`).
 - **Success** — **200**:
