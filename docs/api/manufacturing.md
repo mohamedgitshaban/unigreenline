@@ -6,11 +6,11 @@
 > work centers, shop-floor work orders, quality control, scrap and by-products, costing with optional work-in-progress accounting, material
 > requirements planning, and reports. **Everything that worked before still works the same way**; new fields are additive.
 
-Deeper reading: [architecture](../manufacturing/architecture-analysis.md) ·
-[workflows](../manufacturing/business-workflows.md) · [database](../manufacturing/database-erd.md) ·
-[planning algorithm](../manufacturing/mrp-algorithm.md) · [costing and accounting](../manufacturing/costing-and-accounting.md) ·
-[permissions](../manufacturing/permissions.md) · [operations](../manufacturing/installation-and-operations.md) ·
-[tests](../manufacturing/testing.md).
+Deeper reading: [architecture](../manufacturing-guides/architecture-analysis.md) ·
+[workflows](../manufacturing-guides/business-workflows.md) · [database](../manufacturing-guides/database-erd.md) ·
+[planning algorithm](../manufacturing-guides/mrp-algorithm.md) · [costing and accounting](../manufacturing-guides/costing-and-accounting.md) ·
+[permissions](../manufacturing-guides/permissions.md) · [operations](../manufacturing-guides/installation-and-operations.md) ·
+[tests](../manufacturing-guides/testing.md).
 
 Accounts used (look them up by code; run `AccountSeeder`): `1300` Inventory, `6300` Inventory Write-off Expense, `6400` Manufacturing
 Overhead Absorbed, 🆕 `1350` Work in Progress, 🆕 `5200` Manufacturing Variance.
@@ -168,7 +168,7 @@ Requires `boms.view`. Everything needed to make `qty` cartons (default one run),
 
 ## Production orders
 
-A production order makes a quantity of a finished product from a BoM in a warehouse. See the [workflow](../manufacturing/business-workflows.md) for the diagrams.
+A production order makes a quantity of a finished product from a BoM in a warehouse. See the [workflow](../manufacturing-guides/business-workflows.md) for the diagrams.
 
 ### Production order object 🔄 CHANGED
 
@@ -265,7 +265,7 @@ checks, and reserves the materials unless `reservation_policy` is `manual`. A sh
 
 ### `POST /api/v1/production-orders/{id}/plan` 🆕 NEW
 
-Requires `production-orders.plan`. Confirmed → planned: creates the work orders from the routing and books them on their work centers (see [scheduling](../manufacturing/business-workflows.md#4-work-order-execution)), sets planned start/finish.
+Requires `production-orders.plan`. Confirmed → planned: creates the work orders from the routing and books them on their work centers (see [scheduling](../manufacturing-guides/business-workflows.md#4-work-order-execution)), sets planned start/finish.
 A recipe without routing is planned by lead time. **422** if a work center has no free slot within a year.
 
 ### `POST /api/v1/production-orders/{id}/reserve-materials` · `release-materials` 🆕 NEW
@@ -287,7 +287,7 @@ Requires `production-orders.record-production`. Receives finished goods (and the
 * `qty` good cartons, `rejected` cartons that failed (never received; their cost is absorbed by the good ones and a scrap document is written). `qty + rejected` cannot exceed what is left (422); with `allow_partial_production` off it must equal it.
 * With **backflush** the materials for this output are issued first (earliest-expiring non-expired stock, the order's own reservation first). Short of stock: **422** with `shortfalls`, nothing changes. With manual consumption: **422** with `materials_to_issue` until they are issued.
 * A confirmed or planned order is started automatically. With work orders, you can only receive what the **last operation** has processed.
-* The first receipt's batch is the order's `batch_no`; later ones `…-2`, `…-3`; by-products `…-BP1`. The unit cost comes from the [valuation](../manufacturing/costing-and-accounting.md#valuing-a-receipt). One ledger entry is posted.
+* The first receipt's batch is the order's `batch_no`; later ones `…-2`, `…-3`; by-products `…-BP1`. The unit cost comes from the [valuation](../manufacturing-guides/costing-and-accounting.md#valuing-a-receipt). One ledger entry is posted.
 * **200** — the order, plus `"replayed": false|true`.
 
 ### `POST /api/v1/production-orders/{id}/consume-materials` 🆕 NEW
@@ -338,7 +338,7 @@ Requires `production-orders.create-backorder`. A new draft order for what a *com
 
 ### `GET /api/v1/production-orders/{id}/costs` 🆕 NEW
 
-Requires `production-orders.costs`. Planned against actual by material / operation / overhead, variance, scrap, unit cost, and the ledger entries (with lines) the order made. See [costing](../manufacturing/costing-and-accounting.md#reading-the-numbers).
+Requires `production-orders.costs`. Planned against actual by material / operation / overhead, variance, scrap, unit cost, and the ledger entries (with lines) the order made. See [costing](../manufacturing-guides/costing-and-accounting.md#reading-the-numbers).
 
 ### `GET /api/v1/production-orders/{id}/traceability` 🆕 NEW
 
@@ -458,7 +458,7 @@ order or operation until its latest inspection has passed; a failed check is sup
 
 ## Planning (MRP) 🆕 NEW
 
-How it works: [mrp-algorithm.md](../manufacturing/mrp-algorithm.md). Planning only *proposes*.
+How it works: [mrp-algorithm.md](../manufacturing-guides/mrp-algorithm.md). Planning only *proposes*.
 
 ### Planning policy per product
 
@@ -517,7 +517,7 @@ Converted documents count as supply in later runs, so they are not proposed agai
 ## Reports 🆕 NEW
 
 All under `/api/v1/reports/manufacturing/…`. Aggregated in SQL; `from` / `to` (dates), filters `product_id`, `warehouse_id`, `status` where they apply; `per_page`; `?export=csv|xlsx` with the report's export permission. How each number is worked out:
-[api-reference](../manufacturing/api-reference.md#report-calculation-rules).
+[api-reference](../manufacturing-guides/api-reference.md#report-calculation-rules).
 
 | Report | Permission | Shows |
 |---|---|---|

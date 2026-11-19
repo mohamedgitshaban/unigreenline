@@ -1449,7 +1449,7 @@ $manufacturing = nw(folder('Manufacturing', [
         nw(req('POST', 'Convert manufacture suggestion', '/mrp/suggestions/{{mrp_suggestion_id}}/convert', ['description' => 'A manufacture suggestion becomes a **draft** manufacturing order (`source_type: mrp_suggestion`). **422** for a purchase suggestion.'])),
         nw(req('POST', 'Dismiss MRP suggestion', '/mrp/suggestions/{{mrp_suggestion_id}}/dismiss', ['description' => 'Stays dismissed while the same need remains.'])),
         nw(req('DELETE', 'Delete manual demand', '/mrp-demands/{{demand_id}}', ['description' => '204.'])),
-    ], 'Material requirements planning: policies, manual demand, runs, requirements, shortages and suggestions. See docs/manufacturing/mrp-algorithm.md.'),
+    ], 'Material requirements planning: policies, manual demand, runs, requirements, shortages and suggestions. See docs/manufacturing-guides/mrp-algorithm.md.'),
     folder('Attachments', [
         nw(req('POST', 'Attach a file', '/manufacturing/attachments', [
             'description' => 'Attach a drawing, instruction sheet, certificate or photo to a BoM (`attachable_type`: bom, production_order, work_order, routing, quality_check). pdf / jpg / png / doc / docx / xls / xlsx / csv / txt, up to 10 MB. Attach a file to the `file` field before sending — in an unattended collection run this returns 422. Saves the id into `{{attachment_id}}`.',
@@ -1475,7 +1475,7 @@ $manufacturing = nw(folder('Manufacturing', [
         nw(req('GET', 'Cost variance report', '/reports/manufacturing/cost-variance', ['query' => ['from' => '', 'to' => '', 'export' => 'csv'], 'description' => 'Completed orders: planned vs actual cost, variance, scrap, unit cost.'])),
         nw(req('GET', 'WIP valuation report', '/reports/manufacturing/wip-valuation', ['description' => 'What is in progress per open work-in-progress order, and the balance of account 1350 to reconcile with.'])),
     ], 'Manufacturing reports: database aggregations with filters, pagination and export.'),
-], 'Full manufacturing: recipes, order workflow, reservations, routing and work orders, quality, scrap, costing, planning and reports. See docs/api/manufacturing.md and docs/manufacturing/.'));
+], 'Full manufacturing: recipes, order workflow, reservations, routing and work orders, quality, scrap, costing, planning and reports. See docs/api/manufacturing.md and docs/manufacturing-guides/.'));
 
 $hr = nw(folder('HR', [
     folder('Departments', [

@@ -7399,7 +7399,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `asset-categories.create`. How a kind of asset is booked and depreciated by default. Account codes must exist in the chart.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Lab equipment 134705\",\n    \"asset_account_code\": \"1510\",\n    \"accumulated_account_code\": \"1590\",\n    \"expense_account_code\": \"6500\",\n    \"method\": \"straight_line\",\n    \"duration_periods\": 12,\n    \"period_months\": 1,\n    \"prorata\": false,\n    \"salvage_pct\": 0\n}",
+                                    "raw": "{\n    \"name\": \"Lab equipment 135245\",\n    \"asset_account_code\": \"1510\",\n    \"accumulated_account_code\": \"1590\",\n    \"expense_account_code\": \"6500\",\n    \"method\": \"straight_line\",\n    \"duration_periods\": 12,\n    \"period_months\": 1,\n    \"prorata\": false,\n    \"salvage_pct\": 0\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -12598,7 +12598,7 @@
                             }
                         }
                     ],
-                    "description": "Material requirements planning: policies, manual demand, runs, requirements, shortages and suggestions. See docs/manufacturing/mrp-algorithm.md."
+                    "description": "Material requirements planning: policies, manual demand, runs, requirements, shortages and suggestions. See docs/manufacturing-guides/mrp-algorithm.md."
                 },
                 {
                     "name": "Attachments",
@@ -13007,7 +13007,7 @@
                     "description": "Manufacturing reports: database aggregations with filters, pagination and export."
                 }
             ],
-            "description": "**🆕 — NEW**\n\nFull manufacturing: recipes, order workflow, reservations, routing and work orders, quality, scrap, costing, planning and reports. See docs/api/manufacturing.md and docs/manufacturing/."
+            "description": "**🆕 — NEW**\n\nFull manufacturing: recipes, order workflow, reservations, routing and work orders, quality, scrap, costing, planning and reports. See docs/api/manufacturing.md and docs/manufacturing-guides/."
         },
         {
             "name": "🆕 HR",
@@ -15206,7 +15206,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Trial day 134705\",\n    \"sequence\": 45\n}",
+                                    "raw": "{\n    \"name\": \"Trial day 135245\",\n    \"sequence\": 45\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15285,7 +15285,7 @@
                                 "description": "**🆕 — NEW**\n\nRequires `applicants.create`. Enters the first stage; the recruiter defaults to the job's recruiter.",
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"name\": \"Salma Hassan\",\n    \"email\": \"salma.134705@example.com\",\n    \"phone\": \"0100 555 1234\",\n    \"job_position_id\": \"{{job_position_id}}\",\n    \"source\": \"LinkedIn\",\n    \"expected_salary\": 9000,\n    \"priority\": 2\n}",
+                                    "raw": "{\n    \"name\": \"Salma Hassan\",\n    \"email\": \"salma.135245@example.com\",\n    \"phone\": \"0100 555 1234\",\n    \"job_position_id\": \"{{job_position_id}}\",\n    \"source\": \"LinkedIn\",\n    \"expected_salary\": 9000,\n    \"priority\": 2\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15563,7 +15563,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"applicant_id\": \"{{applicant_id}}\",\n    \"interviewer_id\": \"{{user_id}}\",\n    \"scheduled_at\": \"2026-11-21T13:47:05\",\n    \"duration_minutes\": 45,\n    \"mode\": \"video\"\n}",
+                                    "raw": "{\n    \"applicant_id\": \"{{applicant_id}}\",\n    \"interviewer_id\": \"{{user_id}}\",\n    \"scheduled_at\": \"2026-11-21T13:52:45\",\n    \"duration_minutes\": 45,\n    \"mode\": \"video\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"
@@ -15865,7 +15865,7 @@
                                 },
                                 "body": {
                                     "mode": "raw",
-                                    "raw": "{\n    \"license_plate\": \"PM-134705\",\n    \"brand\": \"Toyota\",\n    \"model\": \"Hilux\",\n    \"model_year\": 2024,\n    \"vehicle_type\": \"truck\",\n    \"fuel_type\": \"diesel\",\n    \"odometer\": 10000,\n    \"acquisition_date\": \"2026-01-10\"\n}",
+                                    "raw": "{\n    \"license_plate\": \"PM-135245\",\n    \"brand\": \"Toyota\",\n    \"model\": \"Hilux\",\n    \"model_year\": 2024,\n    \"vehicle_type\": \"truck\",\n    \"fuel_type\": \"diesel\",\n    \"odometer\": 10000,\n    \"acquisition_date\": \"2026-01-10\"\n}",
                                     "options": {
                                         "raw": {
                                             "language": "json"

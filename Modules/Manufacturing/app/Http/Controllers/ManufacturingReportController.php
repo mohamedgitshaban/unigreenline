@@ -20,7 +20,7 @@ use Modules\Manufacturing\Services\WorkCenterScheduler;
  * loaded wholesale into PHP), takes a date range and the usual product / warehouse / status filters, and
  * can be exported (`?export=csv|xlsx`) with the report's export permission. Reports that expose cost
  * need a cost permission; the others show quantities only. How each number is worked out is in
- * docs/manufacturing/api-reference.md.
+ * docs/manufacturing-guides/api-reference.md.
  */
 class ManufacturingReportController extends Controller
 {

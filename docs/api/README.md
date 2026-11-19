@@ -21,7 +21,7 @@ navigable, if that's easier to share with the frontend dev than raw markdown fil
 > - 🆕 **Edit & delete endpoints** across the API, gated by `{module}.edit` / `{module}.delete` → [Editing and deleting](#editing-and-deleting-records--new)
 > - 🆕 **Spreadsheet import** for customers, products, suppliers, warehouses and invoices → [Importing](#importing-from-a-spreadsheet--new)
 > - 🆕 **Recap** (stock write-off posting to the chart of accounts) → [recap.md](./recap.md)
-> - 🔄 **Manufacturing, now a full module** — recipes with revisions and approval, an order workflow (confirm → plan → start → produce → complete) with partial production and backorders, batch **reservations**, routing and work centers with capacity scheduling, shop-floor work orders, quality control, scrap and by-products, costing with optional work-in-progress accounting, **material requirements planning**, and reports → [manufacturing.md](./manufacturing.md); background in [docs/manufacturing](../manufacturing/architecture-analysis.md)
+> - 🔄 **Manufacturing, now a full module** — recipes with revisions and approval, an order workflow (confirm → plan → start → produce → complete) with partial production and backorders, batch **reservations**, routing and work centers with capacity scheduling, shop-floor work orders, quality control, scrap and by-products, costing with optional work-in-progress accounting, **material requirements planning**, and reports → [manufacturing.md](./manufacturing.md); background in [docs/manufacturing-guides](../manufacturing-guides/architecture-analysis.md)
 > - 🆕 **Units / packaging ladder** (packet → package → carton) → [inventory.md](./inventory.md#units--product-packaging--new)
 > - 🆕 **Free gifts** on purchase receipts and gift lines on sales orders
 > - 🆕 **Minimum selling price** per product; 🔄 **product cost is Administrator-only**
@@ -440,7 +440,7 @@ php artisan db:seed --class="Modules\\HR\\Database\\Seeders\\HRDatabaseSeeder"  
 - **Manufacturing:** the migrations number existing BoMs (`BOM00001` …) and orders (`MO00001` …) and keep them working;
   `inventory_batches` gains `reserved_cartons`. Stock that a confirmed manufacturing order has **reserved** can no longer be taken by
   sales, transfers, write-offs or purchase returns. Set the default warehouse in `PUT /manufacturing/settings` before the nightly
-  `mrp:plan` run, and run `php artisan queue:work` if you plan with `async: true` → [operations guide](../manufacturing/installation-and-operations.md).
+  `mrp:plan` run, and run `php artisan queue:work` if you plan with `async: true` → [operations guide](../manufacturing-guides/installation-and-operations.md).
 - **Reporting line, notifications, calls, assets, loans, recruitment, fleet, stock ledger:** the migrations add `users.manager_id` / `data_scope`,
   `notifications.link_entity` / `link_url` / `actor_id`, `customer_calls`, `stock_movements`, `accounting_sequences`, the fixed-asset and loan tables
   and the recruitment and fleet tables. **Existing stock becomes one `opening_balance` ledger line per batch** so the ledger adds up from day one.

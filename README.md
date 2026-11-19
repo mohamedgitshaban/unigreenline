@@ -48,9 +48,9 @@ A full manufacturing and planning module: bills of materials (versions, approval
 orders that move through a validated workflow, batch-level **stock reservations** that sales, transfers and write-offs respect, routings and
 work centers with capacity-aware scheduling, work orders on the shop floor, quality checks, scrap, costing against the chart of accounts (cost on receipt or
 work-in-progress), **material requirements planning** that proposes purchase and manufacturing orders, and reports. Start with
-[`docs/manufacturing/architecture-analysis.md`](docs/manufacturing/architecture-analysis.md); the full endpoint reference is
+[`docs/manufacturing-guides/architecture-analysis.md`](docs/manufacturing-guides/architecture-analysis.md); the full endpoint reference is
 [`docs/api/manufacturing.md`](docs/api/manufacturing.md), and operating notes (migrations, settings, queue worker, scheduler) are in
-[`docs/manufacturing/installation-and-operations.md`](docs/manufacturing/installation-and-operations.md).
+[`docs/manufacturing-guides/installation-and-operations.md`](docs/manufacturing-guides/installation-and-operations.md).
 
 ### Documentation
 
