@@ -251,6 +251,13 @@ Requires `production-orders.from-sales-order` (and `sales-orders.view`). Make-to
 (draft or picking) sales order that free stock does not cover, carrying `source_type: sales_order`. Never twice for the same product and order.
 **201** with the created orders and `skipped: [{ product_id, reason }]` (`no_recipe`, `already_planned`, `covered_by_stock`). 422 if the sales order is not open.
 
+### Stock requests addressed to Manufacturing 🆕 NEW
+
+A warehouse can ask Manufacturing for stock with `POST /stock-requests` and `"source": "manufacturing"` ([inventory.md](./inventory.md)). Granting it
+(`POST /stock-requests/{id}/approve`, needs `production-orders.create`) raises a **draft** production order for the requesting warehouse: the recipe is `{ "bom_id" }` from the
+body or the best approved recipe for the product (**422** `bom_id` if there is none), `qty_cartons` is the quantity asked for, `planned_finish` is `needed_by`, and `notes` carry the
+request number. The request becomes `fulfilled` with `result: { type: "production_order", id }`. From there the order follows the normal workflow below.
+
 ### `POST /api/v1/production-orders/{id}/confirm` 🆕 NEW
 
 Requires `production-orders.confirm`. Draft → confirmed: copies the recipe's components (with scrap) into the order, records the BoM **revision**, estimates planned cost, raises quality
@@ -537,6 +544,14 @@ Drawings, work instructions, certificates and photos can be attached to a BoM, p
 | `DELETE /manufacturing/attachments/{id}` | `manufacturing-attachments.delete` | removes the record and the stored file. **204** |
 
 Files are stored on the default disk under `manufacturing-attachments/{company}/` and are only ever served through the download endpoint.
+
+---
+
+## Dashboard 🆕 NEW
+
+`GET /api/v1/dashboards/manufacturing` — requires `manufacturing-dashboard.view`. Two features, each limited to callers who hold its own permission: `production` (`production-orders.view`: orders finished,
+cartons produced, yield, orders in progress and late, production by day, orders by status, late orders) and `planning` (`mrp-runs.view`: open MRP suggestions, cartons to make and to buy, open quality alerts).
+Period filters and the response shape are in [dashboards.md](./dashboards.md#the-dashboards).
 
 ---
 

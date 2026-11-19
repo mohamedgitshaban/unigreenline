@@ -534,6 +534,9 @@ $inventory = folder('Inventory', [
             'query' => ['page' => 1, 'per_page' => 15],
             'description' => 'Requires `stock-requests.view`. The requests for or from the warehouses the user works in, plus those addressed to Purchasing or Manufacturing for people who can raise those documents.',
         ]),
+        req('GET', 'Get stock request', '/stock-requests/{{stock_request_id}}', [
+            'description' => 'Requires `stock-requests.view`. Once granted, `result` names what was created: `{ type: transfer | purchase_order | production_order, id }`.',
+        ]),
         req('POST', 'Grant stock request', '/stock-requests/{{stock_request_id}}/approve', [
             'description' => 'Requires `stock-requests.approve`. A warehouse request is transferred (earliest expiry first); a Purchasing request becomes a draft purchase order (optional `supplier_id`); a Manufacturing request becomes a draft production order (optional `bom_id`).',
             'body' => ['supplier_id' => null],
@@ -1244,6 +1247,8 @@ $manufacturing = nw(folder('Manufacturing', [
         ])),
         nw(req('PUT', 'Update routing operation', '/routings/{{routing_id}}/operations/{{routing_operation_id}}', ['description' => 'Partial.', 'body' => ['run_minutes' => 0.75]])),
         nw(req('DELETE', 'Delete routing operation', '/routings/{{routing_id}}/operations/{{routing_operation_id}}', ['description' => '204.'])),
+        ...deleteFlow('work center', '/work-centers', ['code' => 'PM-DEL-WC', 'name' => 'Postman Delete Me Work Center'], 'deletable_work_center_id', '/work-centers/{id}', 'Requires `work-centers.delete`. 204. **409** while routings or work orders use it.'),
+        ...deleteFlow('routing', '/routings', ['code' => 'PM-DEL-R', 'name' => 'Postman Delete Me Routing'], 'deletable_routing_id', '/routings/{id}', 'Requires `routings.delete`. 204. **409** while recipes use it.'),
     ], 'Work centers (capacity, shifts, downtime, costs) and routings (ordered operations). See docs/api/manufacturing.md.'),
     folder('Bills of materials', [
         req('POST', 'Create finished product', '/products', [
@@ -1986,6 +1991,8 @@ $collection = [
             'finished_product_id' => '',
             'bom_id' => '',
             'deletable_bom_id' => '',
+            'deletable_work_center_id' => '',
+            'deletable_routing_id' => '',
             'production_order_id' => '',
             'cancellable_production_order_id' => '',
             'deletable_user_id' => '',
