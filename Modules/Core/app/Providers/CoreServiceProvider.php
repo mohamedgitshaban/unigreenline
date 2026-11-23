@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Modules\Core\Console\Commands\DocumentPermissions;
 use Modules\Core\Console\Commands\VerifyAuditChain;
+use Modules\Core\Console\Commands\WipeData;
 use Modules\Core\Dashboards\DashboardRegistry;
 use Modules\Core\Http\Middleware\AuthorizeOrLookup;
 use Modules\Core\Models\User;
@@ -44,6 +45,7 @@ class CoreServiceProvider extends ModuleServiceProvider
     protected array $commands = [
         VerifyAuditChain::class,
         DocumentPermissions::class,
+        WipeData::class,
     ];
 
     /**
