@@ -18,6 +18,7 @@ class UpdateCustomerRequest extends FormRequest
 
         return [
             'sales_rep_id' => ['nullable', 'string', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
+            'code' => ['nullable', 'string', 'max:40', Rule::unique('customers', 'code')->where('tenant_id', $tenantId)->ignore($this->route('customer'))],
             'name' => ['sometimes', 'string', 'max:255'],
             'type' => ['sometimes', Rule::in(['Clinic', 'Farm', 'Poultry', 'Distributor', 'Retailer', 'Other'])],
             'classification' => ['sometimes', Rule::in(['A+', 'A', 'B', 'C'])],

@@ -11,6 +11,8 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Modules\Core\Console\Commands\DocumentPermissions;
+use Modules\Core\Console\Commands\ProductionImport;
+use Modules\Core\Console\Commands\ProductionReset;
 use Modules\Core\Console\Commands\VerifyAuditChain;
 use Modules\Core\Console\Commands\WipeData;
 use Modules\Core\Dashboards\DashboardRegistry;
@@ -46,6 +48,8 @@ class CoreServiceProvider extends ModuleServiceProvider
         VerifyAuditChain::class,
         DocumentPermissions::class,
         WipeData::class,
+        ProductionReset::class,
+        ProductionImport::class,
     ];
 
     /**

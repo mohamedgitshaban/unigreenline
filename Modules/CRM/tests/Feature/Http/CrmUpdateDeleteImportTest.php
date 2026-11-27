@@ -16,11 +16,12 @@ use Modules\CRM\Models\Lead;
 use Modules\Sales\Models\SalesOrder;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Spatie\Permission\PermissionRegistrar;
+use Tests\Concerns\BuildsWorkbooks;
 use Tests\TestCase;
 
 class CrmUpdateDeleteImportTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsWorkbooks, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -138,6 +139,42 @@ class CrmUpdateDeleteImportTest extends TestCase
         $this->assertDatabaseHas('customers', ['name' => 'Existing Farm', 'city' => 'Old']);
     }
 
+    public function test_uploading_the_company_workbook_imports_its_customer_sheet_by_code(): void
+    {
+        $this->actingAsRole('Administrator');
+        $rep = User::factory()->recycle($this->tenant)->create(['name' => 'Mona Ali']);
+        $path = $this->writeWorkbook([
+            'Marketing Expansions ' => [['Date ', 'Item ', 'Cost  '], ['Aug.2025', 'Posters', 500]],
+            'Customer Master Sheet' => [
+                ['Customer Code', 'acc.name', 'Customer Type', 'Customer Category', 'Phone', 'Sales Representative', 'Active Status'],
+                ['VP-1', 'Ahmed Vet', 'Account / collection customer', 'Clinic', 'NEEDED', 'Mona Ali', 'Active'],
+                ['VP-2', 'Ahmed Vet', 'Cash customer', 'NEEDED', 1000000000, 'NEEDED', 'Collection-only'],
+            ],
+        ]);
+
+        $this->postJson('/api/v1/customers/import', ['file' => new UploadedFile($path, 'customers.xlsx', null, null, true)])
+            ->assertOk()
+            ->assertJsonPath('created', 2);
+
+        $this->assertDatabaseHas('customers', ['code' => 'VP-1', 'name' => 'Ahmed Vet', 'type' => 'Clinic', 'pay_terms' => 'Account', 'sales_rep_id' => $rep->id, 'status' => 'active']);
+        $this->assertDatabaseHas('customers', ['code' => 'VP-2', 'name' => 'Ahmed Vet', 'type' => 'Other', 'phone' => '1000000000', 'sales_rep_id' => null, 'status' => 'inactive']);
+        $this->getJson('/api/v1/customers/'.Customer::query()->where('code', 'VP-1')->value('id'))->assertOk()->assertJsonPath('data.code', 'VP-1');
+    }
+
+    public function test_a_customer_code_must_be_unique_within_the_company(): void
+    {
+        $this->actingAsRole('Administrator');
+        $taken = Customer::factory()->recycle($this->tenant)->create(['code' => 'VP-1']);
+        $other = Customer::factory()->recycle($this->tenant)->create(['code' => null]);
+
+        $this->postJson('/api/v1/customers', ['name' => 'New Clinic', 'type' => 'Clinic', 'code' => 'VP-1'])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('code');
+        $this->putJson("/api/v1/customers/{$other->id}", ['code' => 'VP-1'])->assertUnprocessable()->assertJsonValidationErrors('code');
+        $this->putJson("/api/v1/customers/{$taken->id}", ['code' => 'VP-1', 'name' => 'Renamed'])->assertOk();
+        $this->postJson('/api/v1/customers', ['name' => 'New Clinic', 'type' => 'Clinic', 'code' => 'VP-2'])->assertCreated()->assertJsonPath('data.code', 'VP-2');
+    }
+
     public function test_update_existing_updates_matches_without_blanking_other_fields(): void
     {
         $this->actingAsRole('Administrator');
@@ -189,6 +226,16 @@ class CrmUpdateDeleteImportTest extends TestCase
             ->assertUnprocessable()
             ->assertJsonPath('message', 'The file has no data rows.');
         $this->get('/api/v1/customers/import-template')->assertOk()->assertDownload('customers-import-template.xlsx');
+    }
+
+    public function test_the_customers_template_downloads_and_imports_back_as_it_is(): void
+    {
+        $this->actingAsRole('Administrator');
+
+        $template = $this->get('/api/v1/customers/import-template')->assertOk()->assertDownload('customers-import-template.xlsx');
+
+        $this->postJson('/api/v1/customers/import', ['file' => $this->templateAsUpload($template)])->assertOk()->assertJsonPath('created', 1);
+        $this->assertDatabaseHas('customers', ['name' => 'Nile Vet Clinic', 'type' => 'Clinic', 'credit_limit' => '50000.00']);
     }
 
     private function actingAsRole(string $role): User

@@ -194,18 +194,27 @@ Bulk-load data from an Excel/CSV file:
 
 | Resource | Import | Template | Needs | Matched by |
 |---|---|---|---|---|
-| Customers | `POST /customers/import` | `GET /customers/import-template` | `customers.import` | name |
+| Customers | `POST /customers/import` | `GET /customers/import-template` | `customers.import` | customer code (name when the row has no code) |
 | Products | `POST /products/import` | `GET /products/import-template` | `products.import` | SKU |
 | Suppliers | `POST /suppliers/import` | `GET /suppliers/import-template` | `suppliers.import` | name |
 | Warehouses | `POST /warehouses/import` | `GET /warehouses/import-template` | `warehouses.import` | name |
-| Invoices | `POST /invoices/import` | `GET /invoices/import-template` | `invoices.import` | — (no natural key) |
+| Invoices | `POST /invoices/import` | `GET /invoices/import-template` | `invoices.import` | invoice number (rows without one are never matched, so they create duplicates) |
+
+Every import has its own template download; there is no import without one.
 
 - **Request:** `multipart/form-data` with `file` (`.xlsx`, `.xls` or `.csv`, max
   5 MB, max 5000 rows) and optional `update_existing` (boolean). The first row
   must be the headings from the template (case-insensitive, spaces or
   underscores); blank rows are ignored; unknown columns are ignored.
 - **Template:** `GET .../import-template` downloads an `.xlsx` with the exact
-  headings and one example row.
+  headings and one example row. The template imports back unchanged.
+- **The company's own workbook** (`Final_Data_…xlsx`, with sheets *Customer Master Sheet*,
+  *Product Master Sheet*, *Warehouse Master*, *Invoice Data …* and *Production …*) is accepted as
+  well, so the whole workbook can be uploaded to any of the endpoints: each one reads *its* sheet
+  (found by name, ignoring case and spacing) and ignores the rest. A file without such a sheet is
+  read from its first sheet as before. The headings may sit below a title, and a cell that says
+  `NEEDED` is read as blank. What each endpoint takes from that workbook is described under the
+  endpoint. `row` in an error is always the real row in the sheet.
 - **Existing records** (matched by the key above) are **skipped** by default;
   with `update_existing=1` they are updated with the non-blank cells (a blank
   cell never wipes an existing value).
@@ -224,7 +233,8 @@ Bulk-load data from an Excel/CSV file:
 }
 ```
 
-  `row` is the spreadsheet row number (row 1 = headings). The `message` also
+  `row` is the spreadsheet row number (as Excel numbers it, so a sheet with a title above
+  the headings counts that too). The `message` also
   spells out the first 5 row errors as `Row N (column): reason`, followed by
   "...and X more error(s)" when there are more; `errors` always has them all.
   Status **422**; a
@@ -234,6 +244,32 @@ Bulk-load data from an Excel/CSV file:
   `{ "message": "...", "created": 12, "updated": 0, "skipped": 3, "errors": [] }`.
   One `IMPORT` entry is written to the audit log.
 - Dates may be real Excel dates or `YYYY-MM-DD` text.
+
+### Loading the company workbook at go-live 🆕 NEW
+
+Two artisan commands take a database from "anything" to "the client's data, one admin account":
+
+```bash
+php artisan migrate --force                     # adds customers.code
+php artisan production:reset --email=admin@company.com --name="Admin"
+php artisan production:import /path/Final_Data_4_NewCodes.xlsx --dry-run   # checks everything, saves nothing
+php artisan production:import /path/Final_Data_4_NewCodes.xlsx
+```
+
+- **`production:reset`** deletes **every row** of **every table** (it asks you to type the database
+  name first; `--force` skips that) and leaves one company, one role (`--role`, default
+  `Administrator`) holding every permission, and one account with that role. `--password` is generated
+  and shown once when omitted. The chart of accounts, the packaging units and the expense categories
+  are put back, because invoices, products and expenses cannot be recorded without them. Other options:
+  `--tenant=slug` (which company to keep; the first by default), `--company=` (name of the company to
+  create when there is none).
+- **`production:import`** runs the Warehouse, Supplier, Product, Customer and Invoice importers
+  against the workbook's sheets, in that order, in **one transaction**: if any sheet has a bad row,
+  nothing is saved and every row to fix is listed. `--only=customers --only=products` limits it,
+  `--update` updates records that exist instead of skipping them, `--user=email` picks the account
+  it runs as (needed when there is more than one). Importing the same workbook again adds nothing.
+- Not loaded from the workbook: collections, production / purchase orders, the marketing and company-asset
+  sheets. See [Sales](./sales.md#post-apiv1invoicesimport--new) for what happens to invoices and returns.
 
 ## Exporting a list as CSV or Excel
 
@@ -447,6 +483,8 @@ php artisan db:seed --class="Modules\\HR\\Database\\Seeders\\HRDatabaseSeeder"  
   Run the `AccountSeeder` for the new accounts (`1530`, `1540`, `1590`, `1600`, `2400`, `4300`, `4400`, `6500`, `6600`, `6700`) and the `RolePermissionSeeder` for the new
   permissions (`Sales Manager` now also holds the CRM permissions, so a manager can see and manage their reps' customers). Users keep working exactly as before until you
   give them a `manager_id`; only a Sales Rep is limited to `team` by default, which for a rep with nobody under them is what it always was.
+- **Customer code:** the migration adds the optional `customers.code` (unique per company). Customers are matched by it on import,
+  and invoice imports find their customer by it.
 - **Scheduler** (`php artisan schedule:run` every minute): `assets:depreciate` (02:30), `loans:remind` (08:00), `fleet:remind` (07:30), in addition to the existing jobs.
 - Re-run `php docs/postman/generate.php` and `php artisan permissions:docs`
   after changing endpoints (a test fails if the permission reference is stale).

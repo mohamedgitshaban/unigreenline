@@ -13,11 +13,12 @@ use Modules\Inventory\Models\Product;
 use Modules\Inventory\Models\ProductCategory;
 use Modules\Inventory\Models\Warehouse;
 use Modules\Purchasing\Models\Supplier;
+use Tests\Concerns\BuildsWorkbooks;
 use Tests\TestCase;
 
 class InventoryDeleteImportTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsWorkbooks, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -157,6 +158,35 @@ class InventoryDeleteImportTest extends TestCase
 
         $this->assertDatabaseHas('warehouses', ['name' => 'Cairo Main', 'manager_id' => $manager->id, 'manager_name' => 'The Boss', 'capacity' => 5000]);
         $this->assertDatabaseHas('warehouses', ['name' => 'Alex Cold', 'status' => 'maintenance']);
+    }
+
+    public function test_the_products_template_downloads_and_imports_back_as_it_is(): void
+    {
+        $this->actingAsRole('Administrator');
+        ProductCategory::factory()->recycle($this->tenant)->create(['name' => 'Antibiotics']);
+        Supplier::factory()->recycle($this->tenant)->create(['name' => 'Acme Pharma']);
+
+        $template = $this->get('/api/v1/products/import-template')->assertOk()->assertDownload('products-import-template.xlsx');
+
+        $this->postJson('/api/v1/products/import', ['file' => $this->templateAsUpload($template)])->assertOk()->assertJsonPath('created', 1);
+        $this->assertDatabaseHas('products', ['sku' => 'AMX-100', 'name' => 'Amoxicillin 100ml', 'carton_qty' => 24]);
+    }
+
+    public function test_the_warehouses_template_downloads_and_imports_back_as_it_is(): void
+    {
+        $this->actingAsRole('Administrator');
+
+        $template = $this->get('/api/v1/warehouses/import-template')->assertOk()->assertDownload('warehouses-import-template.xlsx');
+
+        $this->postJson('/api/v1/warehouses/import', ['file' => $this->templateAsUpload($template)])->assertOk()->assertJsonPath('created', 1);
+        $this->assertDatabaseHas('warehouses', ['name' => 'Cairo Main', 'governorate' => 'Cairo']);
+    }
+
+    public function test_the_templates_need_the_same_permission_as_the_imports(): void
+    {
+        $this->actingAsRole('Sales Rep');
+
+        $this->getJson('/api/v1/warehouses/import-template')->assertForbidden();
     }
 
     public function test_importing_products_requires_inventory_add(): void

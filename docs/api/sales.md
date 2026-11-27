@@ -393,11 +393,11 @@ Another tenant's invoice is **404**.
 
 Requires `invoices.import`. Brings in historical / opening invoices. Multipart `file` —
 see [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
-**Invoices have no natural key, so re-importing the same file creates
-duplicates** (`update_existing` has no effect here).
+**Rows without an invoice number have no natural key, so re-importing them creates
+duplicates**; a row with a `Number` that already exists is skipped (`update_existing` has no effect here).
 
-Columns: `Customer`* (exact customer name, must exist), `Issued Date`*,
-`Due Date`, `Subtotal`*, `Tax Amount`, `Paid`. Per row:
+Columns: `Number`, `Customer`* (exact customer name, must exist), `Customer Code` (used instead of the name when
+given), `Issued Date`*, `Due Date`, `Subtotal`*, `Tax Amount`, `Paid`. Per row:
 
 - the invoice is created with `total = subtotal + tax`, `balance = total − paid`
   and status `paid` / `partial` / `overdue` (due date passed and unpaid) /
@@ -409,6 +409,20 @@ Columns: `Customer`* (exact customer name, must exist), `Issued Date`*,
 
 A Sales Rep can only import invoices for their own customers. `paid` may not
 exceed the total.
+
+🆕 **The company's *Invoice Data* sheet** has one row per product line (`Invoice Number`, `Date`, `Customer Code`,
+`Product Code`, `Units`, `Price`, `Discount %`) and is read as whole documents, keeping the company's own numbers:
+
+- **A sale (`SI-…`)**: its lines add up (`units × price × (1 − discount)`, the discount a fraction: 1 = free) to one
+  invoice with that `number`, found for its customer by `Customer Code`; no VAT, nothing paid. Importing the sheet
+  again skips the invoices already there. Only the total is kept, not the lines, so — like any imported invoice —
+  it cannot be returned against.
+- **A return (`RT-…`, negative prices)**: one *Sales Return* per line (the product is found by `Product Code`, so
+  import products first), credited at what the customer paid: Dr Sales Revenue / Cr Receivable and the customer's
+  balance goes down, with no stock movement.
+- A document whose lines add up to nothing (everything free) has nothing to bill and is skipped; the lines of one
+  document must agree on customer and date (**422** otherwise).
+- Rows the sheet's formulas leave behind below the last invoice (nothing but a formula) are ignored.
 
 ### `GET /api/v1/invoices/import-template` 🆕 NEW
 

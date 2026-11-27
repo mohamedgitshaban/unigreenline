@@ -21,6 +21,7 @@ class StoreCustomerRequest extends FormRequest
 
         return [
             'sales_rep_id' => ['nullable', 'string', Rule::exists('users', 'id')->where('tenant_id', $tenantId)],
+            'code' => ['nullable', 'string', 'max:40', Rule::unique('customers', 'code')->where('tenant_id', $tenantId)],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', Rule::in(['Clinic', 'Farm', 'Poultry', 'Distributor', 'Retailer', 'Other'])],
             'classification' => ['sometimes', Rule::in(['A+', 'A', 'B', 'C'])],

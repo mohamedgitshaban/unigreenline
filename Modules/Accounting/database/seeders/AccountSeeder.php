@@ -71,7 +71,11 @@ class AccountSeeder extends Seeder
 
     public function run(): void
     {
-        $tenant = Tenant::query()->where('slug', 'vetpharma')->firstOrFail();
+        $this->seedTenant(Tenant::query()->where('slug', 'vetpharma')->firstOrFail());
+    }
+
+    public function seedTenant(Tenant $tenant): void
+    {
         $idsByCode = [];
 
         foreach (self::ACCOUNTS as $data) {

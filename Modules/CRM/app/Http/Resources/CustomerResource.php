@@ -12,6 +12,7 @@ class CustomerResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'code' => $this->code,
             'sales_rep' => UserResource::make($this->salesRep),
             'name' => $this->name,
             'type' => $this->type,

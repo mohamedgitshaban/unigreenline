@@ -9,9 +9,38 @@ use Modules\Purchasing\Models\Supplier;
 /**
  * Suppliers are matched by name within the tenant. Contract files can't be
  * imported — attach them afterwards via POST /suppliers/contracts.
+ *
+ * The company's workbook has no supplier sheet of its own: its suppliers and factories are the names in
+ * the "supplier or manufacturer" column of the production sheet, one row per production order. Each name
+ * is taken once.
  */
 class SupplierImport extends ImportDefinition
 {
+    public function sheetNames(): array
+    {
+        return ['Production 24, 25, 26', 'Suppliers'];
+    }
+
+    public function aliases(): array
+    {
+        return ['supplier_or_manufacturer' => 'name'];
+    }
+
+    public function prepare(array $rows, array $headings): array
+    {
+        if (! in_array('supplier_or_manufacturer', $headings, true)) {
+            return $rows;
+        }
+
+        $seen = [];
+
+        return array_filter($rows, function (array $row) use (&$seen): bool {
+            $name = mb_strtolower($row['name'] ?? '');
+
+            return $name !== '' && ! ($seen[$name] ?? false) && ($seen[$name] = true);
+        });
+    }
+
     public function columns(): array
     {
         return ['Name', 'Country', 'City', 'Address', 'Contact', 'Email', 'Phone', 'Pay Terms', 'Currency', 'Rating', 'Status'];

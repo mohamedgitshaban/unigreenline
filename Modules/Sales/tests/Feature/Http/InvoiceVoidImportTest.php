@@ -12,11 +12,12 @@ use Modules\Core\Models\User;
 use Modules\CRM\Models\Customer;
 use Modules\Sales\Models\Collection;
 use Modules\Sales\Models\Invoice;
+use Tests\Concerns\BuildsWorkbooks;
 use Tests\TestCase;
 
 class InvoiceVoidImportTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsWorkbooks, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -88,6 +89,17 @@ class InvoiceVoidImportTest extends TestCase
         $this->actingAsRole('Administrator');
 
         $this->get('/api/v1/invoices/import-template')->assertOk()->assertDownload('invoices-import-template.xlsx');
+    }
+
+    public function test_the_invoices_template_downloads_and_imports_back_as_it_is(): void
+    {
+        $this->actingAsRole('Administrator');
+        Customer::factory()->recycle($this->tenant)->create(['name' => 'Nile Vet Clinic', 'balance' => 0]);
+
+        $template = $this->get('/api/v1/invoices/import-template')->assertOk()->assertDownload('invoices-import-template.xlsx');
+
+        $this->postJson('/api/v1/invoices/import', ['file' => $this->templateAsUpload($template)])->assertOk()->assertJsonPath('created', 1);
+        $this->assertDatabaseHas('invoices', ['subtotal' => '1000.00', 'tax_amount' => '140.00', 'total' => '1140.00']);
     }
 
     public function test_voiding_reverses_the_journal_and_returns_the_balance_to_the_customer(): void

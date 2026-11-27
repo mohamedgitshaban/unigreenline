@@ -12,9 +12,62 @@ use Modules\Purchasing\Models\Supplier;
 /**
  * Products are matched by SKU within the tenant. Category (by name or code)
  * and supplier (by name) must already exist.
+ *
+ * Also reads the company's "Product Master Sheet" (Product Code, Product Name English, Category, Packaging,
+ * Standard Cost, Tax Category, Active Status ...). That sheet is the source of its categories, so a category
+ * that doesn't exist yet is created, and a cell it still has to fill in ("NEEDED") falls back to a neutral
+ * default: category "Uncategorized", pack unit "Pack", one pack per carton, zero prices.
  */
 class ProductImport extends ImportDefinition
 {
+    public function sheetNames(): array
+    {
+        return ['Product Master Sheet', 'Products'];
+    }
+
+    public function aliases(): array
+    {
+        return [
+            'product_code' => 'sku',
+            'product_name_english' => 'name',
+            'product_name_arabic' => 'name_arabic',
+            'packaging' => 'pack_unit',
+            'standard_cost' => 'pack_cost_price',
+            'cost_price' => 'pack_cost_price',
+            'sales_price' => 'pack_selling_price',
+            'minimum_stock' => 'min_stock_cartons',
+            'active_status' => 'active',
+        ];
+    }
+
+    public function prepare(array $rows, array $headings): array
+    {
+        $this->workbookFormat = in_array('product_code', $headings, true);
+
+        foreach ($rows as $sheetRow => $row) {
+            $active = isset($row['active']) ? strtolower($row['active']) : null;
+            $row['active'] = match ($active) {
+                'active' => '1',
+                'inactive' => '0',
+                default => $active,
+            };
+
+            if ($this->workbookFormat) {
+                $row['name'] ??= $row['name_arabic'] ?? null;
+                $row['category'] ??= 'Uncategorized';
+                $row['pack_unit'] ??= $row['default_sales_unit'] ?? 'Pack';
+                $row['carton_qty'] ??= '1';
+                $row['pack_cost_price'] ??= '0';
+                $row['pack_selling_price'] ??= $row['retail_price'] ?? '0';
+                $row['tax_pct'] ??= isset($row['tax_category']) && str_contains(strtolower($row['tax_category']), 'non') ? '0' : null;
+            }
+
+            $rows[$sheetRow] = $row;
+        }
+
+        return $rows;
+    }
+
     public function columns(): array
     {
         return [
@@ -62,6 +115,10 @@ class ProductImport extends ImportDefinition
             ->where('tenant_id', $tenantId)
             ->where(fn ($query) => $query->where('name', $row['category'])->orWhere('code', $row['category']))
             ->first();
+
+        if ($category === null && $this->workbookFormat) {
+            $category = ProductCategory::create(['tenant_id' => $tenantId, 'name' => $row['category']]);
+        }
 
         if ($category === null) {
             throw new ImportRowException('category', "No product category named or coded \"{$row['category']}\".");

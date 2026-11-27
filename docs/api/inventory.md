@@ -320,6 +320,10 @@ Matched by **name**. Columns: `Name`*, `City`*, `Governorate`*, `Address`,
 `Manager Email` (an existing user; their name is copied to `manager_name`),
 `Temperature`, `Capacity`, `Phone`, `Status` (`active`/`inactive`/`maintenance`).
 
+🆕 **The company's *Warehouse Master* sheet** (a title row, then the headings) is read too: `Warehouse Name` →
+`Name`; it has no city or governorate, so a new warehouse gets empty ones. The Arabic columns, the
+warehouse code and the notes are not stored.
+
 ## `GET /api/v1/warehouses/import-template` 🆕 NEW
 
 Requires `warehouses.import`. Downloads `warehouses-import-template.xlsx`.
@@ -488,6 +492,15 @@ exist), `Supplier` (name, must exist), `Brand`, `Pack Unit`*, `Carton Qty`*,
 `Pack Cost Price`*, `Pack Selling Price`*, `Min Selling Price`, `Discount Pct`,
 `Tax Pct`, `Min Stock Cartons`, `Reorder Level`, `Active` (`yes`/`no`/`1`/`0`).
 Packaging ladders are not imported — set them with `PUT /products/{id}`.
+
+🆕 **The company's *Product Master Sheet*** is read too: `Product Code` → `SKU`, `Product Name English` →
+`Name` (the Arabic name when that is `NEEDED`), `Packaging` → `Pack Unit`, `Standard Cost` (or `Cost Price`) →
+`Pack Cost Price`, `Sales price` (or `Retail Price`) → `Pack Selling Price`, `Minimum Stock` → `Min Stock Cartons`,
+`Active Status` → `Active`, and `Tax Category` = *Non Taxable* → `Tax Pct` 0. **This sheet is the source of the
+categories, so a category that does not exist yet is created** (a template upload still rejects an unknown one).
+A cell that is `NEEDED` falls back to: category `Uncategorized`, pack unit `Pack`, 1 pack per carton (the sheet
+has no carton size), prices 0. Size, nature, unit of measure, default warehouse / factory, reorder and
+min/max cost columns are not stored.
 
 ## `GET /api/v1/products/import-template` 🆕 NEW
 

@@ -61,13 +61,15 @@ Requires `customers.create`. Only `name` and `type` are required.
 
 ```json
 {
-  "sales_rep_id": null, "name": "Nile Valley Veterinary Clinic", "type": "Clinic",
+  "code": null, "sales_rep_id": null, "name": "Nile Valley Veterinary Clinic", "type": "Clinic",
   "classification": "B", "phone": null, "email": null,
   "governorate": null, "province": null, "city": null, "area": null, "address": null,
   "credit_limit": 50000, "pay_terms": null, "status": "active"
 }
 ```
 `type`: `Clinic`, `Farm`, `Poultry`, `Distributor`, `Retailer`, `Other`.
+🆕 `code` is the company's own customer code (`VP-32714`): optional, at most 40 characters, **422** if another customer of the
+company has it (also on `PUT`). It is returned as `code` on every customer.
 `classification`: `A+`, `A`, `B`, `C` (defaults to `B`). `credit_limit`
 defaults to `50000`. 🔄 A team-scoped user (a Sales Rep by default) omitting `sales_rep_id` gets themselves;
 naming someone outside their team is `422`.
@@ -100,13 +102,20 @@ instead. Another tenant's customer is **404**.
 Requires `customers.import`. Bulk-creates customers from a spreadsheet — see
 [Importing from a spreadsheet](./README.md#importing-from-a-spreadsheet--new).
 Multipart: `file` (.xlsx/.csv) and optional `update_existing` (`1` = update
-customers matched by **name**, otherwise they are skipped).
+customers matched by **code** — or by **name** when the row has no code — otherwise they are skipped).
 
-Columns (headings are case-insensitive): `Name`*, `Type`*, `Classification`,
+Columns (headings are case-insensitive): `Code`, `Name`*, `Type`*, `Classification`,
 `Phone`, `Email`, `Governorate`, `Province`, `City`, `Area`, `Address`,
-`Credit Limit`, `Pay Terms`, `Status`, `Sales Rep Email` (must be an existing
-user; a Sales Rep can only import customers under their own name — a blank
+`Credit Limit`, `Pay Terms`, `Status`, `Sales Rep Email` (an existing user's email **or name**;
+a Sales Rep can only import customers under their own name — a blank
 value assigns them to the importer).
+
+🆕 **The company's *Customer Master Sheet*** is read too: `Customer Code` → `Code`, `acc.name` → `Name`,
+`Customer Category` → `Type` (blank → `Other`), `District` → `Area`, `Full Address` → `Address`,
+`Payment Terms` → `Pay Terms` (blank → taken from `Customer Type`: `Cash` for a *Cash customer*, `Account` otherwise),
+`Sales Representative` → the rep, `Active Status` → `Status` (`Active` = `active`; `Inactive` and
+`Collection-only` = `inactive`). Its other columns (branch, contact person, currency, receivable
+account, first/last sale date, notes) are not stored.
 
 ### `GET /api/v1/customers/import-template` 🆕 NEW
 

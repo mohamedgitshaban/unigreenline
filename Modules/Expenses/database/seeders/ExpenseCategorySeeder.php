@@ -27,8 +27,11 @@ class ExpenseCategorySeeder extends Seeder
 
     public function run(): void
     {
-        $tenant = Tenant::query()->where('slug', 'vetpharma')->firstOrFail();
+        $this->seedTenant(Tenant::query()->where('slug', 'vetpharma')->firstOrFail());
+    }
 
+    public function seedTenant(Tenant $tenant): void
+    {
         foreach (self::CATEGORIES as $name => $code) {
             $account = Account::query()->where('tenant_id', $tenant->id)->where('code', $code)->firstOrFail();
 

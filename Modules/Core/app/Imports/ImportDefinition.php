@@ -15,6 +15,13 @@ abstract class ImportDefinition
     /** Hard cap so one upload can't hold a transaction open for minutes. */
     public const MAX_ROWS = 5000;
 
+    /**
+     * Whether the sheet being imported is laid out like the company's own workbook rather than like this
+     * entity's downloadable template. Set by prepare(); some definitions fill in what the workbook leaves
+     * out (its "NEEDED" cells) only in that case, and stay strict for template uploads.
+     */
+    protected bool $workbookFormat = false;
+
     public function __construct(protected readonly User $user) {}
 
     /**
@@ -44,6 +51,43 @@ abstract class ImportDefinition
      * @return array<string, array<int, mixed>>
      */
     abstract public function rules(): array;
+
+    /**
+     * Names of the workbook sheet this entity's rows live on, best match first (ignoring case and spacing).
+     * Only used when the uploaded file is a workbook with several sheets; otherwise the first sheet is read.
+     *
+     * @return array<int, string>
+     */
+    public function sheetNames(): array
+    {
+        return [];
+    }
+
+    /**
+     * Headings (slugged) of another layout that mean one of this entity's columns: heading => column.
+     * Lets the company's own workbook ("acc.name", "Customer Code") be read next to the template's headings.
+     *
+     * @return array<string, string>
+     */
+    public function aliases(): array
+    {
+        return [];
+    }
+
+    /**
+     * Turns the sheet's rows into the records to validate and persist. Gets the rows keyed by their sheet
+     * row number (headings already mapped to this entity's columns, "NEEDED" cells already blank) and the
+     * sheet's own slugged headings; returns the rows to import, still keyed by a sheet row number so errors
+     * can point at it. Where the layout has one record per row this does little more than fill gaps.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @param  array<int, string>  $headings
+     * @return array<int, array<string, mixed>>
+     */
+    public function prepare(array $rows, array $headings): array
+    {
+        return $rows;
+    }
 
     /**
      * Slugged columns that hold dates, so Excel serial numbers can be turned back into dates.
@@ -78,6 +122,14 @@ abstract class ImportDefinition
     public static function slug(string $heading): string
     {
         return str($heading)->slug('_')->toString();
+    }
+
+    /**
+     * The column a slugged sheet heading stands for in this entity.
+     */
+    public function column(string $slug): string
+    {
+        return $this->aliases()[$slug] ?? $slug;
     }
 
     /**

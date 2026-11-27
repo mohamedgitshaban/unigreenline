@@ -13,7 +13,7 @@ use Modules\Core\Models\User;
 use Modules\CRM\Database\Factories\CustomerFactory;
 
 #[Fillable([
-    'tenant_id', 'sales_rep_id', 'name', 'type', 'classification', 'phone', 'email',
+    'tenant_id', 'code', 'sales_rep_id', 'name', 'type', 'classification', 'phone', 'email',
     'governorate', 'province', 'city', 'area', 'address', 'credit_limit', 'pay_terms',
     'status',
 ])]

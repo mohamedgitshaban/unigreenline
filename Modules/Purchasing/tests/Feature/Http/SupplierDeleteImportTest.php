@@ -10,11 +10,12 @@ use Modules\Core\Models\Tenant;
 use Modules\Core\Models\User;
 use Modules\Purchasing\Models\PurchaseOrder;
 use Modules\Purchasing\Models\Supplier;
+use Tests\Concerns\BuildsWorkbooks;
 use Tests\TestCase;
 
 class SupplierDeleteImportTest extends TestCase
 {
-    use RefreshDatabase;
+    use BuildsWorkbooks, RefreshDatabase;
 
     private Tenant $tenant;
 
@@ -80,6 +81,16 @@ class SupplierDeleteImportTest extends TestCase
             ->assertJsonStructure(['errors' => [['errors' => ['currency', 'rating']]]]);
 
         $this->assertSame(0, Supplier::query()->count());
+    }
+
+    public function test_the_suppliers_template_downloads_and_imports_back_as_it_is(): void
+    {
+        $this->actingAsRole('Purchasing');
+
+        $template = $this->get('/api/v1/suppliers/import-template')->assertOk()->assertDownload('suppliers-import-template.xlsx');
+
+        $this->postJson('/api/v1/suppliers/import', ['file' => $this->templateAsUpload($template)])->assertOk()->assertJsonPath('created', 1);
+        $this->assertDatabaseHas('suppliers', ['name' => 'Acme Pharma', 'currency' => 'EGP', 'rating' => 4]);
     }
 
     private function actingAsRole(string $role): User

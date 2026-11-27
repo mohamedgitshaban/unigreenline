@@ -98,6 +98,10 @@ Matched by **name**. Columns: `Name`*, `Country`, `City`, `Address`, `Contact`,
 Contract files cannot be imported — attach them afterwards with
 `POST /suppliers/contracts`.
 
+🆕 The company's workbook has no supplier sheet: the suppliers and factories are the names in the
+`supplier or manufacturer` column of its *Production* sheet (one row per production order), each taken once.
+Country, contact, pay terms and so on stay at their defaults (`Net 30`, `EGP`).
+
 ## `GET /api/v1/suppliers/import-template` 🆕 NEW
 
 Requires `suppliers.import`. Downloads `suppliers-import-template.xlsx`.
